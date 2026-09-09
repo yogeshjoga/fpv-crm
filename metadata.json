@@ -1,8 +1,5 @@
 {
-  "name": "EgireRobotics_CRM",
-  "description": "A highly styled, glassmorphic CRM dashboard focusing on customer information, interaction history, and sales pipelines.",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "name": "EgireRobotics LMS",
+  "description": "Learning, examination and certification platform for EgireRobotics FPV & drone training. Students enroll in courses, sit timed exams, and earn verifiable QR-coded certificates.",
+  "requestFramePermissions": []
 }

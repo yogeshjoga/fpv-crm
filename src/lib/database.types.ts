@@ -1,0 +1,483 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
+  public: {
+    Tables: {
+      cert_counters: {
+        Row: { course_code: string; last_seq: number }
+        Insert: { course_code: string; last_seq?: number }
+        Update: { course_code?: string; last_seq?: number }
+        Relationships: []
+      }
+      certificates: {
+        Row: {
+          attempt_id: string | null
+          cert_id_string: string
+          course_id: string
+          id: string
+          issued_at: string
+          pdf_path: string | null
+          qr_url: string | null
+          revoked: boolean
+          revoked_reason: string | null
+          score_pct: number
+          student_id: string
+        }
+        Insert: {
+          attempt_id?: string | null
+          cert_id_string: string
+          course_id: string
+          id?: string
+          issued_at?: string
+          pdf_path?: string | null
+          qr_url?: string | null
+          revoked?: boolean
+          revoked_reason?: string | null
+          score_pct: number
+          student_id: string
+        }
+        Update: Partial<Database["public"]["Tables"]["certificates"]["Insert"]>
+        Relationships: []
+      }
+      courses: {
+        Row: {
+          cooldown_hours: number
+          course_code: string
+          cover_image_url: string | null
+          created_at: string
+          created_by: string | null
+          description: string
+          exam_question_count: number
+          exam_time_limit_min: number
+          id: string
+          max_attempts: number
+          pass_pct: number
+          slug: string
+          status: Database["public"]["Enums"]["course_status"]
+          summary: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          cooldown_hours?: number
+          course_code: string
+          cover_image_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          exam_question_count?: number
+          exam_time_limit_min?: number
+          id?: string
+          max_attempts?: number
+          pass_pct?: number
+          slug: string
+          status?: Database["public"]["Enums"]["course_status"]
+          summary?: string
+          title: string
+          updated_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["courses"]["Insert"]>
+        Relationships: []
+      }
+      enrollment_form_fields: {
+        Row: {
+          field_type: Database["public"]["Enums"]["form_field_type"]
+          form_id: string
+          help_text: string
+          id: string
+          label: string
+          options_json: Json
+          position: number
+          required: boolean
+        }
+        Insert: {
+          field_type?: Database["public"]["Enums"]["form_field_type"]
+          form_id: string
+          help_text?: string
+          id?: string
+          label: string
+          options_json?: Json
+          position?: number
+          required?: boolean
+        }
+        Update: Partial<Database["public"]["Tables"]["enrollment_form_fields"]["Insert"]>
+        Relationships: []
+      }
+      enrollment_forms: {
+        Row: {
+          closes_at: string | null
+          course_id: string
+          created_at: string
+          created_by: string | null
+          description: string
+          id: string
+          is_open: boolean
+          opens_at: string | null
+          slug: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          closes_at?: string | null
+          course_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          is_open?: boolean
+          opens_at?: string | null
+          slug: string
+          title: string
+          updated_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["enrollment_forms"]["Insert"]>
+        Relationships: []
+      }
+      enrollment_request_answers: {
+        Row: {
+          field_id: string
+          file_path: string | null
+          id: string
+          request_id: string
+          value_json: Json | null
+          value_text: string | null
+        }
+        Insert: {
+          field_id: string
+          file_path?: string | null
+          id?: string
+          request_id: string
+          value_json?: Json | null
+          value_text?: string | null
+        }
+        Update: Partial<Database["public"]["Tables"]["enrollment_request_answers"]["Insert"]>
+        Relationships: []
+      }
+      enrollment_requests: {
+        Row: {
+          course_id: string
+          form_id: string
+          id: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["enroll_request_status"]
+          student_id: string
+          submitted_at: string
+        }
+        Insert: {
+          course_id: string
+          form_id: string
+          id?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["enroll_request_status"]
+          student_id: string
+          submitted_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["enrollment_requests"]["Insert"]>
+        Relationships: []
+      }
+      enrollments: {
+        Row: {
+          course_id: string
+          enrolled_at: string
+          enrolled_by: string | null
+          id: string
+          source_request_id: string | null
+          status: Database["public"]["Enums"]["enrollment_status"]
+          student_id: string
+        }
+        Insert: {
+          course_id: string
+          enrolled_at?: string
+          enrolled_by?: string | null
+          id?: string
+          source_request_id?: string | null
+          status?: Database["public"]["Enums"]["enrollment_status"]
+          student_id: string
+        }
+        Update: Partial<Database["public"]["Tables"]["enrollments"]["Insert"]>
+        Relationships: []
+      }
+      exam_attempt_answers: {
+        Row: {
+          attempt_id: string
+          id: string
+          is_correct: boolean
+          question_id: string
+          selected_option_ids_json: Json
+        }
+        Insert: {
+          attempt_id: string
+          id?: string
+          is_correct?: boolean
+          question_id: string
+          selected_option_ids_json?: Json
+        }
+        Update: Partial<Database["public"]["Tables"]["exam_attempt_answers"]["Insert"]>
+        Relationships: []
+      }
+      exam_attempts: {
+        Row: {
+          attempt_no: number
+          cooldown_until: string | null
+          course_id: string
+          created_at: string
+          enrollment_id: string
+          expires_at: string
+          id: string
+          locked: boolean
+          passed: boolean | null
+          question_ids_json: Json
+          score_pct: number | null
+          started_at: string
+          status: Database["public"]["Enums"]["attempt_status"]
+          student_id: string
+          submitted_at: string | null
+        }
+        Insert: {
+          attempt_no: number
+          cooldown_until?: string | null
+          course_id: string
+          created_at?: string
+          enrollment_id: string
+          expires_at: string
+          id?: string
+          locked?: boolean
+          passed?: boolean | null
+          question_ids_json?: Json
+          score_pct?: number | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["attempt_status"]
+          student_id: string
+          submitted_at?: string | null
+        }
+        Update: Partial<Database["public"]["Tables"]["exam_attempts"]["Insert"]>
+        Relationships: []
+      }
+      lesson_resources: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_path: string
+          id: string
+          lesson_id: string
+          mime: string | null
+          size_bytes: number | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_path: string
+          id?: string
+          lesson_id: string
+          mime?: string | null
+          size_bytes?: number | null
+          uploaded_by?: string | null
+        }
+        Update: Partial<Database["public"]["Tables"]["lesson_resources"]["Insert"]>
+        Relationships: []
+      }
+      lessons: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          module_id: string
+          position: number
+          title: string
+          video_url: string | null
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          id?: string
+          module_id: string
+          position?: number
+          title: string
+          video_url?: string | null
+        }
+        Update: Partial<Database["public"]["Tables"]["lessons"]["Insert"]>
+        Relationships: []
+      }
+      modules: {
+        Row: {
+          course_id: string
+          created_at: string
+          id: string
+          position: number
+          title: string
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          id?: string
+          position?: number
+          title: string
+        }
+        Update: Partial<Database["public"]["Tables"]["modules"]["Insert"]>
+        Relationships: []
+      }
+      org_settings: {
+        Row: {
+          cert_id_prefix: string
+          default_cooldown_hours: number
+          default_max_attempts: number
+          default_pass_pct: number
+          default_question_count: number
+          default_time_limit_min: number
+          id: boolean
+          logo_url: string | null
+          org_name: string
+          signatory_image_url: string | null
+          signatory_name: string
+          support_email: string
+          updated_at: string
+          verify_base_url: string
+        }
+        Insert: {
+          cert_id_prefix?: string
+          default_cooldown_hours?: number
+          default_max_attempts?: number
+          default_pass_pct?: number
+          default_question_count?: number
+          default_time_limit_min?: number
+          id?: boolean
+          logo_url?: string | null
+          org_name?: string
+          signatory_image_url?: string | null
+          signatory_name?: string
+          support_email?: string
+          updated_at?: string
+          verify_base_url?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["org_settings"]["Insert"]>
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          phone: string | null
+          role: Database["public"]["Enums"]["user_role"]
+          status: Database["public"]["Enums"]["user_status"]
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email: string
+          full_name?: string
+          id: string
+          phone?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          status?: Database["public"]["Enums"]["user_status"]
+          updated_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>
+        Relationships: []
+      }
+      question_options: {
+        Row: {
+          id: string
+          is_correct: boolean
+          label: string
+          position: number
+          question_id: string
+        }
+        Insert: {
+          id?: string
+          is_correct?: boolean
+          label: string
+          position?: number
+          question_id: string
+        }
+        Update: Partial<Database["public"]["Tables"]["question_options"]["Insert"]>
+        Relationships: []
+      }
+      questions: {
+        Row: {
+          course_id: string
+          created_at: string
+          created_by: string | null
+          explanation: string
+          id: string
+          is_active: boolean
+          prompt: string
+          type: Database["public"]["Enums"]["question_type"]
+          updated_at: string
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          created_by?: string | null
+          explanation?: string
+          id?: string
+          is_active?: boolean
+          prompt: string
+          type?: Database["public"]["Enums"]["question_type"]
+          updated_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["questions"]["Insert"]>
+        Relationships: []
+      }
+    }
+    Views: { [_ in never]: never }
+    Functions: {
+      current_user_role: { Args: Record<string, never>; Returns: Database["public"]["Enums"]["user_role"] }
+      current_user_status: { Args: Record<string, never>; Returns: Database["public"]["Enums"]["user_status"] }
+      is_active_user: { Args: Record<string, never>; Returns: boolean }
+      is_staff: { Args: Record<string, never>; Returns: boolean }
+      is_super_admin: { Args: Record<string, never>; Returns: boolean }
+      verify_certificate: {
+        Args: { p_cert_id: string }
+        Returns: {
+          course_title: string
+          issued_at: string
+          revoked: boolean
+          score_pct: number
+          student_name: string
+          valid: boolean
+        }[]
+      }
+    }
+    Enums: {
+      attempt_status: "in_progress" | "submitted" | "expired"
+      course_status: "draft" | "published" | "archived"
+      enroll_request_status: "pending" | "approved" | "rejected"
+      enrollment_status: "active" | "completed" | "revoked"
+      form_field_type:
+        | "text" | "textarea" | "select" | "multiselect" | "number"
+        | "email" | "phone" | "date" | "file" | "checkbox"
+      question_type: "single" | "multi"
+      user_role: "super_admin" | "instructor" | "student"
+      user_status: "pending" | "active" | "suspended"
+    }
+    CompositeTypes: { [_ in never]: never }
+  }
+}
+
+type PublicSchema = Database["public"]
+
+export type Tables<T extends keyof PublicSchema["Tables"]> =
+  PublicSchema["Tables"][T]["Row"]
+export type TablesInsert<T extends keyof PublicSchema["Tables"]> =
+  PublicSchema["Tables"][T]["Insert"]
+export type TablesUpdate<T extends keyof PublicSchema["Tables"]> =
+  PublicSchema["Tables"][T]["Update"]
+export type Enums<T extends keyof PublicSchema["Enums"]> = PublicSchema["Enums"][T]
