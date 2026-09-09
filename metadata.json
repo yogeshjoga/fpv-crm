@@ -1,0 +1,8 @@
+{
+  "name": "EgireRobotics_CRM",
+  "description": "A highly styled, glassmorphic CRM dashboard focusing on customer information, interaction history, and sales pipelines.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
