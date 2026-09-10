@@ -148,27 +148,39 @@ function GoogleFormIntegration({ secret, onRegenerated }: { secret: string; onRe
   const script = `// Google Forms -> EgireRobotics.  Extensions > Apps Script, paste this,
 // then Triggers (clock icon) > Add Trigger: onEgireSubmit / From form / On form submit.
 const EGIRE_WEBHOOK = ${JSON.stringify(webhook)};
+const MAX_FILE_MB = 10;
 
 function onEgireSubmit(e) {
   const answers = {};
+  const files = [];
   let full_name = '', email = '', phone = '';
   e.response.getItemResponses().forEach(function (ir) {
     const q = ir.getItem().getTitle();
-    let a = ir.getResponse();
+    const a = ir.getResponse();
     const key = String(q).toLowerCase();
 
-    // file-upload answers arrive as Drive file IDs -> make them view-shareable links
+    // file-upload answers: forward the actual bytes so the CRM can preview them
     if (ir.getItem().getType() === FormApp.ItemType.FILE_UPLOAD) {
-      const ids = [].concat(a);
-      a = ids.map(function (id) {
+      [].concat(a).forEach(function (id) {
         try {
           const f = DriveApp.getFileById(id);
-          f.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-          return f.getUrl();
+          if (f.getSize() <= MAX_FILE_MB * 1024 * 1024) {
+            const blob = f.getBlob();
+            files.push({
+              q: q,
+              name: f.getName(),
+              mime: blob.getContentType(),
+              data: Utilities.base64Encode(blob.getBytes()),
+            });
+          } else {
+            f.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+            answers[q] = f.getUrl();
+          }
         } catch (err) {
-          return id;
+          answers[q] = String(id);
         }
       });
+      return;
     }
 
     if (key.indexOf('name') > -1 && !full_name) full_name = a;
@@ -180,7 +192,7 @@ function onEgireSubmit(e) {
   UrlFetchApp.fetch(EGIRE_WEBHOOK, {
     method: 'post',
     contentType: 'application/json',
-    payload: JSON.stringify({ full_name: full_name, email: email, phone: phone, answers: answers }),
+    payload: JSON.stringify({ full_name: full_name, email: email, phone: phone, answers: answers, files: files }),
   });
 }`;
 
