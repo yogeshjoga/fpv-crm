@@ -103,6 +103,7 @@ Deno.serve(async (req) => {
     });
 
     let emailSent = false;
+    let emailSkip: string | undefined;
     if (isNew && tempPassword) {
       const res = await sendEmail({
         to: email,
@@ -116,6 +117,7 @@ Deno.serve(async (req) => {
         ),
       });
       emailSent = res.sent;
+      emailSkip = res.skipped;
     }
 
     return json({
@@ -124,6 +126,7 @@ Deno.serve(async (req) => {
       granted_courses: courses.length,
       account_created: isNew,
       email_sent: emailSent,
+      email_skip: emailSkip ?? null,
       // returned only when we couldn't email it, so the admin can pass it on
       temp_password: isNew && !emailSent ? tempPassword : null,
     });

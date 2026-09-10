@@ -62,6 +62,7 @@ Deno.serve(async (req) => {
     );
 
     let emailSent = 0;
+    let lastSkip: string | undefined;
     const html = emailShell(
       (body ?? '')
         .split('\n')
@@ -71,10 +72,11 @@ Deno.serve(async (req) => {
     for (const r of recipients) {
       const res = await sendEmail({ to: r.email, subject, html });
       if (res.sent) emailSent++;
+      else lastSkip = res.skipped;
     }
     await admin.from('broadcasts').update({ email_sent: emailSent }).eq('id', bc.id);
 
-    return json({ broadcast_id: bc.id, recipient_count: recipients.length, email_sent: emailSent });
+    return json({ broadcast_id: bc.id, recipient_count: recipients.length, email_sent: emailSent, skipped: lastSkip });
   } catch (e) {
     const status = e instanceof HttpError ? e.status : 500;
     return json({ error: (e as Error).message }, status);

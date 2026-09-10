@@ -125,20 +125,34 @@ these fields any time in **Company Settings → Branding**.
 
 ### Email transport
 
-`_shared/common.ts` `sendEmail()` picks a transport by env var, in order:
+`_shared/common.ts` `sendEmail()` picks a transport in this order:
 
-1. **`SMTP_HOST` set** → SMTP via denomailer. For GoDaddy/Titan:
-   `SMTP_HOST=smtp.titan.email`, `SMTP_PORT=465`, `SMTP_TLS=true`,
-   `SMTP_USER=contact@egirerobotics.com`, `SMTP_PASS=<mailbox password>`.
-   Requires the domain's SPF + DKIM (`secureserver1/2._domainkey` CNAMEs) to be
-   correct or Titan rejects the login with `535`.
-2. **`RESEND_API_KEY` set** → Resend HTTP API.
-3. **neither** → the email is logged and skipped; `accept-registration` returns
-   the temp password to the admin so it can be shared manually.
+1. **`SMTP_HOST` env secret set** → SMTP via denomailer.
+2. **`RESEND_API_KEY` env secret set** → Resend HTTP API.
+3. **Neither env secret** → read SMTP settings from the `mail_config` table
+   (`smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, `smtp_tls`, `mail_from`,
+   `mail_reply_to`). This is a **server-only** table: RLS on, no policies, so only
+   the service role (edge functions) can read it — it is never exposed to the
+   client API. This is how the live install is configured.
+4. **Nothing configured** → the email is logged and skipped; `accept-registration`
+   returns the temp password to the admin so it can be shared manually.
 
-Optional overrides: `MAIL_FROM` (defaults to `EgireRobotics <contact@egirerobotics.com>`),
-`MAIL_REPLY_TO` (defaults to `contact@egirerobotics.com`). Set these in
-**Supabase Dashboard → Edge Functions → Secrets**.
+The live install uses **GoDaddy / secureserver mail** for `contact@egirerobotics.com`:
+`smtp_host = smtpout.secureserver.net`, `smtp_port = 465`, `smtp_tls = true`,
+`smtp_user = contact@egirerobotics.com`. Update it with:
+
+```sql
+update public.mail_config set
+  smtp_host = 'smtpout.secureserver.net', smtp_port = 465, smtp_tls = true,
+  smtp_user = 'contact@egirerobotics.com', smtp_pass = '<mailbox password>',
+  mail_from = 'EgireRobotics <contact@egirerobotics.com>',
+  mail_reply_to = 'contact@egirerobotics.com'
+where id = true;
+```
+
+Every message sets `From:` and `Reply-To:` to `contact@egirerobotics.com`, so student
+replies land in that mailbox. SPF + DKIM (`secureserver1/2._domainkey` CNAMEs in
+Cloudflare) must resolve or the SMTP login is rejected with `535`.
 
 ### Bootstrapping the first admin
 

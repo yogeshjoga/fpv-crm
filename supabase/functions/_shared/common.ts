@@ -69,11 +69,65 @@ export function emailShell(bodyHtml: string): string {
   );
 }
 
+/** SMTP settings, from env secrets first, else the service-only mail_config table. */
+async function resolveMail(): Promise<{
+  host?: string;
+  port: number;
+  tls: boolean;
+  user: string;
+  pass: string;
+  from: string;
+  replyTo: string;
+  resendKey?: string;
+}> {
+  const env = (k: string) => Deno.env.get(k) ?? undefined;
+  let host = env('SMTP_HOST');
+  let port = Number(env('SMTP_PORT') ?? '465');
+  let tls = (env('SMTP_TLS') ?? 'true') !== 'false';
+  let user = env('SMTP_USER') ?? '';
+  let pass = env('SMTP_PASS') ?? '';
+  let from = env('MAIL_FROM') ?? env('CERT_EMAIL_FROM') ?? '';
+  let replyTo = env('MAIL_REPLY_TO') ?? '';
+  const resendKey = env('RESEND_API_KEY');
+
+  if (!host && !resendKey) {
+    try {
+      const { data } = await adminClient()
+        .from('mail_config')
+        .select('smtp_host, smtp_port, smtp_user, smtp_pass, smtp_tls, mail_from, mail_reply_to')
+        .eq('id', true)
+        .maybeSingle();
+      if (data) {
+        host = data.smtp_host ?? host;
+        port = data.smtp_port ?? port;
+        tls = data.smtp_tls ?? tls;
+        user = data.smtp_user ?? user;
+        pass = data.smtp_pass ?? pass;
+        from = from || (data.mail_from ?? '');
+        replyTo = replyTo || (data.mail_reply_to ?? '');
+      }
+    } catch (e) {
+      console.error('mail_config lookup failed', e);
+    }
+  }
+
+  return {
+    host,
+    port,
+    tls,
+    user,
+    pass,
+    from: from || 'EgireRobotics <contact@egirerobotics.com>',
+    replyTo: replyTo || 'contact@egirerobotics.com',
+    resendKey,
+  };
+}
+
 /**
- * Send a transactional email. Transport is chosen by env:
- *   1. SMTP_HOST set  -> SMTP (e.g. Titan: smtp.titan.email)
- *   2. RESEND_API_KEY -> Resend HTTP API
- *   3. neither        -> logged and skipped
+ * Send a transactional email. Transport is chosen by config:
+ *   1. SMTP host set (env SMTP_HOST or mail_config.smtp_host) -> SMTP
+ *   2. RESEND_API_KEY                                         -> Resend HTTP API
+ *   3. neither                                                -> logged and skipped
  */
 export async function sendEmail(opts: {
   to: string;
@@ -81,25 +135,18 @@ export async function sendEmail(opts: {
   html: string;
   attachments?: { filename: string; content: string }[];
 }): Promise<{ sent: boolean; skipped?: string }> {
-  const from =
-    Deno.env.get('MAIL_FROM') ??
-    Deno.env.get('CERT_EMAIL_FROM') ??
-    'EgireRobotics <contact@egirerobotics.com>';
-  // Where student replies land. Defaults to the real Titan mailbox.
-  const replyTo = Deno.env.get('MAIL_REPLY_TO') ?? 'contact@egirerobotics.com';
+  const cfg = await resolveMail();
+  const from = cfg.from;
+  const replyTo = cfg.replyTo;
 
-  const smtpHost = Deno.env.get('SMTP_HOST');
-  if (smtpHost) {
+  if (cfg.host) {
     try {
       const client = new SMTPClient({
         connection: {
-          hostname: smtpHost,
-          port: Number(Deno.env.get('SMTP_PORT') ?? '465'),
-          tls: (Deno.env.get('SMTP_TLS') ?? 'true') !== 'false',
-          auth: {
-            username: Deno.env.get('SMTP_USER') ?? '',
-            password: Deno.env.get('SMTP_PASS') ?? '',
-          },
+          hostname: cfg.host,
+          port: cfg.port,
+          tls: cfg.tls,
+          auth: { username: cfg.user, password: cfg.pass },
         },
       });
       await client.send({
@@ -118,12 +165,13 @@ export async function sendEmail(opts: {
       await client.close();
       return { sent: true };
     } catch (e) {
-      console.error('SMTP error', e);
-      return { sent: false, skipped: 'smtp_error' };
+      const msg = (e as Error)?.message ?? String(e);
+      console.error('SMTP error', msg);
+      return { sent: false, skipped: `smtp_error: ${msg}`.slice(0, 300) };
     }
   }
 
-  const key = Deno.env.get('RESEND_API_KEY');
+  const key = cfg.resendKey;
   if (!key) {
     console.log(`[email skipped — no transport] to=${opts.to} subject="${opts.subject}"`);
     return { sent: false, skipped: 'no_transport' };
