@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Award, Download, ShieldCheck } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../auth/AuthProvider';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, EmptyState, PageHeader, Spinner, useToast } from '../../components/ui/kit';
@@ -17,15 +18,18 @@ interface Cert {
 
 export function StudentCertificates() {
   const toast = useToast();
+  const { profile } = useAuth();
+  const uid = profile?.id ?? '';
   const q = useQuery<Cert[]>(
     () =>
       unwrap(
         supabase
           .from('certificates')
           .select('id, cert_id_string, score_pct, issued_at, pdf_path, revoked, course:courses(title)')
+          .eq('student_id', uid)
           .order('issued_at', { ascending: false }),
       ) as Promise<Cert[]>,
-    [],
+    [uid],
   );
 
   const openPdf = async (path: string) => {

@@ -14,16 +14,21 @@ interface Row {
 
 export function StudentDashboard() {
   const { profile } = useAuth();
+  const uid = profile?.id ?? '';
 
+  // Scope every query to the current user: staff RLS on these tables returns
+  // every student's rows, which double-counts the stats and repeats course
+  // cards when a staff account opens the student view.
   const enrollments = useQuery<Row[]>(
     () =>
       unwrap(
         supabase
           .from('enrollments')
           .select('id, status, course:courses(id, slug, title, summary, pass_pct)')
+          .eq('student_id', uid)
           .order('enrolled_at', { ascending: false }),
       ) as Promise<Row[]>,
-    [],
+    [uid],
   );
 
   const pending = useQuery<{ id: string; course: { title: string } | null }[]>(
@@ -32,14 +37,15 @@ export function StudentDashboard() {
         supabase
           .from('enrollment_requests')
           .select('id, course:courses(title)')
+          .eq('student_id', uid)
           .eq('status', 'pending'),
       ) as Promise<{ id: string; course: { title: string } | null }[]>,
-    [],
+    [uid],
   );
 
   const certs = useQuery<{ id: string }[]>(
-    () => unwrap(supabase.from('certificates').select('id').eq('revoked', false)) as Promise<{ id: string }[]>,
-    [],
+    () => unwrap(supabase.from('certificates').select('id').eq('student_id', uid).eq('revoked', false)) as Promise<{ id: string }[]>,
+    [uid],
   );
 
   return (
