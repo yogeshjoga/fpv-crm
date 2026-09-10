@@ -117,13 +117,28 @@ images**; images preview inline for students, everything else is a download.
 
 The EgireRobotics logo (inline SVG) is in every header, the landing page, and the
 transactional email header; emails carry a *Yogesh Joga — Founder, EgireRobotics*
-footer and are sent from `EgireRobotics <support@egirerobotics.com>`. The certificate
-signature line reads **Yogesh Joga / Founder, EgireRobotics** (`org_settings.signatory_title`).
-Override the raster logo and these fields any time in **Company Settings → Branding**.
+footer and are sent from `EgireRobotics <contact@egirerobotics.com>` with a
+`Reply-To` of `contact@egirerobotics.com`, so student replies land in the real
+Titan mailbox. The certificate signature line reads **Yogesh Joga / Founder,
+EgireRobotics** (`org_settings.signatory_title`). Override the raster logo and
+these fields any time in **Company Settings → Branding**.
 
-⚠️ Emails only send once `egirerobotics.com` is verified in Resend (DNS) and
-`RESEND_API_KEY` / `CERT_EMAIL_FROM` secrets are set — until then they log and
-`accept-registration` returns the temp password to the admin.
+### Email transport
+
+`_shared/common.ts` `sendEmail()` picks a transport by env var, in order:
+
+1. **`SMTP_HOST` set** → SMTP via denomailer. For GoDaddy/Titan:
+   `SMTP_HOST=smtp.titan.email`, `SMTP_PORT=465`, `SMTP_TLS=true`,
+   `SMTP_USER=contact@egirerobotics.com`, `SMTP_PASS=<mailbox password>`.
+   Requires the domain's SPF + DKIM (`secureserver1/2._domainkey` CNAMEs) to be
+   correct or Titan rejects the login with `535`.
+2. **`RESEND_API_KEY` set** → Resend HTTP API.
+3. **neither** → the email is logged and skipped; `accept-registration` returns
+   the temp password to the admin so it can be shared manually.
+
+Optional overrides: `MAIL_FROM` (defaults to `EgireRobotics <contact@egirerobotics.com>`),
+`MAIL_REPLY_TO` (defaults to `contact@egirerobotics.com`). Set these in
+**Supabase Dashboard → Edge Functions → Secrets**.
 
 ### Bootstrapping the first admin
 
@@ -149,13 +164,19 @@ where email = 'you@example.com';
 
 ## Configuration still required for production
 
-1. **Resend / email** — set edge secrets so credential, certificate and broadcast emails
-   actually send:
+1. **Email transport** — set edge secrets so credential, certificate and broadcast
+   emails actually send. Either SMTP (GoDaddy/Titan):
+   ```bash
+   supabase secrets set SMTP_HOST=smtp.titan.email SMTP_PORT=465 SMTP_TLS=true \
+     SMTP_USER=contact@egirerobotics.com SMTP_PASS=<mailbox password>
+   ```
+   or Resend:
    ```bash
    supabase secrets set RESEND_API_KEY=re_... CERT_EMAIL_FROM="EgireRobotics <no-reply@mail.egirerobotics.com>"
    ```
-   Until then those functions log the email and continue; `accept-registration` returns
-   the temp password to the admin so it can be shared manually.
+   Until one is set those functions log the email and continue; `accept-registration`
+   returns the temp password to the admin so it can be shared manually. See
+   **Email transport** under Branding for the full var list.
 2. **`org_settings.verify_base_url`** — set to the deployed app origin (used in QR codes,
    the Google Forms webhook URL, and email links). Editable from **Company settings**.
 

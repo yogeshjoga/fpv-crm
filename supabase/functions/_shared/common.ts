@@ -64,7 +64,7 @@ export function emailShell(bodyHtml: string): string {
     bodyHtml +
     `<div style="border-top:1px solid #ececec;margin-top:26px;padding-top:12px;color:#8a8a8a;font-size:12px;line-height:1.6">` +
     `<strong style="color:#555">Yogesh Joga</strong> &mdash; Founder, EgireRobotics<br/>` +
-    `support@egirerobotics.com &middot; egirerobotics.com` +
+    `contact@egirerobotics.com &middot; egirerobotics.com` +
     `</div></div>`
   );
 }
@@ -84,7 +84,9 @@ export async function sendEmail(opts: {
   const from =
     Deno.env.get('MAIL_FROM') ??
     Deno.env.get('CERT_EMAIL_FROM') ??
-    'EgireRobotics <support@egirerobotics.com>';
+    'EgireRobotics <contact@egirerobotics.com>';
+  // Where student replies land. Defaults to the real Titan mailbox.
+  const replyTo = Deno.env.get('MAIL_REPLY_TO') ?? 'contact@egirerobotics.com';
 
   const smtpHost = Deno.env.get('SMTP_HOST');
   if (smtpHost) {
@@ -103,6 +105,7 @@ export async function sendEmail(opts: {
       await client.send({
         from,
         to: opts.to,
+        replyTo,
         subject: opts.subject,
         html: opts.html,
         attachments: opts.attachments?.map((a) => ({
@@ -128,7 +131,7 @@ export async function sendEmail(opts: {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from, to: opts.to, subject: opts.subject, html: opts.html, attachments: opts.attachments }),
+    body: JSON.stringify({ from, to: opts.to, reply_to: replyTo, subject: opts.subject, html: opts.html, attachments: opts.attachments }),
   });
   if (!res.ok) {
     console.error('Resend error', res.status, await res.text());
