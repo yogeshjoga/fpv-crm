@@ -18,6 +18,10 @@ interface Registration {
   review_note: string | null;
   created_at: string;
   requested_course_id: string | null;
+  payment_status: 'unpaid' | 'paid' | 'waived';
+  payment_amount: number | null;
+  payment_ref: string | null;
+  payment_method: string | null;
   form: { title: string } | null;
   requested_course: { id: string; title: string } | null;
 }
@@ -41,6 +45,7 @@ export function Registrations() {
       .from('registrations')
       .select(
         'id, source, full_name, email, phone, answers, status, review_note, created_at, requested_course_id, ' +
+          'payment_status, payment_amount, payment_ref, payment_method, ' +
           'form:enrollment_forms(title), requested_course:courses(id, title)',
       )
       .order('created_at', { ascending: false });
@@ -129,6 +134,9 @@ export function Registrations() {
               </div>
               <div className="flex items-center gap-2">
                 <Badge tone="neutral">{SOURCE_LABEL[r.source]}</Badge>
+                <Badge tone={r.payment_status === 'unpaid' ? 'neutral' : 'green'}>
+                  {r.payment_status === 'waived' ? 'fee waived' : r.payment_status}
+                </Badge>
                 <Badge tone={r.status === 'accepted' ? 'green' : r.status === 'rejected' ? 'red' : 'amber'}>{r.status}</Badge>
                 <Button variant="secondary" onClick={() => setViewing(r)}>
                   Review
@@ -173,13 +181,44 @@ function ReviewModal({
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [creds, setCreds] = useState<{ email: string; temp_password: string | null; email_sent: boolean } | null>(null);
+  const [pay, setPay] = useState({
+    status: reg.payment_status,
+    amount: reg.payment_amount != null ? String(reg.payment_amount) : '',
+    ref: reg.payment_ref ?? '',
+    method: reg.payment_method ?? 'UPI',
+  });
+
+  const paymentPayload = () => ({
+    status: pay.status,
+    amount: pay.amount ? Number(pay.amount) : null,
+    ref: pay.ref || null,
+    method: pay.method || null,
+  });
+
+  const savePayment = async () => {
+    setBusy(true);
+    const { error } = await supabase
+      .from('registrations')
+      .update({
+        payment_status: pay.status,
+        payment_amount: pay.amount ? Number(pay.amount) : null,
+        payment_ref: pay.ref || null,
+        payment_method: pay.method || null,
+        paid_at: pay.status === 'paid' ? new Date().toISOString() : null,
+      })
+      .eq('id', reg.id);
+    setBusy(false);
+    if (error) return toast(error.message, 'error');
+    toast('Payment saved');
+    onAccepted();
+  };
 
   const accept = async () => {
     setBusy(true);
     try {
       const res = await invokeFn<{ email: string; temp_password: string | null; email_sent: boolean; granted_courses: number }>(
         'accept-registration',
-        { registration_id: reg.id, course_ids: selected, review_note: note },
+        { registration_id: reg.id, course_ids: selected, review_note: note, payment: paymentPayload() },
       );
       if (res.email_sent) {
         toast(`Account created, ${res.granted_courses} course(s) granted, credentials emailed`);
@@ -241,6 +280,34 @@ function ReviewModal({
 
           {reg.status === 'pending' ? (
             <>
+              <div className="rounded-2xl border border-white/60 bg-white/40 p-4">
+                <div className="mb-2 text-sm font-medium text-neutral-700">Payment</div>
+                <div className="grid gap-3 sm:grid-cols-4">
+                  <Select value={pay.status} onChange={(e) => setPay({ ...pay, status: e.target.value as typeof pay.status })}>
+                    <option value="unpaid">Unpaid</option>
+                    <option value="paid">Paid</option>
+                    <option value="waived">Fee waived</option>
+                  </Select>
+                  <TextInput type="number" placeholder="Amount ₹" value={pay.amount} onChange={(e) => setPay({ ...pay, amount: e.target.value })} />
+                  <TextInput placeholder="Reference / UTR" value={pay.ref} onChange={(e) => setPay({ ...pay, ref: e.target.value })} />
+                  <Select value={pay.method} onChange={(e) => setPay({ ...pay, method: e.target.value })}>
+                    <option>UPI</option>
+                    <option>Bank transfer</option>
+                    <option>Card</option>
+                    <option>Cash</option>
+                    <option>Other</option>
+                  </Select>
+                </div>
+                <div className="mt-2 flex items-center justify-between">
+                  <span className="text-xs text-neutral-500">
+                    {pay.status === 'unpaid' ? 'Record payment (or waive) before you can accept.' : 'Ready to accept.'}
+                  </span>
+                  <Button variant="ghost" onClick={savePayment} loading={busy}>
+                    Save payment only
+                  </Button>
+                </div>
+              </div>
+
               <div>
                 <div className="mb-1.5 text-sm font-medium text-neutral-700">Grant access to courses</div>
                 {!courses.length ? (
@@ -265,7 +332,7 @@ function ReviewModal({
                 <Button variant="danger" onClick={() => onReject(reg, note)}>
                   Reject
                 </Button>
-                <Button onClick={accept} loading={busy}>
+                <Button onClick={accept} loading={busy} disabled={pay.status === 'unpaid'}>
                   Accept &amp; create account
                 </Button>
               </div>

@@ -1,7 +1,7 @@
 import { PDFDocument, StandardFonts, rgb } from 'https://esm.sh/pdf-lib@1.17.1';
 import QRCode from 'https://esm.sh/qrcode@1.5.4';
 import { encodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
-import { adminClient, cors, HttpError, json, sendEmail } from '../_shared/common.ts';
+import { adminClient, cors, emailShell, HttpError, json, sendEmail } from '../_shared/common.ts';
 
 function callerIsServiceRole(req: Request): boolean {
   const provided = (req.headers.get('Authorization') ?? '').replace('Bearer ', '').trim();
@@ -83,8 +83,8 @@ Deno.serve(async (req) => {
     page.drawText(`Verify at ${verifyUrl}`, { x: 60, y: 54, size: 9, font: reg, color: muted });
 
     page.drawLine({ start: { x: 520, y: 120 }, end: { x: 720, y: 120 }, thickness: 1, color: muted });
-    page.drawText(String(org.signatory_name || 'Authorized Signatory'), { x: 520, y: 104, size: 10, font: reg, color: ink });
-    page.drawText(String(org.org_name || 'EgireRobotics'), { x: 520, y: 90, size: 9, font: reg, color: muted });
+    page.drawText(String(org.signatory_name || 'Authorized Signatory'), { x: 520, y: 104, size: 10, font: bold, color: ink });
+    page.drawText(String(org.signatory_title || org.org_name || 'EgireRobotics'), { x: 520, y: 90, size: 9, font: reg, color: muted });
 
     try {
       const qrDataUrl: string = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 300 });
@@ -138,12 +138,12 @@ Deno.serve(async (req) => {
     await sendEmail({
       to: student.email,
       subject: `Your ${org.org_name} certificate - ${course.title}`,
-      html: `<div style='font-family:system-ui,Arial,sans-serif;max-width:520px;margin:auto'>` +
+      html: emailShell(
         `<h2 style='margin:0 0 8px'>Congratulations, ${esc(student.full_name || 'there')}!</h2>` +
-        `<p style='color:#444'>You passed <strong>${esc(course.title)}</strong> with a score of ${Number(score_pct ?? 0)}%.</p>` +
-        `<p style='color:#444'>Your certificate <strong>${certId}</strong> is attached. Anyone can confirm it at:</p>` +
-        `<p><a href='${verifyUrl}'>${verifyUrl}</a></p>` +
-        `<p style='color:#888;font-size:13px'>${esc(String(org.org_name))} - FPV &amp; Drone Training</p></div>`,
+          `<p style='color:#444'>You passed <strong>${esc(course.title)}</strong> with a score of ${Number(score_pct ?? 0)}%.</p>` +
+          `<p style='color:#444'>Your certificate <strong>${certId}</strong> is attached. Anyone can confirm it at:</p>` +
+          `<p><a href='${verifyUrl}'>${verifyUrl}</a></p>`,
+      ),
       attachments: [{ filename: `${certId}.pdf`, content: encodeBase64(pdfBytes) }],
     });
 

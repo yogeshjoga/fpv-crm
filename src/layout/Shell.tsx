@@ -4,6 +4,7 @@ import { LayoutGrid, LogOut, Menu, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import { NotificationBell } from '../components/NotificationBell';
+import { Logo } from '../components/Brand';
 
 export interface NavItem {
   to: string;
@@ -36,12 +37,9 @@ export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin'
           openMobile ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex h-16 items-center gap-2 px-6">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#1a1a1a] text-sm font-bold text-white">E</div>
-          <div className="leading-tight">
-            <div className="text-sm font-semibold text-neutral-900">EgireRobotics</div>
-            <div className="text-[11px] text-neutral-500">{area} Portal</div>
-          </div>
+        <div className="flex h-16 items-center gap-2 px-6 text-neutral-900">
+          <Logo markSize={26} />
+          <span className="ml-1 text-[11px] text-neutral-500">{area}</span>
         </div>
         <nav className="flex flex-col gap-1 px-3 py-4">
           {nav.map((item) => (

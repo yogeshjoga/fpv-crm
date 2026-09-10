@@ -1,4 +1,4 @@
-import { adminClient, cors, HttpError, json, requireUser, sendEmail } from '../_shared/common.ts';
+import { adminClient, cors, emailShell, HttpError, json, requireUser, sendEmail } from '../_shared/common.ts';
 
 /** Super-admin only: create a staff (or student) account and send a set-password link. */
 Deno.serve(async (req) => {
@@ -46,12 +46,12 @@ Deno.serve(async (req) => {
     const emailRes = await sendEmail({
       to: email.trim(),
       subject: 'Your EgireRobotics account',
-      html: `<div style='font-family:system-ui,Arial,sans-serif;max-width:520px'>
-        <p>Hi ${(full_name ?? 'there').replace(/</g, '&lt;')},</p>
-        <p>An EgireRobotics account has been created for you (${wantRole.replace('_', ' ')}).</p>
-        <p>Set your password to sign in:</p>
-        <p><a href='${inviteLink ?? ''}'>Set my password</a></p>
-      </div>`,
+      html: emailShell(
+        `<p>Hi ${(full_name ?? 'there').replace(/</g, '&lt;')},</p>` +
+          `<p>An EgireRobotics account has been created for you (${wantRole.replace('_', ' ')}).</p>` +
+          `<p>Set your password to sign in:</p>` +
+          `<p><a href='${inviteLink ?? ''}'>Set my password</a></p>`,
+      ),
     });
 
     return json({

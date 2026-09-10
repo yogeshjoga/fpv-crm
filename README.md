@@ -82,11 +82,15 @@ There is **no public self-signup**. A new student comes in through a form:
    no login) or a **Google Form** wired to the `form-intake` webhook (see below).
 2. The submission lands in one **Registrations** queue (`/admin/registrations`) with a
    source badge and a pending count on the dashboard.
-3. An admin opens **Review**, picks which course(s) to grant, and clicks **Accept &
-   create account**. The `accept-registration` edge function creates the auth user with
-   a random password, sets `must_change_password`, creates the `enrollments` rows, drops
-   a welcome notification, and emails the student `email + temp password` via Resend
-   (or returns the temp password to the admin if Resend isn't configured).
+3. An admin opens **Review**, records the **payment** (status paid/waived, amount,
+   reference, method — *Accept is blocked while it's "unpaid"*), picks which course(s)
+   to grant, and clicks **Accept & create account**. The `accept-registration` edge
+   function creates the auth user with a random password, sets `must_change_password`,
+   creates the `enrollments` rows, drops a welcome notification, and emails the student
+   `email + temp password` via Resend (or returns the temp password to the admin if
+   Resend isn't configured). A "Save payment only" button records the payment without
+   accepting yet. The manual gate is structured so a Razorpay webhook could flip the
+   same `payment_status` later.
 4. The student signs in with the temp password → is forced to `/set-password` → lands on
    `/app` seeing only the granted courses.
 
@@ -100,6 +104,26 @@ Apps Script. In your Form: **Extensions ▸ Apps Script**, paste the script, the
 **On form submit** trigger for `onEgireSubmit`. Each response POSTs to
 `/functions/v1/form-intake?secret=…` and appears in the queue. Regenerate the secret from
 the same panel (invalidates the old script).
+
+## Course content
+
+Each lesson has a **type**: **Article** (rich text — use for blogs/notes), **Video**
+(YouTube/Vimeo — embedded), **Embed** (paste any URL — Sketchfab 3D model, a
+VelociDrone/Uncrashed/Betaflight sim page, Google Slides, a hosted PDF — shown in an
+iframe), or **Downloads only**. Lesson resources accept **PDF / PPT / DOC / XLS /
+images**; images preview inline for students, everything else is a download.
+
+## Branding
+
+The EgireRobotics logo (inline SVG) is in every header, the landing page, and the
+transactional email header; emails carry a *Yogesh Joga — Founder, EgireRobotics*
+footer and are sent from `EgireRobotics <support@egirerobotics.com>`. The certificate
+signature line reads **Yogesh Joga / Founder, EgireRobotics** (`org_settings.signatory_title`).
+Override the raster logo and these fields any time in **Company Settings → Branding**.
+
+⚠️ Emails only send once `egirerobotics.com` is verified in Resend (DNS) and
+`RESEND_API_KEY` / `CERT_EMAIL_FROM` secrets are set — until then they log and
+`accept-registration` returns the temp password to the admin.
 
 ### Bootstrapping the first admin
 

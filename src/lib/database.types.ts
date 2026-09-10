@@ -114,6 +114,12 @@ export type Database = {
           review_note: string | null
           created_profile_id: string | null
           created_at: string
+          payment_status: Database["public"]["Enums"]["payment_status"]
+          payment_amount: number | null
+          payment_ref: string | null
+          payment_method: string | null
+          paid_at: string | null
+          paid_by: string | null
         }
         Insert: {
           id?: string
@@ -130,6 +136,12 @@ export type Database = {
           review_note?: string | null
           created_profile_id?: string | null
           created_at?: string
+          payment_status?: Database["public"]["Enums"]["payment_status"]
+          payment_amount?: number | null
+          payment_ref?: string | null
+          payment_method?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
         }
         Update: Partial<Database["public"]["Tables"]["registrations"]["Insert"]>
         Relationships: []
@@ -443,6 +455,8 @@ export type Database = {
           position: number
           title: string
           video_url: string | null
+          kind: Database["public"]["Enums"]["lesson_kind"]
+          embed_url: string | null
         }
         Insert: {
           content?: string
@@ -452,6 +466,8 @@ export type Database = {
           position?: number
           title: string
           video_url?: string | null
+          kind?: Database["public"]["Enums"]["lesson_kind"]
+          embed_url?: string | null
         }
         Update: Partial<Database["public"]["Tables"]["lessons"]["Insert"]>
         Relationships: []
@@ -488,6 +504,7 @@ export type Database = {
           org_name: string
           signatory_image_url: string | null
           signatory_name: string
+          signatory_title: string
           support_email: string
           updated_at: string
           verify_base_url: string
@@ -613,6 +630,8 @@ export type Database = {
       form_field_type:
         | "text" | "textarea" | "select" | "multiselect" | "number"
         | "email" | "phone" | "date" | "file" | "checkbox"
+      lesson_kind: "article" | "video" | "embed" | "download"
+      payment_status: "unpaid" | "paid" | "waived"
       question_type: "single" | "multi"
       registration_source: "registration_form" | "google_form" | "csv"
       registration_status: "pending" | "accepted" | "rejected"

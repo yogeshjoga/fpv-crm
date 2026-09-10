@@ -52,6 +52,22 @@ export function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+/** Wrap an email body in the EgireRobotics header + founder footer. */
+export function emailShell(bodyHtml: string): string {
+  return (
+    `<div style="font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;max-width:560px;margin:0 auto;padding:8px;color:#1a1a1a">` +
+    `<div style="border-bottom:2px solid #1a1a1a;padding-bottom:10px;margin-bottom:20px">` +
+    `<span style="font-weight:800;letter-spacing:2px;font-size:16px">EGIRE ROBOTICS</span>` +
+    `<span style="display:block;margin-top:2px;color:#8a8a8a;font-size:10px;letter-spacing:3px">EXPLORE &middot; ENGINEER &middot; EXCEL</span>` +
+    `</div>` +
+    bodyHtml +
+    `<div style="border-top:1px solid #ececec;margin-top:26px;padding-top:12px;color:#8a8a8a;font-size:12px;line-height:1.6">` +
+    `<strong style="color:#555">Yogesh Joga</strong> &mdash; Founder, EgireRobotics<br/>` +
+    `support@egirerobotics.com &middot; egirerobotics.com` +
+    `</div></div>`
+  );
+}
+
 /** Fire a transactional email through Resend. No-ops when RESEND_API_KEY is unset. */
 export async function sendEmail(opts: {
   to: string;
@@ -60,7 +76,7 @@ export async function sendEmail(opts: {
   attachments?: { filename: string; content: string }[];
 }): Promise<{ sent: boolean; skipped?: string }> {
   const key = Deno.env.get('RESEND_API_KEY');
-  const from = Deno.env.get('CERT_EMAIL_FROM') ?? 'EgireRobotics <onboarding@resend.dev>';
+  const from = Deno.env.get('CERT_EMAIL_FROM') ?? 'EgireRobotics <support@egirerobotics.com>';
   if (!key) {
     console.log(`[email skipped — no RESEND_API_KEY] to=${opts.to} subject="${opts.subject}"`);
     return { sent: false, skipped: 'no_api_key' };

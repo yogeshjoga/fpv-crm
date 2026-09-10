@@ -1,4 +1,4 @@
-import { adminClient, cors, HttpError, json, randomPassword, requireUser, sendEmail } from '../_shared/common.ts';
+import { adminClient, cors, emailShell, HttpError, json, randomPassword, requireUser, sendEmail } from '../_shared/common.ts';
 
 /**
  * Staff: accept a registration -> create (or reuse) the student account,
@@ -14,12 +14,25 @@ Deno.serve(async (req) => {
     const { data: me } = await admin.from('profiles').select('role').eq('id', caller.id).single();
     if (!me || !['instructor', 'super_admin'].includes(me.role)) throw new HttpError(403, 'Forbidden.');
 
-    const { registration_id, course_ids, review_note } = await req.json();
+    const { registration_id, course_ids, review_note, payment } = await req.json();
     if (!registration_id) throw new HttpError(400, 'registration_id is required.');
 
     const { data: reg } = await admin.from('registrations').select('*').eq('id', registration_id).single();
     if (!reg) throw new HttpError(404, 'Registration not found.');
     if (reg.status !== 'pending') throw new HttpError(409, 'This registration was already reviewed.');
+
+    // persist any payment details sent with the accept, then enforce the gate
+    const payStatus = payment?.status ?? reg.payment_status;
+    if (payStatus === 'unpaid') throw new HttpError(402, 'Payment must be recorded (paid or waived) before accepting.');
+    const payPatch: Record<string, unknown> = {};
+    if (payment) {
+      payPatch.payment_status = payStatus;
+      payPatch.payment_amount = payment.amount ?? reg.payment_amount ?? null;
+      payPatch.payment_ref = payment.ref ?? reg.payment_ref ?? null;
+      payPatch.payment_method = payment.method ?? reg.payment_method ?? null;
+      payPatch.paid_at = payStatus === 'paid' ? new Date().toISOString() : reg.paid_at ?? null;
+      payPatch.paid_by = caller.id;
+    }
 
     const email = String(reg.email).trim().toLowerCase();
     const courses: string[] = Array.isArray(course_ids) && course_ids.length
@@ -71,6 +84,7 @@ Deno.serve(async (req) => {
         reviewed_at: new Date().toISOString(),
         review_note: review_note ?? null,
         created_profile_id: profileId,
+        ...payPatch,
       })
       .eq('id', registration_id);
 
@@ -93,14 +107,13 @@ Deno.serve(async (req) => {
       const res = await sendEmail({
         to: email,
         subject: `Your ${orgName} account is ready`,
-        html:
-          `<div style='font-family:system-ui,Arial,sans-serif;max-width:520px'>` +
+        html: emailShell(
           `<p>Hi ${(reg.full_name || 'there').replace(/</g, '&lt;')},</p>` +
-          `<p>Your registration has been accepted. Sign in with:</p>` +
-          `<p><strong>Email:</strong> ${email}<br/><strong>Temporary password:</strong> <code>${tempPassword}</code></p>` +
-          `<p>You'll be asked to choose a new password on first sign-in.</p>` +
-          `<p><a href='${appUrl}/login'>Sign in</a></p>` +
-          `<p style='color:#888;font-size:13px'>${orgName}</p></div>`,
+            `<p>Your registration has been accepted. Sign in with:</p>` +
+            `<p><strong>Email:</strong> ${email}<br/><strong>Temporary password:</strong> <code>${tempPassword}</code></p>` +
+            `<p>You'll be asked to choose a new password on first sign-in.</p>` +
+            `<p><a href='${appUrl}/login'>Sign in</a></p>`,
+        ),
       });
       emailSent = res.sent;
     }

@@ -1,4 +1,4 @@
-import { adminClient, cors, HttpError, json, requireUser, sendEmail } from '../_shared/common.ts';
+import { adminClient, cors, emailShell, HttpError, json, requireUser, sendEmail } from '../_shared/common.ts';
 
 /** Staff-only: fan a message out to an audience as in-app notifications + email. */
 Deno.serve(async (req) => {
@@ -62,10 +62,12 @@ Deno.serve(async (req) => {
     );
 
     let emailSent = 0;
-    const html = `<div style='font-family:system-ui,Arial,sans-serif;max-width:560px'>${(body ?? '')
-      .split('\n')
-      .map((l: string) => `<p>${l.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</p>`)
-      .join('')}</div>`;
+    const html = emailShell(
+      (body ?? '')
+        .split('\n')
+        .map((l: string) => `<p>${l.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</p>`)
+        .join(''),
+    );
     for (const r of recipients) {
       const res = await sendEmail({ to: r.email, subject, html });
       if (res.sent) emailSent++;

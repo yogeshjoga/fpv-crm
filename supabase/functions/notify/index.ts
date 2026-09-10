@@ -1,4 +1,4 @@
-import { adminClient, cors, HttpError, json, requireUser, sendEmail } from '../_shared/common.ts';
+import { adminClient, cors, emailShell, HttpError, json, requireUser, sendEmail } from '../_shared/common.ts';
 
 /** Sends account / enrollment notification emails. Callable by staff or service role. */
 Deno.serve(async (req) => {
@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
       link: links[kind] ?? null,
     });
 
-    const result = await sendEmail({ to: user.email, subject: tpl.subject, html: `<div style="font-family:system-ui,Arial,sans-serif">${tpl.html}</div>` });
+    const result = await sendEmail({ to: user.email, subject: tpl.subject, html: emailShell(tpl.html) });
     return json({ ok: true, ...result });
   } catch (e) {
     const status = e instanceof HttpError ? e.status : 500;

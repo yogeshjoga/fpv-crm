@@ -1,10 +1,42 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Download, FileText, GraduationCap, Lock, PlayCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, Button, PageHeader, Spinner, useToast } from '../../components/ui/kit';
+
+/** Convert common video URLs to an embeddable src; null if we can't. */
+function embedSrc(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes('youtube.com') && u.searchParams.get('v'))
+      return `https://www.youtube.com/embed/${u.searchParams.get('v')}`;
+    if (u.hostname === 'youtu.be') return `https://www.youtube.com/embed/${u.pathname.slice(1)}`;
+    if (u.hostname.includes('vimeo.com')) return `https://player.vimeo.com/video/${u.pathname.split('/').filter(Boolean).pop()}`;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Inline image preview for a lesson resource stored in course-resources. */
+function ImageResource({ path, name }: { path: string; name: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    supabase.storage.from('course-resources').createSignedUrl(path, 600).then(({ data }) => live && setUrl(data?.signedUrl ?? null));
+    return () => {
+      live = false;
+    };
+  }, [path]);
+  if (!url) return null;
+  return (
+    <a href={url} target="_blank" rel="noreferrer">
+      <img src={url} alt={name} className="max-h-48 rounded-xl border border-white/60 object-contain" />
+    </a>
+  );
+}
 
 export function CourseViewer() {
   const { slug } = useParams();
@@ -16,7 +48,7 @@ export function CourseViewer() {
         .from('courses')
         .select(
           'id, title, slug, description, pass_pct, exam_time_limit_min, exam_question_count, max_attempts, cooldown_hours, ' +
-            'modules(id, title, position, lessons(id, title, position, content, video_url, lesson_resources(id, file_name, file_path, mime)))',
+            'modules(id, title, position, lessons(id, title, position, kind, content, video_url, embed_url, lesson_resources(id, file_name, file_path, mime)))',
         )
         .eq('slug', slug as string)
         .single(),
@@ -82,24 +114,45 @@ export function CourseViewer() {
                       <div className="flex items-center gap-2 font-medium text-neutral-900">
                         <span className="text-neutral-400">{mi + 1}.{li + 1}</span> {l.title}
                       </div>
-                      {l.content && <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-600">{l.content}</p>}
-                      {l.video_url && (
-                        <a href={l.video_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline">
-                          <PlayCircle size={15} /> Watch video
-                        </a>
+
+                      {(l.kind ?? 'article') === 'article' && l.content && (
+                        <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-600">{l.content}</p>
                       )}
+
+                      {l.kind === 'video' && l.video_url && (
+                        embedSrc(l.video_url) ? (
+                          <div className="mt-3 aspect-video overflow-hidden rounded-xl border border-white/60">
+                            <iframe src={embedSrc(l.video_url)!} className="h-full w-full" allowFullScreen title={l.title} />
+                          </div>
+                        ) : (
+                          <a href={l.video_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline">
+                            <PlayCircle size={15} /> Watch video
+                          </a>
+                        )
+                      )}
+
+                      {l.kind === 'embed' && l.embed_url && (
+                        <div className="mt-3 aspect-video overflow-hidden rounded-xl border border-white/60">
+                          <iframe src={l.embed_url} className="h-full w-full" allowFullScreen title={l.title} />
+                        </div>
+                      )}
+
                       {!!l.lesson_resources?.length && (
                         <div className="mt-3 flex flex-wrap gap-2">
-                          {l.lesson_resources.map((r: any) => (
-                            <button
-                              key={r.id}
-                              onClick={() => download(r.file_path, r.file_name)}
-                              className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-white"
-                            >
-                              {downloading === r.file_path ? '…' : <FileText size={13} />} {r.file_name}
-                              <Download size={12} />
-                            </button>
-                          ))}
+                          {l.lesson_resources.map((r: any) =>
+                            (r.mime ?? '').startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(r.file_name) ? (
+                              <ImageResource key={r.id} path={r.file_path} name={r.file_name} />
+                            ) : (
+                              <button
+                                key={r.id}
+                                onClick={() => download(r.file_path, r.file_name)}
+                                className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-white"
+                              >
+                                {downloading === r.file_path ? '…' : <FileText size={13} />} {r.file_name}
+                                <Download size={12} />
+                              </button>
+                            ),
+                          )}
                         </div>
                       )}
                     </div>

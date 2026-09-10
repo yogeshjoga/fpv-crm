@@ -1,12 +1,12 @@
 import { Link, Outlet } from 'react-router-dom';
+import { Logo } from '../components/Brand';
 
 export function PublicShell() {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="flex h-16 items-center justify-between px-6 md:px-10">
-        <Link to="/" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#1a1a1a] text-sm font-bold text-white">E</div>
-          <span className="text-sm font-semibold text-neutral-900">EgireRobotics</span>
+        <Link to="/" className="text-neutral-900">
+          <Logo markSize={26} />
         </Link>
         <nav className="flex items-center gap-4 text-sm text-neutral-600">
           <Link to="/verify" className="hover:text-neutral-900">Verify a certificate</Link>

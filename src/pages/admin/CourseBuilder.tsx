@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
-import { Button, Field, Modal, PageHeader, Spinner, TextArea, TextInput, useToast } from '../../components/ui/kit';
+import { Button, Field, Modal, PageHeader, Select, Spinner, TextArea, TextInput, useToast } from '../../components/ui/kit';
 
 export function CourseBuilder() {
   const { id } = useParams();
@@ -19,7 +19,7 @@ export function CourseBuilder() {
     return (await unwrap(
       supabase
         .from('courses')
-        .select('id, title, slug, modules(id, title, position, lessons(id, title, position, content, video_url, lesson_resources(id, file_name, file_path)))')
+        .select('id, title, slug, modules(id, title, position, lessons(id, title, position, kind, content, video_url, embed_url, lesson_resources(id, file_name, file_path)))')
         .eq('id', id as string)
         .single(),
     )) as any;
@@ -57,8 +57,11 @@ export function CourseBuilder() {
   };
 
   const saveLesson = async () => {
-    const { id: lid, title, content, video_url } = editingLesson;
-    const { error } = await supabase.from('lessons').update({ title, content, video_url }).eq('id', lid);
+    const { id: lid, title, kind, content, video_url, embed_url } = editingLesson;
+    const { error } = await supabase
+      .from('lessons')
+      .update({ title, kind, content, video_url: video_url || null, embed_url: embed_url || null })
+      .eq('id', lid);
     if (error) return toast(error.message, 'error');
     setEditingLesson(null);
     q.refetch();
@@ -138,7 +141,7 @@ export function CourseBuilder() {
                           {uploadingFor === l.id ? '…' : <Upload size={15} />}
                           <input
                             type="file"
-                            accept="application/pdf,image/*"
+                            accept=".pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,image/*"
                             className="hidden"
                             onChange={(e) => e.target.files?.[0] && uploadResource(l.id, e.target.files[0])}
                           />
@@ -176,16 +179,36 @@ export function CourseBuilder() {
             <Field label="Title">
               <TextInput value={editingLesson.title} onChange={(e) => setEditingLesson({ ...editingLesson, title: e.target.value })} />
             </Field>
-            <Field label="Content" hint="Plain text or markdown">
-              <TextArea
-                value={editingLesson.content ?? ''}
-                onChange={(e) => setEditingLesson({ ...editingLesson, content: e.target.value })}
-                className="min-h-[160px]"
-              />
+            <Field label="Lesson type">
+              <Select value={editingLesson.kind ?? 'article'} onChange={(e) => setEditingLesson({ ...editingLesson, kind: e.target.value })}>
+                <option value="article">Article (text / blog)</option>
+                <option value="video">Video</option>
+                <option value="embed">Embed (simulator, 3D model, slides…)</option>
+                <option value="download">Downloads only</option>
+              </Select>
             </Field>
-            <Field label="Video URL" hint="Optional — YouTube/Vimeo link">
-              <TextInput value={editingLesson.video_url ?? ''} onChange={(e) => setEditingLesson({ ...editingLesson, video_url: e.target.value })} />
-            </Field>
+            {(editingLesson.kind ?? 'article') === 'article' && (
+              <Field label="Content" hint="Plain text or markdown">
+                <TextArea
+                  value={editingLesson.content ?? ''}
+                  onChange={(e) => setEditingLesson({ ...editingLesson, content: e.target.value })}
+                  className="min-h-[160px]"
+                />
+              </Field>
+            )}
+            {editingLesson.kind === 'video' && (
+              <Field label="Video URL" hint="YouTube / Vimeo link">
+                <TextInput value={editingLesson.video_url ?? ''} onChange={(e) => setEditingLesson({ ...editingLesson, video_url: e.target.value })} />
+              </Field>
+            )}
+            {editingLesson.kind === 'embed' && (
+              <Field label="Embed URL" hint="Sketchfab 3D model, VelociDrone/Uncrashed/Betaflight sim, Google Slides, a hosted PDF — anything embeddable">
+                <TextInput value={editingLesson.embed_url ?? ''} onChange={(e) => setEditingLesson({ ...editingLesson, embed_url: e.target.value })} placeholder="https://…" />
+              </Field>
+            )}
+            <p className="text-xs text-neutral-500">
+              Attach PDFs, PPTs, DOCs and images from each lesson row (upload icon). Images preview inline for students.
+            </p>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setEditingLesson(null)}>
                 Cancel
