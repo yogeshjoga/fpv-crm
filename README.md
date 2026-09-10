@@ -46,7 +46,8 @@ src/
 supabase/
   migrations/     schema, RLS, storage, seed, hardening
   functions/      start-exam, submit-exam, generate-certificate, notify,
-                  broadcast, admin-create-user
+                  broadcast, admin-create-user, register, form-intake,
+                  accept-registration
 ```
 
 ## Staff, calendar & notifications
@@ -75,13 +76,34 @@ supabase/
 | `instructor` | courses, lessons, PDFs, question banks, enrollment forms, grade/view results |
 | `student` | enrolled courses, exams, certificates |
 
-Self sign-up → `profiles.status = 'pending'` → **admin activates** on `/admin/approvals`
-→ student submits an enrollment form (`/enroll/<slug>`) → **admin approves** on
-`/admin/enrollments` → course unlocks.
+There is **no public self-signup**. A new student comes in through a form:
+
+1. They fill a **registration form** — either a built-in public form (`/register-form/<slug>`,
+   no login) or a **Google Form** wired to the `form-intake` webhook (see below).
+2. The submission lands in one **Registrations** queue (`/admin/registrations`) with a
+   source badge and a pending count on the dashboard.
+3. An admin opens **Review**, picks which course(s) to grant, and clicks **Accept &
+   create account**. The `accept-registration` edge function creates the auth user with
+   a random password, sets `must_change_password`, creates the `enrollments` rows, drops
+   a welcome notification, and emails the student `email + temp password` via Resend
+   (or returns the temp password to the admin if Resend isn't configured).
+4. The student signs in with the temp password → is forced to `/set-password` → lands on
+   `/app` seeing only the granted courses.
+
+Existing enrollment forms still work for **already-registered** students requesting an
+extra course: a private form at `/enroll/<slug>` → `/admin/enrollments` → approve.
+
+### Google Forms → Registrations
+
+**Company Settings ▸ Google Forms integration** shows a webhook URL and a ready-to-paste
+Apps Script. In your Form: **Extensions ▸ Apps Script**, paste the script, then add an
+**On form submit** trigger for `onEgireSubmit`. Each response POSTs to
+`/functions/v1/form-intake?secret=…` and appears in the queue. Regenerate the secret from
+the same panel (invalidates the old script).
 
 ### Bootstrapping the first admin
 
-Sign up through the UI, then in the Supabase SQL editor:
+Register through a public form and accept yourself, or in the Supabase SQL editor:
 
 ```sql
 update public.profiles
@@ -103,19 +125,18 @@ where email = 'you@example.com';
 
 ## Configuration still required for production
 
-1. **Custom SMTP / email** — the Supabase built-in mailer is rate-limited (≈2/hour).
-   Add Resend under Supabase → Auth → SMTP, and set edge secrets:
+1. **Resend / email** — set edge secrets so credential, certificate and broadcast emails
+   actually send:
    ```bash
    supabase secrets set RESEND_API_KEY=re_... CERT_EMAIL_FROM="EgireRobotics <no-reply@mail.egirerobotics.com>"
    ```
-   Until then `notify` / `generate-certificate` log the email and continue.
-2. **Google OAuth** — Supabase → Auth → Providers → Google: add the OAuth client ID
-   and secret; redirect URL `https://<your-app>/auth/callback`.
-3. **`org_settings.verify_base_url`** — set to the deployed app origin (used in QR
-   codes and email links). Editable from **Company settings**.
-4. Review Supabase **email confirmation** setting for the sign-up experience you want.
+   Until then those functions log the email and continue; `accept-registration` returns
+   the temp password to the admin so it can be shared manually.
+2. **`org_settings.verify_base_url`** — set to the deployed app origin (used in QR codes,
+   the Google Forms webhook URL, and email links). Editable from **Company settings**.
 
 ## Edge functions
 
-Deployed via the Supabase dashboard / MCP. Source in `supabase/functions/`; each
-bundles `_shared/common.ts`. All run with `verify_jwt = true`.
+Deployed via the Supabase dashboard / MCP. Source in `supabase/functions/`; each bundles
+`_shared/common.ts`. `register` and `form-intake` run with `verify_jwt = false` (public
+intake, secret-checked); all others require a JWT.

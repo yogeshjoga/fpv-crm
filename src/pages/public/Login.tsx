@@ -5,7 +5,7 @@ import { AuthCard } from '../../layout/PublicShell';
 import { Button, Field, TextInput } from '../../components/ui/kit';
 
 export function Login() {
-  const { signIn, signInWithGoogle, isAuthed, profile, isStaff } = useAuth();
+  const { signIn, isAuthed, profile, isStaff } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +21,10 @@ export function Login() {
     // navigation happens via the <Navigate> below once auth state propagates
   };
 
-  if (isAuthed && profile) return <Navigate to={isStaff ? '/admin' : '/app'} replace />;
+  if (isAuthed && profile) {
+    if (profile.must_change_password) return <Navigate to="/set-password" replace />;
+    return <Navigate to={isStaff ? '/admin' : '/app'} replace />;
+  }
 
   return (
     <AuthCard title="Welcome back" subtitle="Sign in to continue your training">
@@ -42,18 +45,10 @@ export function Login() {
         </Button>
       </form>
 
-      <div className="my-5 flex items-center gap-3 text-xs text-neutral-400">
-        <div className="h-px flex-1 bg-neutral-200" /> OR <div className="h-px flex-1 bg-neutral-200" />
-      </div>
-
-      <Button variant="secondary" className="w-full" onClick={() => signInWithGoogle()}>
-        <img src="https://www.google.com/favicon.ico" alt="" className="h-4 w-4" /> Continue with Google
-      </Button>
-
       <p className="mt-6 text-center text-sm text-neutral-500">
-        New here?{' '}
+        Want to join a course?{' '}
         <Link to="/register" className="font-medium text-blue-600 hover:underline">
-          Create an account
+          Register here
         </Link>
       </p>
     </AuthCard>

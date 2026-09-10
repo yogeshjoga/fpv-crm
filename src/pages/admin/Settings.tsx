@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
-import { Button, Field, PageHeader, Spinner, TextInput, useToast } from '../../components/ui/kit';
+import { Button, Field, PageHeader, Spinner, TextArea, TextInput, useToast } from '../../components/ui/kit';
 import type { Tables } from '../../lib/database.types';
+
+const FUNCTIONS_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
 
 type Org = Tables<'org_settings'>;
 
@@ -59,6 +61,8 @@ export function Settings() {
   return (
     <div className="max-w-2xl">
       <PageHeader title="Company settings" subtitle="Branding and default exam parameters" />
+
+      <GoogleFormIntegration secret={org.google_form_secret} onRegenerated={() => q.refetch()} />
 
       <GlassCard className="mb-6 p-6">
         <h2 className="mb-4 font-semibold text-neutral-900">Branding</h2>
@@ -133,5 +137,72 @@ function BrandingSlot({ label, url, busy, onFile }: { label: string; url: string
         <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
       </label>
     </div>
+  );
+}
+
+function GoogleFormIntegration({ secret, onRegenerated }: { secret: string; onRegenerated: () => void }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const webhook = `${FUNCTIONS_BASE}/form-intake?secret=${secret}`;
+
+  const script = `// Google Forms → EgireRobotics — add via Extensions ▸ Apps Script, then set an
+// "On form submit" trigger for onEgireSubmit.
+const EGIRE_WEBHOOK = ${JSON.stringify(webhook)};
+
+function onEgireSubmit(e) {
+  const answers = {};
+  let full_name = '', email = '', phone = '';
+  e.response.getItemResponses().forEach(function (ir) {
+    const q = ir.getItem().getTitle();
+    const a = ir.getResponse();
+    const key = String(q).toLowerCase();
+    if (key.indexOf('name') > -1 && !full_name) full_name = a;
+    else if (key.indexOf('email') > -1 && !email) email = a;
+    else if (key.indexOf('phone') > -1 || key.indexOf('mobile') > -1) phone = a;
+    else answers[q] = a;
+  });
+  if (!email && e.response.getRespondentEmail) email = e.response.getRespondentEmail();
+  UrlFetchApp.fetch(EGIRE_WEBHOOK, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({ full_name: full_name, email: email, phone: phone, answers: answers }),
+  });
+}`;
+
+  const regenerate = async () => {
+    if (!confirm('Regenerate the secret? Any existing Google Form script will stop working until you update it.')) return;
+    setBusy(true);
+    const newSecret = Array.from(crypto.getRandomValues(new Uint8Array(18)))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+    const { error } = await supabase.from('org_settings').update({ google_form_secret: newSecret }).eq('id', true);
+    setBusy(false);
+    if (error) return toast(error.message, 'error');
+    toast('Secret regenerated');
+    onRegenerated();
+  };
+
+  return (
+    <GlassCard className="mb-6 p-6">
+      <h2 className="mb-1 font-semibold text-neutral-900">Google Forms integration</h2>
+      <p className="mb-4 text-sm text-neutral-500">
+        Pipe a Google Form’s responses straight into the Registrations queue.
+      </p>
+      <Field label="Webhook URL">
+        <TextInput readOnly value={webhook} onFocus={(e) => e.currentTarget.select()} className="font-mono text-xs" />
+      </Field>
+      <div className="mt-4">
+        <div className="mb-1.5 text-sm font-medium text-neutral-700">Apps Script (paste into your Form)</div>
+        <TextArea readOnly value={script} className="min-h-[220px] font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
+      </div>
+      <div className="mt-3 flex gap-2">
+        <Button variant="secondary" onClick={() => { navigator.clipboard.writeText(script); toast('Script copied'); }}>
+          Copy script
+        </Button>
+        <Button variant="ghost" onClick={regenerate} loading={busy}>
+          Regenerate secret
+        </Button>
+      </div>
+    </GlassCard>
   );
 }

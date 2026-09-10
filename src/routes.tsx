@@ -7,7 +7,9 @@ import { RequireActive, RequireRole } from './auth/guards';
 
 import { Landing } from './pages/public/Landing';
 import { Login } from './pages/public/Login';
-import { Register } from './pages/public/Register';
+import { RegisterLanding } from './pages/public/RegisterLanding';
+import { PublicRegistrationForm } from './pages/public/PublicRegistrationForm';
+import { SetPassword } from './pages/public/SetPassword';
 import { ForgotPassword } from './pages/public/ForgotPassword';
 import { ResetPassword } from './pages/public/ResetPassword';
 import { AwaitingActivation } from './pages/public/AwaitingActivation';
@@ -24,6 +26,7 @@ import { StudentProfile } from './pages/student/StudentProfile';
 import { StudentCalendar } from './pages/student/StudentCalendar';
 
 import { AdminDashboard } from './pages/admin/AdminDashboard';
+import { Registrations } from './pages/admin/Registrations';
 import { Approvals } from './pages/admin/Approvals';
 import { Users } from './pages/admin/Users';
 import { AdminCourses } from './pages/admin/AdminCourses';
@@ -45,7 +48,8 @@ export function AppRoutes() {
       <Route element={<PublicShell />}>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        <Route path="/register" element={<RegisterLanding />} />
+        <Route path="/set-password" element={<SetPassword />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/awaiting-activation" element={<AwaitingActivation />} />
@@ -53,6 +57,8 @@ export function AppRoutes() {
         <Route path="/verify" element={<VerifyCertificate />} />
         <Route path="/verify/:certId" element={<VerifyCertificate />} />
       </Route>
+
+      <Route path="/register-form/:slug" element={<PublicRegistrationForm />} />
 
       <Route
         path="/enroll/:slug"
@@ -89,6 +95,7 @@ export function AppRoutes() {
         }
       >
         <Route index element={<AdminDashboard />} />
+        <Route path="registrations" element={<Registrations />} />
         <Route path="approvals" element={<Approvals />} />
         <Route
           path="users"

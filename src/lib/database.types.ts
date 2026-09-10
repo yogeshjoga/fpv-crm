@@ -98,6 +98,42 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["notifications"]["Insert"]>
         Relationships: []
       }
+      registrations: {
+        Row: {
+          id: string
+          source: Database["public"]["Enums"]["registration_source"]
+          form_id: string | null
+          full_name: string
+          email: string
+          phone: string | null
+          answers: Json
+          requested_course_id: string | null
+          status: Database["public"]["Enums"]["registration_status"]
+          reviewed_by: string | null
+          reviewed_at: string | null
+          review_note: string | null
+          created_profile_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          source?: Database["public"]["Enums"]["registration_source"]
+          form_id?: string | null
+          full_name?: string
+          email: string
+          phone?: string | null
+          answers?: Json
+          requested_course_id?: string | null
+          status?: Database["public"]["Enums"]["registration_status"]
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          review_note?: string | null
+          created_profile_id?: string | null
+          created_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["registrations"]["Insert"]>
+        Relationships: []
+      }
       broadcasts: {
         Row: {
           id: string
@@ -227,6 +263,7 @@ export type Database = {
           description: string
           id: string
           is_open: boolean
+          is_public: boolean
           opens_at: string | null
           slug: string
           title: string
@@ -240,6 +277,7 @@ export type Database = {
           description?: string
           id?: string
           is_open?: boolean
+          is_public?: boolean
           opens_at?: string | null
           slug: string
           title: string
@@ -444,6 +482,7 @@ export type Database = {
           default_pass_pct: number
           default_question_count: number
           default_time_limit_min: number
+          google_form_secret: string
           id: boolean
           logo_url: string | null
           org_name: string
@@ -460,6 +499,7 @@ export type Database = {
           default_pass_pct?: number
           default_question_count?: number
           default_time_limit_min?: number
+          google_form_secret?: string
           id?: boolean
           logo_url?: string | null
           org_name?: string
@@ -479,6 +519,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          must_change_password: boolean
           phone: string | null
           role: Database["public"]["Enums"]["user_role"]
           status: Database["public"]["Enums"]["user_status"]
@@ -490,6 +531,7 @@ export type Database = {
           email: string
           full_name?: string
           id: string
+          must_change_password?: boolean
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           status?: Database["public"]["Enums"]["user_status"]
@@ -572,6 +614,8 @@ export type Database = {
         | "text" | "textarea" | "select" | "multiselect" | "number"
         | "email" | "phone" | "date" | "file" | "checkbox"
       question_type: "single" | "multi"
+      registration_source: "registration_form" | "google_form" | "csv"
+      registration_status: "pending" | "accepted" | "rejected"
       user_role: "super_admin" | "instructor" | "student"
       user_status: "pending" | "active" | "suspended"
     }

@@ -18,6 +18,7 @@ export function RequireActive({ children }: { children: ReactElement }) {
   if (loading) return <Spinner />;
   if (!isAuthed) return <Navigate to="/login" replace />;
   if (!profile) return <Spinner label="Loading your profile…" />;
+  if (profile.must_change_password) return <Navigate to="/set-password" replace />;
   if (profile.status !== 'active') return <Navigate to="/awaiting-activation" replace />;
   return children;
 }

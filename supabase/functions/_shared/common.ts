@@ -36,6 +36,13 @@ export class HttpError extends Error {
   }
 }
 
+/** A short URL-safe temporary password (hex + a couple of symbols). */
+export function randomPassword(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  const hex = Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+  return `Egr-${hex}`;
+}
+
 export function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {

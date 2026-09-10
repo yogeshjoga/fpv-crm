@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ClipboardCheck, GraduationCap, Inbox, ScrollText, Users } from 'lucide-react';
+import { GraduationCap, Inbox, ScrollText, UserPlus, Users } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useQuery } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
@@ -14,21 +14,21 @@ async function count(table: string, filter?: (q: any) => any) {
 
 export function AdminDashboard() {
   const q = useQuery(async () => {
-    const [pendingAccounts, pendingRequests, courses, students, certs] = await Promise.all([
-      count('profiles', (q) => q.eq('status', 'pending')),
+    const [pendingRegs, pendingRequests, courses, students, certs] = await Promise.all([
+      count('registrations', (q) => q.eq('status', 'pending')),
       count('enrollment_requests', (q) => q.eq('status', 'pending')),
       count('courses'),
       count('profiles', (q) => q.eq('role', 'student')),
       count('certificates', (q) => q.eq('revoked', false)),
     ]);
-    return { pendingAccounts, pendingRequests, courses, students, certs };
+    return { pendingRegs, pendingRequests, courses, students, certs };
   }, []);
 
   if (q.loading) return <Spinner />;
   const d = q.data!;
 
   const cards = [
-    { label: 'Accounts awaiting approval', value: d.pendingAccounts, to: '/admin/approvals', icon: ClipboardCheck, tone: d.pendingAccounts ? 'text-amber-500' : 'text-neutral-400' },
+    { label: 'Registrations pending', value: d.pendingRegs, to: '/admin/registrations', icon: UserPlus, tone: d.pendingRegs ? 'text-amber-500' : 'text-neutral-400' },
     { label: 'Enrollment requests pending', value: d.pendingRequests, to: '/admin/enrollments', icon: Inbox, tone: d.pendingRequests ? 'text-amber-500' : 'text-neutral-400' },
     { label: 'Courses', value: d.courses, to: '/admin/courses', icon: GraduationCap, tone: 'text-blue-500' },
     { label: 'Students', value: d.students, to: '/admin/users', icon: Users, tone: 'text-blue-500' },
