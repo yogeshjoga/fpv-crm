@@ -180,7 +180,7 @@ function ReviewModal({
   const [selected, setSelected] = useState<string[]>(reg.requested_course_id ? [reg.requested_course_id] : []);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
-  const [creds, setCreds] = useState<{ email: string; temp_password: string | null; email_sent: boolean } | null>(null);
+  const [creds, setCreds] = useState<{ email: string; temp_password: string | null; email_skip?: string | null } | null>(null);
   const [pay, setPay] = useState({
     status: reg.payment_status,
     amount: reg.payment_amount != null ? String(reg.payment_amount) : '',
@@ -216,15 +216,34 @@ function ReviewModal({
   const accept = async () => {
     setBusy(true);
     try {
-      const res = await invokeFn<{ email: string; temp_password: string | null; email_sent: boolean; granted_courses: number }>(
-        'accept-registration',
-        { registration_id: reg.id, course_ids: selected, review_note: note, payment: paymentPayload() },
-      );
-      if (res.email_sent) {
-        toast(`Account created, ${res.granted_courses} course(s) granted, credentials emailed`);
+      const res = await invokeFn<{
+        email: string;
+        temp_password: string | null;
+        email_sent: boolean;
+        email_skip?: string | null;
+        account_created: boolean;
+        granted_courses: number;
+      }>('accept-registration', {
+        registration_id: reg.id,
+        course_ids: selected,
+        review_note: note,
+        payment: paymentPayload(),
+      });
+
+      if (!res.account_created) {
+        // email already had an account — we only updated their course access
+        toast(
+          res.email_sent
+            ? `Existing account — access updated, student notified by email`
+            : `Existing account — access updated (${res.granted_courses} course(s))`,
+        );
+        onAccepted();
+      } else if (res.email_sent) {
+        toast(`Account created, ${res.granted_courses} course(s) granted — credentials emailed`);
         onAccepted();
       } else {
-        setCreds({ email: res.email, temp_password: res.temp_password, email_sent: res.email_sent });
+        // new account, but the email didn't go out — surface the credentials to hand over
+        setCreds({ email: res.email, temp_password: res.temp_password, email_skip: res.email_skip });
       }
     } catch (e) {
       toast((e as Error).message, 'error');
@@ -240,7 +259,8 @@ function ReviewModal({
       {creds ? (
         <div className="space-y-3">
           <p className="text-sm text-neutral-600">
-            Account created. Email delivery isn’t configured yet — share these credentials with the student:
+            Account created, but the welcome email could not be sent
+            {creds.email_skip ? ` (${creds.email_skip})` : ''}. Share these credentials with the student:
           </p>
           <div className="rounded-2xl border border-white/60 bg-white/50 p-4 text-sm">
             <div>

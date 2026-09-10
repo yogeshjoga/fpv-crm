@@ -102,6 +102,11 @@ Deno.serve(async (req) => {
       link: '/app',
     });
 
+    const hi = `<p>Hi ${(reg.full_name || 'there').replace(/</g, '&lt;')},</p>`;
+    const coursesLine = courses.length
+      ? `<p>You now have access to <strong>${courses.length}</strong> course${courses.length > 1 ? 's' : ''}.</p>`
+      : '';
+
     let emailSent = false;
     let emailSkip: string | undefined;
     if (isNew && tempPassword) {
@@ -109,10 +114,26 @@ Deno.serve(async (req) => {
         to: email,
         subject: `Your ${orgName} account is ready`,
         html: emailShell(
-          `<p>Hi ${(reg.full_name || 'there').replace(/</g, '&lt;')},</p>` +
+          hi +
             `<p>Your registration has been accepted. Sign in with:</p>` +
             `<p><strong>Email:</strong> ${email}<br/><strong>Temporary password:</strong> <code>${tempPassword}</code></p>` +
             `<p>You'll be asked to choose a new password on first sign-in.</p>` +
+            coursesLine +
+            `<p><a href='${appUrl}/login'>Sign in</a></p>`,
+        ),
+      });
+      emailSent = res.sent;
+      emailSkip = res.skipped;
+    } else {
+      // account already existed — confirm the updated access, no password
+      const res = await sendEmail({
+        to: email,
+        subject: `Your ${orgName} access has been updated`,
+        html: emailShell(
+          hi +
+            `<p>Your registration has been accepted.</p>` +
+            coursesLine +
+            `<p>Sign in with your existing password.</p>` +
             `<p><a href='${appUrl}/login'>Sign in</a></p>`,
         ),
       });
