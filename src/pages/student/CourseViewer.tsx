@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Download, FileText, GraduationCap, Lock, PlayCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../auth/AuthProvider';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, Button, PageHeader, Spinner, useToast } from '../../components/ui/kit';
@@ -40,7 +41,9 @@ function ImageResource({ path, name }: { path: string; name: string }) {
 
 export function CourseViewer() {
   const { slug } = useParams();
+  const { profile } = useAuth();
   const toast = useToast();
+  const uid = profile?.id ?? '';
 
   const q = useQuery(async () => {
     const course = (await unwrap(
@@ -54,13 +57,16 @@ export function CourseViewer() {
         .single(),
     )) as any;
 
+    // Scope to the current user explicitly: staff RLS on these tables returns
+    // every student's rows, which would break the .maybeSingle() calls and
+    // pollute attempt counts when a staff account uses the student view.
     const [enrollment, attempts, cert] = await Promise.all([
-      unwrap(supabase.from('enrollments').select('id, status').eq('course_id', course.id).maybeSingle()) as Promise<any>,
-      unwrap(supabase.from('exam_attempts').select('*').eq('course_id', course.id).order('attempt_no', { ascending: false })) as Promise<any[]>,
-      unwrap(supabase.from('certificates').select('id, cert_id_string').eq('course_id', course.id).eq('revoked', false).maybeSingle()) as Promise<any>,
+      unwrap(supabase.from('enrollments').select('id, status').eq('course_id', course.id).eq('student_id', uid).maybeSingle()) as Promise<any>,
+      unwrap(supabase.from('exam_attempts').select('*').eq('course_id', course.id).eq('student_id', uid).order('attempt_no', { ascending: false })) as Promise<any[]>,
+      unwrap(supabase.from('certificates').select('id, cert_id_string').eq('course_id', course.id).eq('student_id', uid).eq('revoked', false).maybeSingle()) as Promise<any>,
     ]);
     return { course, enrollment, attempts, cert };
-  }, [slug]);
+  }, [slug, uid]);
 
   const [downloading, setDownloading] = useState<string | null>(null);
 
