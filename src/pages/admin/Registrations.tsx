@@ -230,7 +230,9 @@ function ReviewModal({
                 {answers.map(([k, v]) => (
                   <div key={k} className="grid grid-cols-[160px_1fr] gap-3">
                     <dt className="text-neutral-500">{k}</dt>
-                    <dd className="text-neutral-900">{Array.isArray(v) ? v.join(', ') : String(v ?? '—')}</dd>
+                    <dd className="text-neutral-900">
+                      <AnswerValue value={v} />
+                    </dd>
                   </div>
                 ))}
               </dl>
@@ -278,6 +280,57 @@ function ReviewModal({
       )}
     </Modal>
   );
+}
+
+const DRIVE_ID = /^[A-Za-z0-9_-]{25,}$/;
+
+function driveLink(id: string) {
+  return `https://drive.google.com/file/d/${id}/view`;
+}
+function driveThumb(id: string) {
+  return `https://drive.google.com/thumbnail?id=${id}&sz=w320`;
+}
+
+/** Renders a form answer: linkifies URLs and Google Drive file IDs, previews images. */
+function AnswerValue({ value }: { value: unknown }) {
+  const parts = Array.isArray(value) ? value : [value];
+  const rendered = parts
+    .map((raw) => String(raw ?? '').trim())
+    .filter(Boolean)
+    .map((v, i) => {
+      const idMatch = DRIVE_ID.test(v);
+      const isUrl = /^https?:\/\//i.test(v);
+      const driveIdInUrl = isUrl ? v.match(/[-\w]{25,}/)?.[0] : null;
+      if (idMatch || driveIdInUrl) {
+        const id = idMatch ? v : (driveIdInUrl as string);
+        return (
+          <a key={i} href={isUrl ? v : driveLink(id)} target="_blank" rel="noreferrer" className="inline-block">
+            <img
+              src={driveThumb(id)}
+              alt="upload"
+              className="h-20 w-20 rounded-lg border border-white/60 object-cover"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).replaceWith(
+                  Object.assign(document.createElement('span'), {
+                    className: 'text-blue-600 underline text-xs',
+                    textContent: 'Open file',
+                  }),
+                );
+              }}
+            />
+          </a>
+        );
+      }
+      if (isUrl)
+        return (
+          <a key={i} href={v} target="_blank" rel="noreferrer" className="break-all text-blue-600 underline">
+            {v}
+          </a>
+        );
+      return <span key={i}>{v}</span>;
+    });
+  if (!rendered.length) return <>—</>;
+  return <div className="flex flex-wrap items-center gap-2">{rendered}</div>;
 }
 
 /** Minimal CSV parser: first row = headers. name/full name, email, phone are mapped; the rest go to answers. */

@@ -145,8 +145,8 @@ function GoogleFormIntegration({ secret, onRegenerated }: { secret: string; onRe
   const [busy, setBusy] = useState(false);
   const webhook = `${FUNCTIONS_BASE}/form-intake?secret=${secret}`;
 
-  const script = `// Google Forms → EgireRobotics — add via Extensions ▸ Apps Script, then set an
-// "On form submit" trigger for onEgireSubmit.
+  const script = `// Google Forms -> EgireRobotics.  Extensions > Apps Script, paste this,
+// then Triggers (clock icon) > Add Trigger: onEgireSubmit / From form / On form submit.
 const EGIRE_WEBHOOK = ${JSON.stringify(webhook)};
 
 function onEgireSubmit(e) {
@@ -154,8 +154,23 @@ function onEgireSubmit(e) {
   let full_name = '', email = '', phone = '';
   e.response.getItemResponses().forEach(function (ir) {
     const q = ir.getItem().getTitle();
-    const a = ir.getResponse();
+    let a = ir.getResponse();
     const key = String(q).toLowerCase();
+
+    // file-upload answers arrive as Drive file IDs -> make them view-shareable links
+    if (ir.getItem().getType() === FormApp.ItemType.FILE_UPLOAD) {
+      const ids = [].concat(a);
+      a = ids.map(function (id) {
+        try {
+          const f = DriveApp.getFileById(id);
+          f.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+          return f.getUrl();
+        } catch (err) {
+          return id;
+        }
+      });
+    }
+
     if (key.indexOf('name') > -1 && !full_name) full_name = a;
     else if (key.indexOf('email') > -1 && !email) email = a;
     else if (key.indexOf('phone') > -1 || key.indexOf('mobile') > -1) phone = a;
