@@ -23,7 +23,7 @@ interface FormRow {
   is_open: boolean;
   opens_at: string | null;
   closes_at: string | null;
-  course: { title: string } | null;
+  course: { title: string; slug: string } | null;
   enrollment_form_fields: FormField[];
 }
 
@@ -51,19 +51,26 @@ export function EnrollmentForm() {
       supabase
         .from('enrollment_forms')
         .select(
-          'id, course_id, title, description, is_open, opens_at, closes_at, course:courses(title), ' +
+          'id, course_id, title, description, is_open, opens_at, closes_at, course:courses(title, slug), ' +
             'enrollment_form_fields(id, label, field_type, options_json, required, help_text, position)',
         )
         .eq('slug', slug as string)
         .single(),
     )) as unknown as FormRow;
 
+    // Scope to the current user — staff RLS returns every request for the form,
+    // which would break .maybeSingle().
     const existing = (await unwrap(
-      supabase.from('enrollment_requests').select('id, status').eq('form_id', form.id).maybeSingle(),
+      supabase
+        .from('enrollment_requests')
+        .select('id, status')
+        .eq('form_id', form.id)
+        .eq('student_id', profile?.id ?? '')
+        .maybeSingle(),
     )) as { id: string; status: string } | null;
 
     return { form, existing };
-  }, [slug]);
+  }, [slug, profile?.id]);
 
   const fields = useMemo(
     () => [...(q.data?.form.enrollment_form_fields ?? [])].sort((a, b) => a.position - b.position),
@@ -152,7 +159,15 @@ export function EnrollmentForm() {
                 ? 'An administrator declined this enrollment request.'
                 : 'An administrator will review your enrollment request shortly.'}
           </p>
-          <Link to="/app/courses" className="mt-2 text-sm font-medium text-blue-600 hover:underline">
+          {status === 'approved' && form.course?.slug && (
+            <Link
+              to={`/app/courses/${form.course.slug}`}
+              className="mt-2 inline-flex items-center gap-2 rounded-full bg-[#1a1a1a] px-5 py-2.5 text-sm font-medium text-white"
+            >
+              Open course
+            </Link>
+          )}
+          <Link to="/app/courses" className="mt-1 text-sm font-medium text-blue-600 hover:underline">
             Back to catalog
           </Link>
         </div>
