@@ -52,6 +52,19 @@ Deno.serve(async (req) => {
     const tpl = templates[kind];
     if (!tpl) throw new HttpError(400, `Unknown notification kind: ${kind}`);
 
+    const links: Record<string, string> = {
+      account_activated: '/app',
+      enrollment_approved: '/app/courses',
+      attempts_locked: '/app',
+    };
+    await admin.from('notifications').insert({
+      recipient_id: user_id,
+      title: tpl.subject,
+      body: tpl.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+      kind,
+      link: links[kind] ?? null,
+    });
+
     const result = await sendEmail({ to: user.email, subject: tpl.subject, html: `<div style="font-family:system-ui,Arial,sans-serif">${tpl.html}</div>` });
     return json({ ok: true, ...result });
   } catch (e) {

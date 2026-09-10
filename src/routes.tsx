@@ -21,6 +21,7 @@ import { CourseViewer } from './pages/student/CourseViewer';
 import { ExamFlow } from './pages/student/ExamFlow';
 import { StudentCertificates } from './pages/student/StudentCertificates';
 import { StudentProfile } from './pages/student/StudentProfile';
+import { StudentCalendar } from './pages/student/StudentCalendar';
 
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { Approvals } from './pages/admin/Approvals';
@@ -34,6 +35,9 @@ import { FormResponses } from './pages/admin/FormResponses';
 import { EnrollmentRequests } from './pages/admin/EnrollmentRequests';
 import { AdminCertificates } from './pages/admin/AdminCertificates';
 import { Settings } from './pages/admin/Settings';
+import { Employees } from './pages/admin/Employees';
+import { AdminCalendar } from './pages/admin/AdminCalendar';
+import { Notifications } from './pages/admin/Notifications';
 
 export function AppRoutes() {
   return (
@@ -71,6 +75,7 @@ export function AppRoutes() {
         <Route path="courses" element={<CourseCatalog />} />
         <Route path="courses/:slug" element={<CourseViewer />} />
         <Route path="courses/:slug/exam" element={<ExamFlow />} />
+        <Route path="calendar" element={<StudentCalendar />} />
         <Route path="certificates" element={<StudentCertificates />} />
         <Route path="profile" element={<StudentProfile />} />
       </Route>
@@ -100,7 +105,17 @@ export function AppRoutes() {
         <Route path="forms/:id/edit" element={<FormBuilder />} />
         <Route path="forms/:id/responses" element={<FormResponses />} />
         <Route path="enrollments" element={<EnrollmentRequests />} />
+        <Route path="calendar" element={<AdminCalendar />} />
+        <Route path="notifications" element={<Notifications />} />
         <Route path="certificates" element={<AdminCertificates />} />
+        <Route
+          path="employees"
+          element={
+            <RequireRole roles={['super_admin']}>
+              <Employees />
+            </RequireRole>
+          }
+        />
         <Route
           path="settings"
           element={

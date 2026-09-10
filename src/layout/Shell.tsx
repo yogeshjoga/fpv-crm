@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LogOut, Menu, X } from 'lucide-react';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { LayoutGrid, LogOut, Menu, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
+import { NotificationBell } from '../components/NotificationBell';
 
 export interface NavItem {
   to: string;
@@ -18,7 +19,7 @@ const roleLabel: Record<string, string> = {
 };
 
 export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin' }) {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, isStaff } = useAuth();
   const navigate = useNavigate();
   const [openMobile, setOpenMobile] = useState(false);
 
@@ -71,6 +72,15 @@ export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin'
             {openMobile ? <X size={20} /> : <Menu size={20} />}
           </button>
           <div className="flex flex-1 items-center justify-end gap-3">
+            {isStaff && (
+              <Link
+                to={area === 'Admin' ? '/app' : '/admin'}
+                className="hidden items-center gap-1.5 rounded-full bg-white/60 px-3 py-1.5 text-sm text-neutral-600 hover:bg-white sm:flex"
+              >
+                <LayoutGrid size={14} /> {area === 'Admin' ? 'Student view' : 'Admin'}
+              </Link>
+            )}
+            <NotificationBell />
             <div className="text-right leading-tight">
               <div className="text-sm font-medium text-neutral-900">{profile?.full_name || profile?.email}</div>
               <div className="text-[11px] text-neutral-500">{profile ? roleLabel[profile.role] : ''}</div>

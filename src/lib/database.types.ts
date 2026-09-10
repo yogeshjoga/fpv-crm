@@ -18,6 +18,112 @@ export type Database = {
         Update: { course_code?: string; last_seq?: number }
         Relationships: []
       }
+      staff_details: {
+        Row: {
+          profile_id: string
+          employee_code: string | null
+          department: string
+          designation: string
+          joined_on: string | null
+          notes: string
+          updated_at: string
+        }
+        Insert: {
+          profile_id: string
+          employee_code?: string | null
+          department?: string
+          designation?: string
+          joined_on?: string | null
+          notes?: string
+          updated_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["staff_details"]["Insert"]>
+        Relationships: []
+      }
+      calendar_events: {
+        Row: {
+          id: string
+          title: string
+          description: string
+          type: Database["public"]["Enums"]["calendar_event_type"]
+          starts_at: string
+          ends_at: string | null
+          all_day: boolean
+          location: string
+          course_id: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          description?: string
+          type?: Database["public"]["Enums"]["calendar_event_type"]
+          starts_at: string
+          ends_at?: string | null
+          all_day?: boolean
+          location?: string
+          course_id?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["calendar_events"]["Insert"]>
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          id: string
+          recipient_id: string
+          title: string
+          body: string
+          kind: string
+          link: string | null
+          broadcast_id: string | null
+          read_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          recipient_id: string
+          title: string
+          body?: string
+          kind?: string
+          link?: string | null
+          broadcast_id?: string | null
+          read_at?: string | null
+          created_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["notifications"]["Insert"]>
+        Relationships: []
+      }
+      broadcasts: {
+        Row: {
+          id: string
+          subject: string
+          body: string
+          audience_type: string
+          audience_ref: Json
+          recipient_count: number
+          email_sent: number
+          sent_by: string | null
+          sent_at: string
+        }
+        Insert: {
+          id?: string
+          subject: string
+          body?: string
+          audience_type: string
+          audience_ref?: Json
+          recipient_count?: number
+          email_sent?: number
+          sent_by?: string | null
+          sent_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["broadcasts"]["Insert"]>
+        Relationships: []
+      }
       certificates: {
         Row: {
           attempt_id: string | null
@@ -458,6 +564,7 @@ export type Database = {
     }
     Enums: {
       attempt_status: "in_progress" | "submitted" | "expired"
+      calendar_event_type: "session" | "exam_window" | "deadline" | "holiday" | "other"
       course_status: "draft" | "published" | "archived"
       enroll_request_status: "pending" | "approved" | "rejected"
       enrollment_status: "active" | "completed" | "revoked"

@@ -5,7 +5,7 @@ import { AuthCard } from '../../layout/PublicShell';
 import { Button, Field, TextInput } from '../../components/ui/kit';
 
 export function Login() {
-  const { signIn, signInWithGoogle, isAuthed } = useAuth();
+  const { signIn, signInWithGoogle, isAuthed, profile, isStaff } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +21,7 @@ export function Login() {
     // navigation happens via the <Navigate> below once auth state propagates
   };
 
-  if (isAuthed) return <Navigate to="/app" replace />;
+  if (isAuthed && profile) return <Navigate to={isStaff ? '/admin' : '/app'} replace />;
 
   return (
     <AuthCard title="Welcome back" subtitle="Sign in to continue your training">

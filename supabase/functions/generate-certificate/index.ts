@@ -127,6 +127,14 @@ Deno.serve(async (req) => {
     });
     if (insErr) throw new HttpError(500, insErr.message);
 
+    await admin.from('notifications').insert({
+      recipient_id: student_id,
+      title: `Certificate issued — ${course.title}`,
+      body: `You passed ${course.title} with ${Number(score_pct ?? 0)}%. Certificate ${certId} is ready to download.`,
+      kind: 'exam_passed',
+      link: '/app/certificates',
+    });
+
     await sendEmail({
       to: student.email,
       subject: `Your ${org.org_name} certificate - ${course.title}`,

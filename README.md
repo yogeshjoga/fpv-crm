@@ -36,14 +36,36 @@ src/
   layout/         Shell (student + admin), PublicShell, nav config
   components/ui/  glassmorphic design system (shared.tsx, kit.tsx)
   pages/public/   landing, login, register, password reset, verify, enrollment form
-  pages/student/  dashboard, catalog, course viewer, exam runner, certificates, profile
-  pages/admin/    dashboard, approvals, users, courses + builder, question bank,
-                  enrollment forms + builder + responses, enrollment requests,
-                  certificates, company settings
+  components/     NotificationBell, CalendarView (shared month grid)
+  pages/student/  dashboard, catalog, course viewer, exam runner, certificates,
+                  calendar, profile
+  pages/admin/    dashboard, approvals, users, employees, courses + builder,
+                  question bank, enrollment forms + builder + responses,
+                  enrollment requests, calendar, notifications, certificates,
+                  company settings
 supabase/
   migrations/     schema, RLS, storage, seed, hardening
-  functions/      start-exam, submit-exam, generate-certificate, notify
+  functions/      start-exam, submit-exam, generate-certificate, notify,
+                  broadcast, admin-create-user
 ```
+
+## Staff, calendar & notifications
+
+- **Employees** (`/admin/employees`, super-admin) — staff directory over `profiles`
+  + `staff_details` (department, designation, joined date, code). "Add employee"
+  calls the `admin-create-user` edge function (creates the auth user, elevates the
+  role, emails a set-password link via Resend — or returns the link to copy while
+  Resend is unconfigured).
+- **Calendar** — shared `calendar_events` (session / exam_window / deadline /
+  holiday / other, optional course link). Staff manage it at `/admin/calendar`;
+  students see org-wide events plus events for their enrolled courses at
+  `/app/calendar` (RLS-scoped).
+- **Notifications** — `/admin/notifications` composes a message to an audience
+  (all students / one course / all staff); the `broadcast` edge function fans it
+  out to `notifications` rows + Resend emails and logs a `broadcasts` row. A
+  notification bell in both shells shows unread items; `notify` and
+  `generate-certificate` also drop bell notifications (account activated,
+  enrollment approved, exam passed).
 
 ## Roles & lifecycle
 
