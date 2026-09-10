@@ -1,5 +1,6 @@
 // Shared helpers for EgireRobotics edge functions.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.47.10';
+import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts';
 
 export const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -68,18 +69,61 @@ export function emailShell(bodyHtml: string): string {
   );
 }
 
-/** Fire a transactional email through Resend. No-ops when RESEND_API_KEY is unset. */
+/**
+ * Send a transactional email. Transport is chosen by env:
+ *   1. SMTP_HOST set  -> SMTP (e.g. Titan: smtp.titan.email)
+ *   2. RESEND_API_KEY -> Resend HTTP API
+ *   3. neither        -> logged and skipped
+ */
 export async function sendEmail(opts: {
   to: string;
   subject: string;
   html: string;
   attachments?: { filename: string; content: string }[];
 }): Promise<{ sent: boolean; skipped?: string }> {
+  const from =
+    Deno.env.get('MAIL_FROM') ??
+    Deno.env.get('CERT_EMAIL_FROM') ??
+    'EgireRobotics <support@egirerobotics.com>';
+
+  const smtpHost = Deno.env.get('SMTP_HOST');
+  if (smtpHost) {
+    try {
+      const client = new SMTPClient({
+        connection: {
+          hostname: smtpHost,
+          port: Number(Deno.env.get('SMTP_PORT') ?? '465'),
+          tls: (Deno.env.get('SMTP_TLS') ?? 'true') !== 'false',
+          auth: {
+            username: Deno.env.get('SMTP_USER') ?? '',
+            password: Deno.env.get('SMTP_PASS') ?? '',
+          },
+        },
+      });
+      await client.send({
+        from,
+        to: opts.to,
+        subject: opts.subject,
+        html: opts.html,
+        attachments: opts.attachments?.map((a) => ({
+          filename: a.filename,
+          content: a.content,
+          encoding: 'base64',
+          contentType: 'application/pdf',
+        })),
+      });
+      await client.close();
+      return { sent: true };
+    } catch (e) {
+      console.error('SMTP error', e);
+      return { sent: false, skipped: 'smtp_error' };
+    }
+  }
+
   const key = Deno.env.get('RESEND_API_KEY');
-  const from = Deno.env.get('CERT_EMAIL_FROM') ?? 'EgireRobotics <support@egirerobotics.com>';
   if (!key) {
-    console.log(`[email skipped — no RESEND_API_KEY] to=${opts.to} subject="${opts.subject}"`);
-    return { sent: false, skipped: 'no_api_key' };
+    console.log(`[email skipped — no transport] to=${opts.to} subject="${opts.subject}"`);
+    return { sent: false, skipped: 'no_transport' };
   }
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
