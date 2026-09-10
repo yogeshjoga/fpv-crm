@@ -1,4 +1,15 @@
-import { adminClient, cors, emailShell, HttpError, json, randomPassword, requireUser, sendEmail } from '../_shared/common.ts';
+import {
+  adminClient,
+  cors,
+  emailButton,
+  emailKeyValueCard,
+  emailShell,
+  HttpError,
+  json,
+  randomPassword,
+  requireUser,
+  sendEmail,
+} from '../_shared/common.ts';
 
 /**
  * Staff: accept a registration -> create (or reuse) the student account,
@@ -88,9 +99,10 @@ Deno.serve(async (req) => {
       })
       .eq('id', registration_id);
 
-    const { data: org } = await admin.from('org_settings').select('org_name, verify_base_url').single();
+    const { data: org } = await admin.from('org_settings').select('org_name, verify_base_url, logo_url').single();
     const appUrl = String(org?.verify_base_url ?? '').replace(/\/+$/, '');
     const orgName = org?.org_name ?? 'EgireRobotics';
+    const logoUrl = org?.logo_url ?? null;
 
     await admin.from('notifications').insert({
       recipient_id: profileId,
@@ -102,24 +114,32 @@ Deno.serve(async (req) => {
       link: '/app',
     });
 
-    const hi = `<p>Hi ${(reg.full_name || 'there').replace(/</g, '&lt;')},</p>`;
+    const safeName = String(reg.full_name || 'there').replace(/</g, '&lt;');
+    const firstName = safeName.split(' ')[0] || 'there';
     const coursesLine = courses.length
-      ? `<p>You now have access to <strong>${courses.length}</strong> course${courses.length > 1 ? 's' : ''}.</p>`
+      ? `<p style="margin:0 0 16px;color:#444">You now have access to <strong>${courses.length}</strong> course${courses.length > 1 ? 's' : ''}.</p>`
       : '';
+    const loginUrl = `${appUrl}/login`;
 
     let emailSent = false;
     let emailSkip: string | undefined;
     if (isNew && tempPassword) {
       const res = await sendEmail({
         to: email,
-        subject: `Your ${orgName} account is ready`,
+        subject: `Welcome to ${orgName} — your account is ready`,
         html: emailShell(
-          hi +
-            `<p>Your registration has been accepted. Sign in with:</p>` +
-            `<p><strong>Email:</strong> ${email}<br/><strong>Temporary password:</strong> <code>${tempPassword}</code></p>` +
-            `<p>You'll be asked to choose a new password on first sign-in.</p>` +
+          `<h1 style="font-size:20px;margin:0 0 14px;color:#0a0a0a">Welcome to ${orgName} 🚁</h1>` +
+            `<p style="margin:0 0 16px;color:#444">Hi ${firstName}, your registration has been accepted and your student account is ready.</p>` +
             coursesLine +
-            `<p><a href='${appUrl}/login'>Sign in</a></p>`,
+            `<p style="margin:0 0 4px;color:#444">Use these details to sign in:</p>` +
+            emailKeyValueCard([
+              { label: 'Email', value: email, mono: true },
+              { label: 'Temporary password', value: tempPassword, mono: true, big: true },
+            ]) +
+            `<p style="margin:0 0 18px;color:#666;font-size:13px">For your security you'll be asked to set your own password the first time you sign in.</p>` +
+            `<p style="margin:0 0 6px">${emailButton(loginUrl, 'Log in to your account')}</p>` +
+            `<p style="margin:14px 0 0;color:#9a9a9a;font-size:12px">Or paste this link into your browser:<br/>${loginUrl}</p>`,
+          logoUrl,
         ),
       });
       emailSent = res.sent;
@@ -130,11 +150,12 @@ Deno.serve(async (req) => {
         to: email,
         subject: `Your ${orgName} access has been updated`,
         html: emailShell(
-          hi +
-            `<p>Your registration has been accepted.</p>` +
+          `<h1 style="font-size:20px;margin:0 0 14px;color:#0a0a0a">Access updated</h1>` +
+            `<p style="margin:0 0 16px;color:#444">Hi ${firstName}, your registration has been accepted.</p>` +
             coursesLine +
-            `<p>Sign in with your existing password.</p>` +
-            `<p><a href='${appUrl}/login'>Sign in</a></p>`,
+            `<p style="margin:0 0 18px;color:#444">Sign in with your existing password to get started.</p>` +
+            `<p style="margin:0">${emailButton(loginUrl, 'Log in')}</p>`,
+          logoUrl,
         ),
       });
       emailSent = res.sent;

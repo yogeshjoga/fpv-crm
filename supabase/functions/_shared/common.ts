@@ -53,19 +53,54 @@ export function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-/** Wrap an email body in the EgireRobotics header + founder footer. */
-export function emailShell(bodyHtml: string): string {
+const esc = (s: string) =>
+  String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/** A primary call-to-action button for email bodies. */
+export function emailButton(href: string, label: string): string {
   return (
-    `<div style="font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;max-width:560px;margin:0 auto;padding:8px;color:#1a1a1a">` +
-    `<div style="border-bottom:2px solid #1a1a1a;padding-bottom:10px;margin-bottom:20px">` +
-    `<span style="font-weight:800;letter-spacing:2px;font-size:16px">EGIRE ROBOTICS</span>` +
-    `<span style="display:block;margin-top:2px;color:#8a8a8a;font-size:10px;letter-spacing:3px">EXPLORE &middot; ENGINEER &middot; EXCEL</span>` +
-    `</div>` +
+    `<a href="${esc(href)}" style="display:inline-block;background:#0a0a0a;color:#ffffff;` +
+    `text-decoration:none;font-weight:600;font-size:14px;line-height:1;padding:13px 26px;` +
+    `border-radius:10px;margin:4px 0">${esc(label)}</a>`
+  );
+}
+
+/** A labelled key/value card — used for login credentials. */
+export function emailKeyValueCard(rows: { label: string; value: string; mono?: boolean; big?: boolean }[]): string {
+  const cells = rows
+    .map(
+      (r) =>
+        `<div style="margin-bottom:12px">` +
+        `<div style="color:#8a8a8a;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px">${esc(r.label)}</div>` +
+        `<div style="${r.mono ? 'font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;' : ''}` +
+        `font-size:${r.big ? '18px' : '14px'};font-weight:${r.big ? '700' : '500'};color:#0a0a0a;word-break:break-all">${esc(r.value)}</div>` +
+        `</div>`,
+    )
+    .join('');
+  return (
+    `<div style="background:#f6f6f6;border:1px solid #e8e8e8;border-radius:12px;padding:18px 18px 6px;margin:18px 0">` +
+    cells +
+    `</div>`
+  );
+}
+
+/** Wrap an email body in the EgireRobotics header (logo image if available) + founder footer. */
+export function emailShell(bodyHtml: string, logoUrl?: string | null): string {
+  const header = logoUrl
+    ? `<img src="${esc(logoUrl)}" alt="EgireRobotics" height="38" style="height:38px;width:auto;border:0;display:block" />`
+    : `<span style="font-weight:800;letter-spacing:2px;font-size:18px;color:#0a0a0a">EGIRE ROBOTICS</span>` +
+      `<span style="display:block;margin-top:3px;color:#9a9a9a;font-size:10px;letter-spacing:3px">EXPLORE &middot; ENGINEER &middot; EXCEL</span>`;
+  return (
+    `<div style="background:#f0f0f0;padding:24px 12px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif">` +
+    `<div style="max-width:544px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e8e8e8">` +
+    `<div style="padding:22px 28px;border-bottom:1px solid #efefef">${header}</div>` +
+    `<div style="padding:28px;color:#1a1a1a;font-size:15px;line-height:1.65">` +
     bodyHtml +
-    `<div style="border-top:1px solid #ececec;margin-top:26px;padding-top:12px;color:#8a8a8a;font-size:12px;line-height:1.6">` +
+    `</div>` +
+    `<div style="padding:18px 28px;border-top:1px solid #efefef;color:#9a9a9a;font-size:12px;line-height:1.7">` +
     `<strong style="color:#555">Yogesh Joga</strong> &mdash; Founder, EgireRobotics<br/>` +
-    `contact@egirerobotics.com &middot; egirerobotics.com` +
-    `</div></div>`
+    `<a href="mailto:contact@egirerobotics.com" style="color:#9a9a9a;text-decoration:none">contact@egirerobotics.com</a> &middot; egirerobotics.com` +
+    `</div></div></div>`
   );
 }
 

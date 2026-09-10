@@ -1,4 +1,4 @@
-import { adminClient, cors, emailShell, HttpError, json, requireUser, sendEmail } from '../_shared/common.ts';
+import { adminClient, cors, emailButton, emailShell, HttpError, json, requireUser, sendEmail } from '../_shared/common.ts';
 
 /** Super-admin only: create a staff (or student) account and send a set-password link. */
 Deno.serve(async (req) => {
@@ -43,14 +43,19 @@ Deno.serve(async (req) => {
     const { data: link } = await admin.auth.admin.generateLink({ type: 'recovery', email: email.trim() });
     inviteLink = link?.properties?.action_link ?? null;
 
+    const { data: org } = await admin.from('org_settings').select('org_name, logo_url').single();
+    const orgName = org?.org_name ?? 'EgireRobotics';
+    const firstName = String(full_name ?? 'there').replace(/</g, '&lt;').split(' ')[0] || 'there';
+
     const emailRes = await sendEmail({
       to: email.trim(),
-      subject: 'Your EgireRobotics account',
+      subject: `Your ${orgName} account`,
       html: emailShell(
-        `<p>Hi ${(full_name ?? 'there').replace(/</g, '&lt;')},</p>` +
-          `<p>An EgireRobotics account has been created for you (${wantRole.replace('_', ' ')}).</p>` +
-          `<p>Set your password to sign in:</p>` +
-          `<p><a href='${inviteLink ?? ''}'>Set my password</a></p>`,
+        `<h1 style="font-size:20px;margin:0 0 14px;color:#0a0a0a">Your ${orgName} account</h1>` +
+          `<p style="margin:0 0 16px;color:#444">Hi ${firstName}, an account has been created for you (${wantRole.replace('_', ' ')}). ` +
+          `Set your password to sign in:</p>` +
+          `<p style="margin:0">${emailButton(inviteLink ?? '', 'Set my password')}</p>`,
+        org?.logo_url ?? null,
       ),
     });
 

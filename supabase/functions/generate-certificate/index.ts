@@ -139,10 +139,11 @@ Deno.serve(async (req) => {
       to: student.email,
       subject: `Your ${org.org_name} certificate - ${course.title}`,
       html: emailShell(
-        `<h2 style='margin:0 0 8px'>Congratulations, ${esc(student.full_name || 'there')}!</h2>` +
-          `<p style='color:#444'>You passed <strong>${esc(course.title)}</strong> with a score of ${Number(score_pct ?? 0)}%.</p>` +
-          `<p style='color:#444'>Your certificate <strong>${certId}</strong> is attached. Anyone can confirm it at:</p>` +
-          `<p><a href='${verifyUrl}'>${verifyUrl}</a></p>`,
+        `<h1 style="font-size:20px;margin:0 0 12px;color:#0a0a0a">Congratulations, ${esc(student.full_name || 'there')}! 🎉</h1>` +
+          `<p style="margin:0 0 16px;color:#444">You passed <strong>${esc(course.title)}</strong> with a score of ${Number(score_pct ?? 0)}%.</p>` +
+          `<p style="margin:0 0 16px;color:#444">Your certificate <strong>${certId}</strong> is attached to this email. Anyone can confirm it here:</p>` +
+          `<p style="margin:0"><a href="${verifyUrl}" style="color:#0a0a0a">${verifyUrl}</a></p>`,
+        org.logo_url ?? null,
       ),
       attachments: [{ filename: `${certId}.pdf`, content: encodeBase64(pdfBytes) }],
     });
