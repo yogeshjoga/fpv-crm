@@ -132,8 +132,14 @@ export function CourseViewer() {
                       )}
 
                       {l.kind === 'embed' && l.embed_url && (
-                        <div className="mt-3 aspect-video overflow-hidden rounded-xl border border-white/60">
-                          <iframe src={l.embed_url} className="h-full w-full" allowFullScreen title={l.title} />
+                        <div className="mt-3 h-[75vh] min-h-[520px] overflow-hidden rounded-xl border border-white/60">
+                          <iframe
+                            src={l.embed_url}
+                            className="h-full w-full"
+                            allowFullScreen
+                            title={l.title}
+                            allow="fullscreen; accelerometer; gyroscope"
+                          />
                         </div>
                       )}
 
