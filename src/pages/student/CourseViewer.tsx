@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Download, FileText, GraduationCap, Lock, PlayCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../auth/AuthProvider';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, Button, PageHeader, Spinner, useToast } from '../../components/ui/kit';
@@ -40,7 +41,9 @@ function ImageResource({ path, name }: { path: string; name: string }) {
 
 export function CourseViewer() {
   const { slug } = useParams();
+  const { profile } = useAuth();
   const toast = useToast();
+  const uid = profile?.id ?? '';
 
   const q = useQuery(async () => {
     const course = (await unwrap(
@@ -54,13 +57,16 @@ export function CourseViewer() {
         .single(),
     )) as any;
 
+    // Scope to the current user explicitly: staff RLS on these tables returns
+    // every student's rows, which would break the .maybeSingle() calls and
+    // pollute attempt counts when a staff account uses the student view.
     const [enrollment, attempts, cert] = await Promise.all([
-      unwrap(supabase.from('enrollments').select('id, status').eq('course_id', course.id).maybeSingle()) as Promise<any>,
-      unwrap(supabase.from('exam_attempts').select('*').eq('course_id', course.id).order('attempt_no', { ascending: false })) as Promise<any[]>,
-      unwrap(supabase.from('certificates').select('id, cert_id_string').eq('course_id', course.id).eq('revoked', false).maybeSingle()) as Promise<any>,
+      unwrap(supabase.from('enrollments').select('id, status').eq('course_id', course.id).eq('student_id', uid).maybeSingle()) as Promise<any>,
+      unwrap(supabase.from('exam_attempts').select('*').eq('course_id', course.id).eq('student_id', uid).order('attempt_no', { ascending: false })) as Promise<any[]>,
+      unwrap(supabase.from('certificates').select('id, cert_id_string').eq('course_id', course.id).eq('student_id', uid).eq('revoked', false).maybeSingle()) as Promise<any>,
     ]);
     return { course, enrollment, attempts, cert };
-  }, [slug]);
+  }, [slug, uid]);
 
   const [downloading, setDownloading] = useState<string | null>(null);
 
@@ -89,6 +95,7 @@ export function CourseViewer() {
   const cooldownActive = latest?.cooldown_until && new Date(latest.cooldown_until) > new Date();
   const canStart =
     enrollment?.status === 'active' && !cert && !locked && !cooldownActive && attemptsUsed < course.max_attempts;
+  const hasAccess = enrollment?.status === 'active' || enrollment?.status === 'completed';
 
   return (
     <div>
@@ -97,6 +104,20 @@ export function CourseViewer() {
         actions={enrollment ? <Badge tone={enrollment.status === 'completed' ? 'green' : 'blue'}>{enrollment.status}</Badge> : <Badge tone="red">not enrolled</Badge>}
       />
 
+      {!hasAccess ? (
+        <GlassCard className="flex flex-col items-center gap-3 p-10 text-center">
+          <Lock size={26} className="text-neutral-400" />
+          <div className="text-lg font-semibold text-neutral-900">You don't have access to this course</div>
+          <p className="max-w-sm text-sm text-neutral-500">
+            {enrollment?.status === 'revoked'
+              ? 'Your enrollment in this course was revoked. Contact an administrator if you think this is a mistake.'
+              : 'An administrator needs to enroll you before you can view the lessons and take the exam.'}
+          </p>
+          <Link to="/app/courses" className="mt-1 text-sm font-medium text-blue-600 hover:underline">
+            Back to catalog
+          </Link>
+        </GlassCard>
+      ) : (
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-4">
           {course.description && (
@@ -214,6 +235,7 @@ export function CourseViewer() {
           </GlassCard>
         </div>
       </div>
+      )}
     </div>
   );
 }

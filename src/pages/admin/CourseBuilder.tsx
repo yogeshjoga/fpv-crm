@@ -31,10 +31,12 @@ export function CourseBuilder() {
   const modules = [...(course.modules ?? [])].sort((a: any, b: any) => a.position - b.position);
 
   const addModule = async () => {
-    if (!newModule.trim()) return;
-    const { error } = await supabase.from('modules').insert({ course_id: course.id, title: newModule.trim(), position: modules.length });
+    const title = newModule.trim();
+    if (!title) return toast('Type a module title first', 'error');
+    const { error } = await supabase.from('modules').insert({ course_id: course.id, title, position: modules.length });
     if (error) return toast(error.message, 'error');
     setNewModule('');
+    toast('Module added');
     q.refetch();
   };
 

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, BookOpen, Lock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../auth/AuthProvider';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, EmptyState, PageHeader, Spinner } from '../../components/ui/kit';
@@ -14,15 +15,19 @@ interface Course {
 }
 
 export function CourseCatalog() {
+  const { profile } = useAuth();
+  const uid = profile?.id ?? '';
   const q = useQuery(async () => {
+    // enrollments / requests are scoped to the current user explicitly — staff
+    // RLS would otherwise return every student's rows and mislabel course cards.
     const [courses, enrollments, requests, forms] = await Promise.all([
       unwrap(supabase.from('courses').select('id, slug, title, summary, cover_image_url').eq('status', 'published').order('title')) as Promise<Course[]>,
-      unwrap(supabase.from('enrollments').select('course_id, status')) as Promise<{ course_id: string; status: string }[]>,
-      unwrap(supabase.from('enrollment_requests').select('course_id, status')) as Promise<{ course_id: string; status: string }[]>,
+      unwrap(supabase.from('enrollments').select('course_id, status').eq('student_id', uid)) as Promise<{ course_id: string; status: string }[]>,
+      unwrap(supabase.from('enrollment_requests').select('course_id, status').eq('student_id', uid)) as Promise<{ course_id: string; status: string }[]>,
       unwrap(supabase.from('enrollment_forms').select('course_id, slug').eq('is_open', true)) as Promise<{ course_id: string; slug: string }[]>,
     ]);
     return { courses, enrollments, requests, forms };
-  }, []);
+  }, [uid]);
 
   if (q.loading) return <Spinner />;
   if (q.error) return <p className="text-sm text-red-600">{q.error}</p>;
