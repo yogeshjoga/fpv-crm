@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { GraduationCap, Inbox, ScrollText, UserPlus, Users } from 'lucide-react';
+import { GraduationCap, Inbox, Layers3, ScrollText, UserPlus, Users } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useQuery } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
@@ -14,14 +14,15 @@ async function count(table: string, filter?: (q: any) => any) {
 
 export function AdminDashboard() {
   const q = useQuery(async () => {
-    const [pendingRegs, pendingRequests, courses, students, certs] = await Promise.all([
+    const [pendingRegs, pendingRequests, courses, courseGroups, students, certs] = await Promise.all([
       count('registrations', (q) => q.eq('status', 'pending')),
       count('enrollment_requests', (q) => q.eq('status', 'pending')),
       count('courses'),
+      count('course_groups'),
       count('profiles', (q) => q.eq('role', 'student')),
       count('certificates', (q) => q.eq('revoked', false)),
     ]);
-    return { pendingRegs, pendingRequests, courses, students, certs };
+    return { pendingRegs, pendingRequests, courses, courseGroups, students, certs };
   }, []);
 
   if (q.loading) return <Spinner />;
@@ -31,6 +32,7 @@ export function AdminDashboard() {
     { label: 'Registrations pending', value: d.pendingRegs, to: '/admin/registrations', icon: UserPlus, tone: d.pendingRegs ? 'text-amber-500' : 'text-neutral-400' },
     { label: 'Enrollment requests pending', value: d.pendingRequests, to: '/admin/enrollments', icon: Inbox, tone: d.pendingRequests ? 'text-amber-500' : 'text-neutral-400' },
     { label: 'Courses', value: d.courses, to: '/admin/courses', icon: GraduationCap, tone: 'text-blue-500' },
+    { label: 'Course groups', value: d.courseGroups, to: '/admin/course-groups', icon: Layers3, tone: 'text-blue-500' },
     { label: 'Students', value: d.students, to: '/admin/users', icon: Users, tone: 'text-blue-500' },
     { label: 'Certificates issued', value: d.certs, to: '/admin/certificates', icon: ScrollText, tone: 'text-green-500' },
   ];
