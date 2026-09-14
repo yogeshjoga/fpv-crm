@@ -1,3 +1,9 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "build": {
+    "env": {
+      "VITE_SUPABASE_URL": "https://txbrnewcztixcagdnnfx.supabase.co",
+      "VITE_SUPABASE_ANON_KEY": "sb_publishable_3U5FgNr8wNimcWj8j5pQ9Q_VwF3_c-2"
+    }
+  }
 }
