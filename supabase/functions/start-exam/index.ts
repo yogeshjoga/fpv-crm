@@ -87,15 +87,11 @@ Deno.serve(async (req) => {
     }
 
     // pick questions
-    const { data: pool } = await admin
-      .from('questions')
-      .select('id')
-      .eq('course_id', course.id)
-      .eq('is_active', true);
-    if (!pool || pool.length === 0) throw new HttpError(400, 'This course has no exam questions yet.');
-
-    const pickCount = Math.min(course.exam_question_count, pool.length);
-    const pickedIds = shuffle(pool.map((q) => q.id)).slice(0, pickCount);
+    const pickedIds =
+      course.grading_mode === 'tiered'
+        ? await pickTieredQuestions(admin, course)
+        : await pickPlainQuestions(admin, course);
+    if (pickedIds.length === 0) throw new HttpError(400, 'This course has no exam questions yet.');
 
     const expiresAt = new Date(now + course.exam_time_limit_min * 60_000).toISOString();
     const { data: attempt, error: insErr } = await admin
@@ -140,6 +136,61 @@ Deno.serve(async (req) => {
     return json({ error: (e as Error).message }, status);
   }
 });
+
+async function pickPlainQuestions(admin: ReturnType<typeof adminClient>, course: Record<string, any>) {
+  const { data: pool } = await admin
+    .from('questions')
+    .select('id')
+    .eq('course_id', course.id)
+    .eq('is_active', true);
+  if (!pool || pool.length === 0) return [];
+  const pickCount = Math.min(course.exam_question_count, pool.length);
+  return shuffle(pool.map((q) => q.id)).slice(0, pickCount);
+}
+
+async function pickTieredQuestions(admin: ReturnType<typeof adminClient>, course: Record<string, any>) {
+  const { data: sources } = await admin
+    .from('exam_pool_sources')
+    .select('source_course_id')
+    .eq('course_id', course.id);
+  const courseIds = [course.id, ...(sources ?? []).map((s) => s.source_course_id)];
+
+  const { data: pool } = await admin
+    .from('questions')
+    .select('id, difficulty')
+    .in('course_id', courseIds)
+    .eq('is_active', true);
+  if (!pool || pool.length === 0) return [];
+
+  const byDifficulty: Record<string, string[]> = { hard: [], medium: [], easy: [] };
+  for (const q of pool) {
+    (byDifficulty[q.difficulty] ?? (byDifficulty[q.difficulty] = [])).push(q.id);
+  }
+
+  const wanted: Record<string, number> = {
+    hard: course.mix_hard ?? 0,
+    medium: course.mix_medium ?? 0,
+    easy: course.mix_easy ?? 0,
+  };
+
+  const picked: string[] = [];
+  const usedIds = new Set<string>();
+  for (const tier of ['hard', 'medium', 'easy']) {
+    const shuffled = shuffle(byDifficulty[tier] ?? []);
+    const take = shuffled.slice(0, wanted[tier]);
+    for (const id of take) usedIds.add(id);
+    picked.push(...take);
+  }
+
+  // backfill any shortfall from the remaining pool so the exam still hits the target count
+  const target = course.exam_question_count ?? picked.length;
+  if (picked.length < target) {
+    const remaining = shuffle(pool.map((q) => q.id).filter((id) => !usedIds.has(id)));
+    picked.push(...remaining.slice(0, target - picked.length));
+  }
+
+  return shuffle(picked);
+}
 
 async function buildQuestionSet(admin: ReturnType<typeof adminClient>, ids: string[]) {
   const { data: qs } = await admin.from('questions').select('id, prompt, type').in('id', ids);

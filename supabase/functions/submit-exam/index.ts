@@ -26,29 +26,51 @@ Deno.serve(async (req) => {
       .from('question_options')
       .select('id, question_id, is_correct')
       .in('question_id', questionIds);
+    const { data: pointsRows } = await admin.from('questions').select('id, points').in('id', questionIds);
 
     const correctByQ = new Map<string, Set<string>>();
     for (const o of options ?? []) {
       if (!correctByQ.has(o.question_id)) correctByQ.set(o.question_id, new Set());
       if (o.is_correct) correctByQ.get(o.question_id)!.add(o.id);
     }
+    const pointsByQ = new Map<string, number>();
+    for (const q of pointsRows ?? []) pointsByQ.set(q.id, q.points ?? 1);
 
     const answerMap = new Map<string, string[]>();
     for (const a of answers ?? []) answerMap.set(a.question_id, a.selected_option_ids ?? []);
 
     let correctCount = 0;
+    let earnedPoints = 0;
+    let totalPoints = 0;
     const answerRows = questionIds.map((qid) => {
       const correct = correctByQ.get(qid) ?? new Set<string>();
       const selected = new Set(answerMap.get(qid) ?? []);
       const isCorrect =
         selected.size === correct.size && [...selected].every((id) => correct.has(id)) && correct.size > 0;
-      if (isCorrect) correctCount++;
+      const points = pointsByQ.get(qid) ?? 1;
+      totalPoints += points;
+      if (isCorrect) {
+        correctCount++;
+        earnedPoints += points;
+      }
       return { attempt_id, question_id: qid, selected_option_ids_json: [...selected], is_correct: isCorrect };
     });
 
     const total = questionIds.length;
-    const scorePct = total ? Math.round((correctCount / total) * 10000) / 100 : 0;
-    const passed = scorePct >= course.pass_pct;
+    const scorePct = totalPoints ? Math.round((earnedPoints / totalPoints) * 10000) / 100 : 0;
+
+    let gradeLabel: string | null = null;
+    let passed: boolean;
+    if (course.grading_mode === 'tiered') {
+      if (scorePct >= 80) gradeLabel = 'Grade 1';
+      else if (scorePct >= 70) gradeLabel = 'Grade 2';
+      else if (scorePct >= 50) gradeLabel = 'Grade 3';
+      else if (scorePct >= 35) gradeLabel = 'Grade 4';
+      else gradeLabel = 'Failed';
+      passed = gradeLabel !== 'Failed';
+    } else {
+      passed = scorePct >= course.pass_pct;
+    }
     const now = Date.now();
 
     await admin.from('exam_attempt_answers').insert(answerRows);
@@ -67,6 +89,7 @@ Deno.serve(async (req) => {
       submitted_at: new Date(now).toISOString(),
       score_pct: scorePct,
       passed,
+      grade_label: gradeLabel,
     };
     let locked = false;
     let cooldownUntil: string | undefined;
@@ -100,6 +123,7 @@ Deno.serve(async (req) => {
     return json({
       score_pct: scorePct,
       passed,
+      grade_label: gradeLabel,
       correct_count: correctCount,
       total,
       cert_id_string: certId,

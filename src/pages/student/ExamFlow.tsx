@@ -14,6 +14,7 @@ interface StartResponse {
 interface SubmitResponse {
   score_pct: number;
   passed: boolean;
+  grade_label?: string | null;
   correct_count: number;
   total: number;
   cert_id_string?: string;
@@ -116,6 +117,17 @@ export function ExamFlow() {
         <p className="mt-1 text-neutral-600">
           Score <span className="font-semibold text-neutral-900">{Number(result.score_pct)}%</span> — {result.correct_count}/{result.total} correct
         </p>
+        {result.grade_label && (
+          <p className="mt-2">
+            <span
+              className={`inline-block rounded-full px-3 py-1 text-sm font-semibold ${
+                result.grade_label === 'Failed' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+              }`}
+            >
+              {result.grade_label}
+            </span>
+          </p>
+        )}
 
         {result.passed && result.cert_id_string && (
           <div className="mt-5 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
