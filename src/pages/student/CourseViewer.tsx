@@ -4,6 +4,7 @@ import { Download, FileText, GraduationCap, Lock, PlayCircle } from 'lucide-reac
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useQuery, unwrap } from '../../lib/useQuery';
+import { useCourseTimeTracker } from '../../lib/useTimeTracker';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, Button, PageHeader, Spinner, useToast } from '../../components/ui/kit';
 
@@ -81,6 +82,13 @@ export function CourseViewer() {
     a.target = '_blank';
     a.click();
   };
+
+  // Only track time while the student actually has access — call unconditionally
+  // (before the early returns below) since hooks can't be called conditionally.
+  const trackedEnrollment = q.data?.enrollment?.status;
+  useCourseTimeTracker(
+    trackedEnrollment === 'active' || trackedEnrollment === 'completed' ? q.data?.course?.id : null,
+  );
 
   if (q.loading) return <Spinner />;
   if (q.error) return <p className="text-sm text-red-600">{q.error}</p>;

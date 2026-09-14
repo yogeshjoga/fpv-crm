@@ -37,6 +37,7 @@ import { FormBuilder } from './pages/admin/FormBuilder';
 import { FormResponses } from './pages/admin/FormResponses';
 import { EnrollmentRequests } from './pages/admin/EnrollmentRequests';
 import { AdminCertificates } from './pages/admin/AdminCertificates';
+import { AdminAnalytics } from './pages/admin/AdminAnalytics';
 import { Settings } from './pages/admin/Settings';
 import { Employees } from './pages/admin/Employees';
 import { AdminCalendar } from './pages/admin/AdminCalendar';
@@ -115,6 +116,14 @@ export function AppRoutes() {
         <Route path="calendar" element={<AdminCalendar />} />
         <Route path="notifications" element={<Notifications />} />
         <Route path="certificates" element={<AdminCertificates />} />
+        <Route
+          path="analytics"
+          element={
+            <RequireRole roles={['super_admin']}>
+              <AdminAnalytics />
+            </RequireRole>
+          }
+        />
         <Route
           path="employees"
           element={
