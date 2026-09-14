@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../lib/supabase';
 import { AuthCard } from '../../layout/PublicShell';
-import { Button, Field, TextInput } from '../../components/ui/kit';
+import { Button, Field, PasswordInput } from '../../components/ui/kit';
 
 /** Forced password change for accounts created by an admin with a temp password. */
 export function SetPassword() {
@@ -38,10 +38,10 @@ export function SetPassword() {
     <AuthCard title="Choose your password" subtitle="Set a new password to finish setting up your account">
       <form onSubmit={submit} className="space-y-4">
         <Field label="New password">
-          <TextInput type="password" required value={pw} onChange={(e) => setPw(e.target.value)} />
+          <PasswordInput required value={pw} onChange={(e) => setPw(e.target.value)} />
         </Field>
         <Field label="Confirm new password" error={error}>
-          <TextInput type="password" required value={pw2} onChange={(e) => setPw2(e.target.value)} />
+          <PasswordInput required value={pw2} onChange={(e) => setPw2(e.target.value)} />
         </Field>
         <Button type="submit" loading={busy} className="w-full">
           Save and continue

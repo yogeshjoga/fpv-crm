@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useState } from 'react';
-import { AlertCircle, CheckCircle2, Loader2, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Loader2, X } from 'lucide-react';
 
 /* ---------------------------------------------------------------- Button --- */
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -57,6 +57,28 @@ export const TextInput = React.forwardRef<HTMLInputElement, React.InputHTMLAttri
   ({ className = '', ...props }, ref) => <input ref={ref} className={`${inputBase} ${className}`} {...props} />,
 );
 TextInput.displayName = 'TextInput';
+
+/** Password field with a show/hide toggle. Same shape as TextInput. */
+export const PasswordInput = React.forwardRef<HTMLInputElement, Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'>>(
+  ({ className = '', ...props }, ref) => {
+    const [visible, setVisible] = useState(false);
+    return (
+      <div className="relative">
+        <input ref={ref} type={visible ? 'text' : 'password'} className={`${inputBase} pr-11 ${className}`} {...props} />
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => setVisible((v) => !v)}
+          className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-neutral-400 hover:text-neutral-700"
+          aria-label={visible ? 'Hide password' : 'Show password'}
+        >
+          {visible ? <EyeOff size={16} /> : <Eye size={16} />}
+        </button>
+      </div>
+    );
+  },
+);
+PasswordInput.displayName = 'PasswordInput';
 
 export const TextArea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(
   ({ className = '', ...props }, ref) => (

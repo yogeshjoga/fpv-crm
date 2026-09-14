@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../lib/supabase';
 import { AuthCard } from '../../layout/PublicShell';
-import { Button, Field, TextInput } from '../../components/ui/kit';
+import { Button, Field, PasswordInput } from '../../components/ui/kit';
 
 export function ResetPassword() {
   const { updatePassword } = useAuth();
@@ -46,10 +46,10 @@ export function ResetPassword() {
       ) : (
         <form onSubmit={submit} className="space-y-4">
           <Field label="New password">
-            <TextInput type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+            <PasswordInput required value={password} onChange={(e) => setPassword(e.target.value)} />
           </Field>
           <Field label="Confirm password" error={error}>
-            <TextInput type="password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+            <PasswordInput required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
           </Field>
           <Button type="submit" loading={busy} className="w-full">
             Update password
