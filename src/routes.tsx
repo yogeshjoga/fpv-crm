@@ -32,6 +32,7 @@ import { Registrations } from './pages/admin/Registrations';
 import { Approvals } from './pages/admin/Approvals';
 import { Users } from './pages/admin/Users';
 import { AdminCourses } from './pages/admin/AdminCourses';
+import { CourseGroups } from './pages/admin/CourseGroups';
 import { CourseBuilder } from './pages/admin/CourseBuilder';
 import { QuestionBank } from './pages/admin/QuestionBank';
 import { Forms } from './pages/admin/Forms';
@@ -112,6 +113,7 @@ export function AppRoutes() {
           }
         />
         <Route path="courses" element={<AdminCourses />} />
+        <Route path="course-groups" element={<CourseGroups />} />
         <Route path="courses/:id/build" element={<CourseBuilder />} />
         <Route path="question-bank/:courseId" element={<QuestionBank />} />
         <Route path="forms" element={<Forms />} />
