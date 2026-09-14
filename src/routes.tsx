@@ -33,6 +33,7 @@ import { Approvals } from './pages/admin/Approvals';
 import { Users } from './pages/admin/Users';
 import { AdminCourses } from './pages/admin/AdminCourses';
 import { CourseGroups } from './pages/admin/CourseGroups';
+import { AdminHelp } from './pages/admin/AdminHelp';
 import { CourseBuilder } from './pages/admin/CourseBuilder';
 import { QuestionBank } from './pages/admin/QuestionBank';
 import { Forms } from './pages/admin/Forms';
@@ -148,6 +149,7 @@ export function AppRoutes() {
             </RequireRole>
           }
         />
+        <Route path="help" element={<AdminHelp />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
