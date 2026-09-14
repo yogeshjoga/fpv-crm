@@ -5,6 +5,7 @@ import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import { NotificationBell } from '../components/NotificationBell';
 import { Logo } from '../components/Brand';
+import { useStaffActivityTracker } from '../lib/useTimeTracker';
 
 export interface NavItem {
   to: string;
@@ -23,6 +24,7 @@ export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin'
   const { profile, signOut, isStaff } = useAuth();
   const navigate = useNavigate();
   const [openMobile, setOpenMobile] = useState(false);
+  useStaffActivityTracker(area === 'Admin');
 
   const handleSignOut = async () => {
     await signOut();

@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, BookOpen, Award, UserCircle, CalendarDays,
   ClipboardCheck, Users, GraduationCap, Briefcase, Megaphone,
-  FormInput, Inbox, ScrollText, Settings2, UserPlus,
+  FormInput, Inbox, ScrollText, Settings2, UserPlus, BarChart3,
 } from 'lucide-react';
 import type { NavItem } from './Shell';
 
@@ -23,6 +23,7 @@ export const adminNav: NavItem[] = [
   { to: '/admin/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/admin/notifications', label: 'Notifications', icon: Megaphone },
   { to: '/admin/certificates', label: 'Certificates', icon: ScrollText },
+  { to: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/admin/employees', label: 'Employees', icon: Briefcase },
   { to: '/admin/users', label: 'Users', icon: Users },
   { to: '/admin/settings', label: 'Company Settings', icon: Settings2 },

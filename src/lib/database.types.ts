@@ -40,6 +40,40 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["staff_details"]["Insert"]>
         Relationships: []
       }
+      study_time: {
+        Row: {
+          student_id: string
+          course_id: string
+          day: string
+          seconds: number
+          updated_at: string
+        }
+        Insert: {
+          student_id: string
+          course_id: string
+          day?: string
+          seconds?: number
+          updated_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["study_time"]["Insert"]>
+        Relationships: []
+      }
+      staff_activity_time: {
+        Row: {
+          staff_id: string
+          day: string
+          seconds: number
+          updated_at: string
+        }
+        Insert: {
+          staff_id: string
+          day?: string
+          seconds?: number
+          updated_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["staff_activity_time"]["Insert"]>
+        Relationships: []
+      }
       calendar_events: {
         Row: {
           id: string
@@ -613,6 +647,8 @@ export type Database = {
       is_active_user: { Args: Record<string, never>; Returns: boolean }
       is_staff: { Args: Record<string, never>; Returns: boolean }
       is_super_admin: { Args: Record<string, never>; Returns: boolean }
+      increment_study_time: { Args: { p_course_id: string; p_seconds: number }; Returns: void }
+      increment_staff_activity: { Args: { p_seconds: number }; Returns: void }
       verify_certificate: {
         Args: { p_cert_id: string }
         Returns: {
