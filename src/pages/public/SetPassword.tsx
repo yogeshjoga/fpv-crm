@@ -7,15 +7,16 @@ import { Button, Field, PasswordInput } from '../../components/ui/kit';
 
 /** Forced password change for accounts created by an admin with a temp password. */
 export function SetPassword() {
-  const { isAuthed, profile, session, updatePassword, refreshProfile } = useAuth();
+  const { isAuthed, profile, session, isStaff, updatePassword, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [pw, setPw] = useState('');
   const [pw2, setPw2] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const home = isStaff ? '/admin' : '/app';
 
   if (!isAuthed) return <Navigate to="/login" replace />;
-  if (profile && !profile.must_change_password) return <Navigate to="/app" replace />;
+  if (profile && !profile.must_change_password) return <Navigate to={home} replace />;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +32,7 @@ export function SetPassword() {
     await supabase.from('profiles').update({ must_change_password: false }).eq('id', session!.user.id);
     await refreshProfile();
     setBusy(false);
-    navigate('/app', { replace: true });
+    navigate(home, { replace: true });
   };
 
   return (
