@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { Clock, GraduationCap } from 'lucide-react';
+import { Clock, Flame, GraduationCap } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useQuery, unwrap } from '../../lib/useQuery';
+import { computeStreak } from '../../lib/streak';
 import { GlassCard } from '../../components/ui/shared';
-import { EmptyState, PageHeader, Spinner, TextInput } from '../../components/ui/kit';
+import { Badge, EmptyState, PageHeader, Spinner, TextInput } from '../../components/ui/kit';
 
 interface StudyRow {
   student_id: string;
@@ -95,6 +96,23 @@ export function AdminAnalytics() {
     return byStudentCourse.filter((r) => r.name.toLowerCase().includes(s) || r.email.toLowerCase().includes(s) || r.course.toLowerCase().includes(s));
   }, [byStudentCourse, search]);
 
+  const streaks = useMemo(() => {
+    const map = new Map<string, { name: string; email: string; days: string[] }>();
+    for (const r of q.data?.studyRows ?? []) {
+      const entry = map.get(r.student_id) ?? { name: r.student?.full_name || r.student?.email || 'Unknown', email: r.student?.email ?? '', days: [] };
+      entry.days.push(r.day);
+      map.set(r.student_id, entry);
+    }
+    return [...map.values()]
+      .map((v) => ({ name: v.name, email: v.email, ...computeStreak(v.days) }))
+      .sort((a, b) => b.current - a.current || b.longest - a.longest);
+  }, [q.data]);
+
+  const filteredStreaks = useMemo(() => {
+    const s = search.toLowerCase();
+    return streaks.filter((r) => r.name.toLowerCase().includes(s) || r.email.toLowerCase().includes(s));
+  }, [streaks, search]);
+
   const chartData = byStaff.slice(0, 8).map((s) => ({ name: s.name.split(' ')[0] || s.name, minutes: Math.round(s.seconds / 60) }));
 
   if (q.loading) return <Spinner />;
@@ -143,6 +161,51 @@ export function AdminAnalytics() {
               ))}
             </div>
           </>
+        )}
+      </GlassCard>
+
+      <GlassCard className="mb-6 p-5">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 font-semibold text-neutral-900">
+            <Flame size={17} /> Student streaks — daily consistency
+          </div>
+          <TextInput placeholder="Search student…" value={search} onChange={(e) => setSearch(e.target.value)} className="w-64" />
+        </div>
+        {!filteredStreaks.length ? (
+          <EmptyState icon={<Flame size={22} />} title="No activity recorded yet" description="Streaks fill in as students spend time in a course." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-neutral-400">
+                  <th className="px-3 py-2">Student</th>
+                  <th className="px-3 py-2">Current streak</th>
+                  <th className="px-3 py-2">Longest streak</th>
+                  <th className="px-3 py-2">Active days</th>
+                  <th className="px-3 py-2">Last active</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/50">
+                {filteredStreaks.map((r) => (
+                  <tr key={r.email}>
+                    <td className="px-3 py-2.5 font-medium text-neutral-900">{r.name}</td>
+                    <td className="px-3 py-2.5">
+                      {r.current > 0 ? (
+                        <Badge tone="amber">
+                          <Flame size={11} className="mr-1 inline" /> {r.current} day{r.current === 1 ? '' : 's'}
+                        </Badge>
+                      ) : (
+                        <span className="text-neutral-400">broken</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-neutral-600">{r.longest}</td>
+                    <td className="px-3 py-2.5 text-neutral-600">{r.totalActiveDays}</td>
+                    <td className="px-3 py-2.5 text-neutral-500">{r.lastActiveDay ? new Date(r.lastActiveDay).toLocaleDateString() : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </GlassCard>
 
