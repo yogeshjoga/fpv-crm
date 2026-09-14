@@ -32,10 +32,10 @@ export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin'
   };
 
   return (
-    <div className="flex min-h-screen">
-      {/* sidebar */}
+    <div className="flex h-screen overflow-hidden">
+      {/* sidebar — scrolls independently of the main content */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 shrink-0 border-r border-white/50 bg-white/50 backdrop-blur-2xl transition-transform md:static md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 w-64 shrink-0 overflow-y-auto border-r border-white/50 bg-white/50 backdrop-blur-2xl transition-transform md:static md:translate-x-0 ${
           openMobile ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -65,9 +65,9 @@ export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin'
 
       {openMobile && <div className="fixed inset-0 z-30 bg-black/20 md:hidden" onClick={() => setOpenMobile(false)} />}
 
-      {/* main */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-16 items-center justify-between gap-4 border-b border-white/50 px-4 md:px-8">
+      {/* main — its own independent scroll area */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-white/50 px-4 md:px-8">
           <button className="md:hidden" onClick={() => setOpenMobile((v) => !v)}>
             {openMobile ? <X size={20} /> : <Menu size={20} />}
           </button>
@@ -98,7 +98,7 @@ export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin'
             </button>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-8 md:px-8">
+        <main className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-4 py-8 md:px-8">
           <Outlet />
         </main>
       </div>
