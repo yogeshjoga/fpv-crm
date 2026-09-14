@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FileQuestion, Layers, Plus } from 'lucide-react';
+import { FileQuestion, ImageIcon, Layers, Plus } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useQuery, unwrap } from '../../lib/useQuery';
@@ -16,6 +16,7 @@ export function AdminCourses() {
   const { profile } = useAuth();
   const toast = useToast();
   const [creating, setCreating] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState<string | null>(null);
 
   const q = useQuery(async () => {
     const [courses, org] = await Promise.all([
@@ -30,6 +31,22 @@ export function AdminCourses() {
     const { error } = await supabase.from('courses').update({ status: next }).eq('id', c.id);
     if (error) return toast(error.message, 'error');
     toast(`"${c.title}" ${next === 'published' ? 'published' : 'unpublished'}`);
+    q.refetch();
+  };
+
+  const uploadCover = async (c: Course, file: File) => {
+    setUploadingCover(c.id);
+    const path = `${c.id}-${Date.now()}-${file.name}`;
+    const up = await supabase.storage.from('course-covers').upload(path, file, { upsert: true });
+    if (up.error) {
+      setUploadingCover(null);
+      return toast(up.error.message, 'error');
+    }
+    const { data } = supabase.storage.from('course-covers').getPublicUrl(path);
+    const { error } = await supabase.from('courses').update({ cover_image_url: data.publicUrl }).eq('id', c.id);
+    setUploadingCover(null);
+    if (error) return toast(error.message, 'error');
+    toast('Cover image updated');
     q.refetch();
   };
 
@@ -53,6 +70,22 @@ export function AdminCourses() {
         <div className="grid gap-4 md:grid-cols-2">
           {q.data.courses.map((c) => (
             <GlassCard key={c.id} className="p-5">
+              <div className="mb-3 flex h-28 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100">
+                {c.cover_image_url ? (
+                  <img src={c.cover_image_url} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <ImageIcon className="text-blue-400" size={28} />
+                )}
+              </div>
+              <label className="mb-3 -mt-1 inline-block cursor-pointer text-xs font-medium text-blue-600 hover:underline">
+                {uploadingCover === c.id ? 'Uploading…' : c.cover_image_url ? 'Change cover image' : 'Upload cover image'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && uploadCover(c, e.target.files[0])}
+                />
+              </label>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="font-semibold text-neutral-900">{c.title}</div>
