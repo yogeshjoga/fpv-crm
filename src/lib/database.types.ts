@@ -74,6 +74,98 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["staff_activity_time"]["Insert"]>
         Relationships: []
       }
+      support_threads: {
+        Row: {
+          id: string
+          student_id: string
+          subject: string
+          status: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          subject: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["support_threads"]["Insert"]>
+        Relationships: []
+      }
+      support_messages: {
+        Row: {
+          id: string
+          thread_id: string
+          sender_id: string
+          body: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          thread_id: string
+          sender_id: string
+          body: string
+          created_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["support_messages"]["Insert"]>
+        Relationships: []
+      }
+      showcase_posts: {
+        Row: {
+          id: string
+          student_id: string
+          course_id: string | null
+          caption: string
+          media_path: string
+          media_type: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          course_id?: string | null
+          caption?: string
+          media_path: string
+          media_type?: string
+          created_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["showcase_posts"]["Insert"]>
+        Relationships: []
+      }
+      showcase_likes: {
+        Row: {
+          post_id: string
+          student_id: string
+          created_at: string
+        }
+        Insert: {
+          post_id: string
+          student_id: string
+          created_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["showcase_likes"]["Insert"]>
+        Relationships: []
+      }
+      showcase_comments: {
+        Row: {
+          id: string
+          post_id: string
+          author_id: string
+          body: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          author_id: string
+          body: string
+          created_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["showcase_comments"]["Insert"]>
+        Relationships: []
+      }
       calendar_events: {
         Row: {
           id: string

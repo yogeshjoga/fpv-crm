@@ -23,6 +23,8 @@ import { CourseViewer } from './pages/student/CourseViewer';
 import { ExamFlow } from './pages/student/ExamFlow';
 import { StudentCertificates } from './pages/student/StudentCertificates';
 import { StudentProfile } from './pages/student/StudentProfile';
+import { Ask } from './pages/student/Ask';
+import { Showcase } from './pages/student/Showcase';
 import { StudentCalendar } from './pages/student/StudentCalendar';
 
 import { AdminDashboard } from './pages/admin/AdminDashboard';
@@ -38,6 +40,7 @@ import { FormResponses } from './pages/admin/FormResponses';
 import { EnrollmentRequests } from './pages/admin/EnrollmentRequests';
 import { AdminCertificates } from './pages/admin/AdminCertificates';
 import { AdminAnalytics } from './pages/admin/AdminAnalytics';
+import { AdminAsk } from './pages/admin/AdminAsk';
 import { Settings } from './pages/admin/Settings';
 import { Employees } from './pages/admin/Employees';
 import { AdminCalendar } from './pages/admin/AdminCalendar';
@@ -85,6 +88,8 @@ export function AppRoutes() {
         <Route path="calendar" element={<StudentCalendar />} />
         <Route path="certificates" element={<StudentCertificates />} />
         <Route path="profile" element={<StudentProfile />} />
+        <Route path="ask" element={<Ask />} />
+        <Route path="showcase" element={<Showcase />} />
       </Route>
 
       <Route
@@ -116,6 +121,7 @@ export function AppRoutes() {
         <Route path="calendar" element={<AdminCalendar />} />
         <Route path="notifications" element={<Notifications />} />
         <Route path="certificates" element={<AdminCertificates />} />
+        <Route path="ask" element={<AdminAsk />} />
         <Route
           path="analytics"
           element={
