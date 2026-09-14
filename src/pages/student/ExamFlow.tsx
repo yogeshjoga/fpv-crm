@@ -1,9 +1,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Clock, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Clock, Maximize, XCircle } from 'lucide-react';
 import { invokeFn } from '../../lib/functions';
 import { GlassCard } from '../../components/ui/shared';
 import { Button, Spinner } from '../../components/ui/kit';
+
+function isFullscreenActive() {
+  return !!document.fullscreenElement;
+}
+
+async function enterFullscreen() {
+  const el = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> };
+  try {
+    if (el.requestFullscreen) await el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
+  } catch {
+    // ignore — some browsers/contexts (e.g. embedded iframes) block fullscreen; the overlay will just keep prompting
+  }
+}
+
+function exitFullscreen() {
+  const doc = document as Document & { webkitExitFullscreen?: () => Promise<void> };
+  if (!isFullscreenActive()) return;
+  (doc.exitFullscreen?.() ?? doc.webkitExitFullscreen?.())?.catch?.(() => {});
+}
 
 interface StartResponse {
   attempt_id: string;
@@ -22,7 +42,7 @@ interface SubmitResponse {
   locked?: boolean;
 }
 
-type Phase = 'loading' | 'error' | 'exam' | 'result';
+type Phase = 'loading' | 'error' | 'ready' | 'exam' | 'result';
 
 export function ExamFlow() {
   const { slug } = useParams();
@@ -34,6 +54,7 @@ export function ExamFlow() {
   const [result, setResult] = useState<SubmitResponse | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [remaining, setRemaining] = useState(0);
+  const [fullscreen, setFullscreen] = useState(isFullscreenActive());
   const submittedRef = useRef(false);
   const startedRef = useRef(false);
 
@@ -44,13 +65,33 @@ export function ExamFlow() {
     invokeFn<StartResponse>('start-exam', { course_slug: slug })
       .then((data) => {
         setExam(data);
-        setPhase('exam');
+        setPhase('ready');
       })
       .catch((e) => {
         setErrorMsg(e.message);
         setPhase('error');
       });
   }, [slug]);
+
+  // track fullscreen state throughout the exam, and always release it once the exam is over
+  useEffect(() => {
+    const onChange = () => setFullscreen(isFullscreenActive());
+    document.addEventListener('fullscreenchange', onChange);
+    document.addEventListener('webkitfullscreenchange', onChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onChange);
+      document.removeEventListener('webkitfullscreenchange', onChange);
+    };
+  }, []);
+  useEffect(() => {
+    if (phase === 'result' || phase === 'error') exitFullscreen();
+  }, [phase]);
+  useEffect(() => () => exitFullscreen(), []);
+
+  const beginExam = useCallback(async () => {
+    await enterFullscreen();
+    setPhase('exam');
+  }, []);
 
   const doSubmit = useCallback(
     async (auto = false) => {
@@ -103,6 +144,25 @@ export function ExamFlow() {
         <h2 className="mt-3 text-lg font-semibold text-neutral-900">Can’t start the exam</h2>
         <p className="mt-2 text-sm text-neutral-600">{errorMsg}</p>
         <Link to={`/app/courses/${slug}`} className="mt-5 inline-block text-sm font-medium text-blue-600 hover:underline">
+          Back to course
+        </Link>
+      </GlassCard>
+    );
+  }
+
+  if (phase === 'ready' && exam) {
+    return (
+      <GlassCard className="mx-auto max-w-lg p-8 text-center">
+        <Maximize className="mx-auto text-neutral-700" size={36} />
+        <h2 className="mt-3 text-lg font-semibold text-neutral-900">Ready to begin</h2>
+        <p className="mt-2 text-sm text-neutral-600">
+          {exam.questions.length} questions · {exam.time_limit_min} minutes. This exam must be taken in fullscreen — if
+          you exit fullscreen at any point, the exam will pause until you return.
+        </p>
+        <Button className="mt-5" onClick={beginExam}>
+          <Maximize size={16} /> Enter fullscreen &amp; start
+        </Button>
+        <Link to={`/app/courses/${slug}`} className="mt-4 block text-sm font-medium text-blue-600 hover:underline">
           Back to course
         </Link>
       </GlassCard>
@@ -171,6 +231,20 @@ export function ExamFlow() {
 
   return (
     <div className="mx-auto max-w-3xl">
+      {!fullscreen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6 text-center backdrop-blur-sm">
+          <div className="max-w-sm rounded-3xl bg-white p-8">
+            <AlertTriangle className="mx-auto text-amber-500" size={36} />
+            <h2 className="mt-3 text-lg font-semibold text-neutral-900">Fullscreen required</h2>
+            <p className="mt-2 text-sm text-neutral-600">
+              You left fullscreen mode. Your exam is paused — the timer keeps running. Return to fullscreen to continue.
+            </p>
+            <Button className="mt-5" onClick={() => enterFullscreen()}>
+              <Maximize size={16} /> Return to fullscreen
+            </Button>
+          </div>
+        </div>
+      )}
       <div className="mb-4 flex items-center justify-between">
         <div className="text-sm text-neutral-500">
           Question {current + 1} of {exam.questions.length} · {answeredCount} answered
