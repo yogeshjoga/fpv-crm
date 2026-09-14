@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { GlassCard } from '../../components/ui/shared';
-import { Button, Field, PageHeader, TextInput, useToast } from '../../components/ui/kit';
+import { Button, Field, PageHeader, PasswordInput, TextInput, useToast } from '../../components/ui/kit';
 
 export function StudentProfile() {
   const { profile, refreshProfile, updatePassword } = useAuth();
@@ -62,10 +62,10 @@ export function StudentProfile() {
         <h2 className="mb-4 font-semibold text-neutral-900">Change password</h2>
         <form onSubmit={changePw} className="space-y-4">
           <Field label="New password">
-            <TextInput type="password" value={pw} onChange={(e) => setPw(e.target.value)} />
+            <PasswordInput value={pw} onChange={(e) => setPw(e.target.value)} />
           </Field>
           <Field label="Confirm new password">
-            <TextInput type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} />
+            <PasswordInput value={pw2} onChange={(e) => setPw2(e.target.value)} />
           </Field>
           <Button type="submit" variant="secondary" loading={savingPw}>
             Update password

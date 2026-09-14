@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthProvider';
 import { AuthCard } from '../../layout/PublicShell';
-import { Button, Field, TextInput } from '../../components/ui/kit';
+import { Button, Field, PasswordInput, TextInput } from '../../components/ui/kit';
 
 export function Login() {
   const { signIn, isAuthed, profile, isStaff } = useAuth();
@@ -33,7 +33,7 @@ export function Login() {
           <TextInput type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
         </Field>
         <Field label="Password" error={error}>
-          <TextInput type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+          <PasswordInput required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
         </Field>
         <div className="text-right">
           <Link to="/forgot-password" className="text-xs text-blue-600 hover:underline">
