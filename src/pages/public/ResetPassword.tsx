@@ -6,7 +6,7 @@ import { AuthCard } from '../../layout/PublicShell';
 import { Button, Field, PasswordInput } from '../../components/ui/kit';
 
 export function ResetPassword() {
-  const { updatePassword } = useAuth();
+  const { updatePassword, isStaff } = useAuth();
   const navigate = useNavigate();
   const [ready, setReady] = useState(false);
   const [password, setPassword] = useState('');
@@ -34,7 +34,7 @@ export function ResetPassword() {
     const { error } = await updatePassword(password);
     setBusy(false);
     if (error) return setError(error);
-    navigate('/app');
+    navigate(isStaff ? '/admin' : '/app');
   };
 
   return (
