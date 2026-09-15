@@ -267,7 +267,7 @@ export function CourseViewer() {
           </Link>
         </GlassCard>
       ) : (
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
           {course.description && (
             <GlassCard className="p-5">
