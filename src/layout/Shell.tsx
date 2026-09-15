@@ -1,17 +1,22 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutGrid, LogOut, Menu, X } from 'lucide-react';
+import { Eye, GraduationCap, LayoutGrid, LogOut, Menu, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import { NotificationBell } from '../components/NotificationBell';
 import { Logo } from '../components/Brand';
 import { useStaffActivityTracker } from '../lib/useTimeTracker';
+import { isModuleVisible, useInstructorModuleAccess } from '../lib/moduleAccess';
 
 export interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
   end?: boolean;
+  /** Matches instructor_module_access.module_key — omit for items every admin role always sees. */
+  key?: string;
+  /** Never shown to instructors (real or previewed), and not configurable. */
+  superAdminOnly?: boolean;
 }
 
 const roleLabel: Record<string, string> = {
@@ -24,7 +29,21 @@ export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin'
   const { profile, signOut, isStaff } = useAuth();
   const navigate = useNavigate();
   const [openMobile, setOpenMobile] = useState(false);
+  const [previewInstructor, setPreviewInstructor] = useState(false);
   useStaffActivityTracker(area === 'Admin');
+
+  const canPreviewInstructor = area === 'Admin' && profile?.role === 'super_admin';
+  const asInstructor = area === 'Admin' && (profile?.role === 'instructor' || (canPreviewInstructor && previewInstructor));
+  const moduleAccess = useInstructorModuleAccess(area === 'Admin');
+
+  const visibleNav = useMemo(() => {
+    if (!asInstructor) return nav;
+    return nav.filter((item) => {
+      if (item.superAdminOnly) return false;
+      if (!item.key) return true; // e.g. Dashboard — always reachable, never gated
+      return isModuleVisible(moduleAccess.data, item.key);
+    });
+  }, [nav, asInstructor, moduleAccess.data]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -44,7 +63,7 @@ export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin'
           <span className="ml-1 text-[11px] text-neutral-500">{area}</span>
         </div>
         <nav className="flex flex-col gap-1 px-3 py-4">
-          {nav.map((item) => (
+          {visibleNav.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -72,6 +91,16 @@ export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin'
             {openMobile ? <X size={20} /> : <Menu size={20} />}
           </button>
           <div className="flex flex-1 items-center justify-end gap-3">
+            {canPreviewInstructor && (
+              <button
+                onClick={() => setPreviewInstructor((v) => !v)}
+                className={`hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-sm sm:flex ${
+                  previewInstructor ? 'bg-amber-100 font-medium text-amber-800' : 'bg-white/60 text-neutral-600 hover:bg-white'
+                }`}
+              >
+                <GraduationCap size={14} /> {previewInstructor ? 'Exit instructor view' : 'Instructor view'}
+              </button>
+            )}
             {isStaff && (
               <Link
                 to={area === 'Admin' ? '/app' : '/admin'}
@@ -98,6 +127,11 @@ export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin'
             </button>
           </div>
         </header>
+        {canPreviewInstructor && previewInstructor && (
+          <div className="flex shrink-0 items-center justify-center gap-2 bg-amber-100 px-4 py-2 text-center text-xs font-medium text-amber-800">
+            <Eye size={13} /> Previewing the sidebar as an Instructor sees it — configure this in Company Settings.
+          </div>
+        )}
         <main className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-4 py-8 md:px-8">
           <Outlet />
         </main>

@@ -3,7 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { PublicShell } from './layout/PublicShell';
 import { Shell } from './layout/Shell';
 import { studentNav, adminNav } from './layout/navConfig';
-import { RequireActive, RequireRole } from './auth/guards';
+import { RequireActive, RequireModule, RequireRole } from './auth/guards';
 
 import { Landing } from './pages/public/Landing';
 import { Login } from './pages/public/Login';
@@ -103,8 +103,22 @@ export function AppRoutes() {
         }
       >
         <Route index element={<AdminDashboard />} />
-        <Route path="registrations" element={<Registrations />} />
-        <Route path="approvals" element={<Approvals />} />
+        <Route
+          path="registrations"
+          element={
+            <RequireModule moduleKey="registrations">
+              <Registrations />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="approvals"
+          element={
+            <RequireModule moduleKey="approvals">
+              <Approvals />
+            </RequireModule>
+          }
+        />
         <Route
           path="users"
           element={
@@ -113,18 +127,102 @@ export function AppRoutes() {
             </RequireRole>
           }
         />
-        <Route path="courses" element={<AdminCourses />} />
-        <Route path="course-groups" element={<CourseGroups />} />
-        <Route path="courses/:id/build" element={<CourseBuilder />} />
-        <Route path="question-bank/:courseId" element={<QuestionBank />} />
-        <Route path="forms" element={<Forms />} />
-        <Route path="forms/:id/edit" element={<FormBuilder />} />
-        <Route path="forms/:id/responses" element={<FormResponses />} />
-        <Route path="enrollments" element={<EnrollmentRequests />} />
-        <Route path="calendar" element={<AdminCalendar />} />
-        <Route path="notifications" element={<Notifications />} />
-        <Route path="certificates" element={<AdminCertificates />} />
-        <Route path="ask" element={<AdminAsk />} />
+        <Route
+          path="courses"
+          element={
+            <RequireModule moduleKey="courses">
+              <AdminCourses />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="course-groups"
+          element={
+            <RequireModule moduleKey="course-groups">
+              <CourseGroups />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="courses/:id/build"
+          element={
+            <RequireModule moduleKey="courses">
+              <CourseBuilder />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="question-bank/:courseId"
+          element={
+            <RequireModule moduleKey="courses">
+              <QuestionBank />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="forms"
+          element={
+            <RequireModule moduleKey="forms">
+              <Forms />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="forms/:id/edit"
+          element={
+            <RequireModule moduleKey="forms">
+              <FormBuilder />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="forms/:id/responses"
+          element={
+            <RequireModule moduleKey="forms">
+              <FormResponses />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="enrollments"
+          element={
+            <RequireModule moduleKey="enrollments">
+              <EnrollmentRequests />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="calendar"
+          element={
+            <RequireModule moduleKey="calendar">
+              <AdminCalendar />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="notifications"
+          element={
+            <RequireModule moduleKey="notifications">
+              <Notifications />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="certificates"
+          element={
+            <RequireModule moduleKey="certificates">
+              <AdminCertificates />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="ask"
+          element={
+            <RequireModule moduleKey="ask">
+              <AdminAsk />
+            </RequireModule>
+          }
+        />
         <Route
           path="analytics"
           element={
@@ -149,7 +247,14 @@ export function AppRoutes() {
             </RequireRole>
           }
         />
-        <Route path="help" element={<AdminHelp />} />
+        <Route
+          path="help"
+          element={
+            <RequireModule moduleKey="help">
+              <AdminHelp />
+            </RequireModule>
+          }
+        />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

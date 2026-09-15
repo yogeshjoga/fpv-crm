@@ -803,6 +803,24 @@ export type Database = {
           },
         ]
       }
+      instructor_module_access: {
+        Row: {
+          module_key: string
+          updated_at: string
+          visible: boolean
+        }
+        Insert: {
+          module_key: string
+          updated_at?: string
+          visible?: boolean
+        }
+        Update: {
+          module_key?: string
+          updated_at?: string
+          visible?: boolean
+        }
+        Relationships: []
+      }
       lesson_resources: {
         Row: {
           created_at: string
