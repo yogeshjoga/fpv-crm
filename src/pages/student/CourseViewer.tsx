@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Download, FileText, GraduationCap, Lock, PlayCircle } from 'lucide-react';
+import { AlertTriangle, Download, FileText, GraduationCap, Lock, PlayCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useQuery, unwrap } from '../../lib/useQuery';
@@ -20,6 +20,147 @@ function embedSrc(url: string): string | null {
   } catch {
     return null;
   }
+}
+
+interface ContentBlock {
+  type: 'section' | 'list' | 'callout' | 'paragraph';
+  key: number;
+  title?: string;
+  subtitle?: string | null;
+  body?: string;
+  heading?: string | null;
+  items?: string[];
+  pipeStyle?: boolean;
+  label?: string;
+  text?: string;
+}
+
+/**
+ * Lesson content is authored as plain text with a lightweight convention rather
+ * than markdown/HTML: "-- Title - Subtitle --" or "=== Title - Subtitle ==="
+ * section headers, a "Heading" line followed by "* item" bullets (or a single
+ * "Key value | Key value" line), and a "Label -- warning text" or "! warning
+ * text" callout. This turns that into styled blocks instead of printing the
+ * raw markers verbatim.
+ */
+/** Tidies the plain-text " -- " aside convention into a real em dash for display. */
+const tidy = (s: string) => s.replace(/ -- /g, ' — ');
+
+function parseLessonContent(content: string): ContentBlock[] {
+  const blocks: ContentBlock[] = [];
+  content.split(/\n\s*\n/).forEach((raw, i) => {
+    const lines = raw
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (!lines.length) return;
+
+    const headerMatch = lines[0].match(/^(?:--|===)\s*(.+?)\s*(?:--|===)$/);
+    if (headerMatch) {
+      const titleLine = headerMatch[1];
+      const split = titleLine.match(/^(.+?)\s-\s(.+)$/);
+      blocks.push({
+        type: 'section',
+        key: i,
+        title: split ? split[1] : titleLine,
+        subtitle: split ? split[2] : null,
+        body: tidy(lines.slice(1).join(' ')),
+      });
+      return;
+    }
+
+    const bulletLines = lines.filter((l) => l.startsWith('*'));
+    if (bulletLines.length && bulletLines.length >= lines.length - 1) {
+      const heading = lines[0].startsWith('*') ? null : lines[0];
+      const items = (heading ? lines.slice(1) : lines).map((l) => tidy(l.replace(/^\*\s*/, '')));
+      blocks.push({ type: 'list', key: i, heading, items });
+      return;
+    }
+    if (lines.length === 1 && lines[0].includes(' | ')) {
+      blocks.push({ type: 'list', key: i, heading: null, items: lines[0].split('|').map((s) => tidy(s.trim())), pipeStyle: true });
+      return;
+    }
+
+    const bangMatch = raw.match(/^!\s*([\s\S]+)$/);
+    if (bangMatch) {
+      blocks.push({ type: 'callout', key: i, label: 'Watch out', text: tidy(bangMatch[1].trim()) });
+      return;
+    }
+    const calloutMatch = raw.match(/^([A-Za-z][A-Za-z ]{1,20}?)\s--\s([\s\S]+)$/);
+    if (calloutMatch) {
+      blocks.push({ type: 'callout', key: i, label: calloutMatch[1], text: tidy(calloutMatch[2].trim()) });
+      return;
+    }
+
+    blocks.push({ type: 'paragraph', key: i, text: tidy(lines.join(' ')) });
+  });
+  return blocks;
+}
+
+/** "Key: value" (or, for a pipe-separated spec line, "Key value") -> [key, rest]; [null, item] if there's no key. */
+function splitKV(item: string, pipeStyle?: boolean): [string | null, string] {
+  if (pipeStyle) {
+    const idx = item.indexOf(' ');
+    return idx > -1 ? [item.slice(0, idx), item.slice(idx + 1)] : [null, item];
+  }
+  const idx = item.indexOf(': ');
+  return idx > -1 && idx < 30 ? [item.slice(0, idx), item.slice(idx + 2)] : [null, item];
+}
+
+function LessonContent({ content }: { content: string }) {
+  const blocks = useMemo(() => parseLessonContent(content), [content]);
+  return (
+    <div className="mt-2 space-y-3 text-sm text-neutral-600">
+      {blocks.map((b) => {
+        if (b.type === 'paragraph') return <p key={b.key}>{b.text}</p>;
+        if (b.type === 'section')
+          return (
+            <div key={b.key} className="rounded-xl border border-blue-100 bg-blue-50/50 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold text-neutral-900">{b.title}</span>
+                {b.subtitle && <Badge tone="blue">{b.subtitle}</Badge>}
+              </div>
+              <p className="mt-1.5">{b.body}</p>
+            </div>
+          );
+        if (b.type === 'list')
+          return (
+            <div key={b.key}>
+              {b.heading && <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-400">{b.heading}</div>}
+              <ul className="space-y-1">
+                {b.items!.map((item, idx) => {
+                  const [k, v] = splitKV(item, b.pipeStyle);
+                  return (
+                    <li key={idx} className="flex gap-1.5 pl-1">
+                      <span className="text-neutral-300">•</span>
+                      <span>
+                        {k ? (
+                          <>
+                            <strong className="font-medium text-neutral-800">{k}:</strong> {v}
+                          </>
+                        ) : (
+                          v
+                        )}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        if (b.type === 'callout')
+          return (
+            <div key={b.key} className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-800">
+              <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+              <p>
+                <strong>{b.label}.</strong> {b.text}
+              </p>
+            </div>
+          );
+        return null;
+      })}
+    </div>
+  );
 }
 
 /** Inline image preview for a lesson resource stored in course-resources. */
@@ -144,9 +285,7 @@ export function CourseViewer() {
                         <span className="text-neutral-400">{mi + 1}.{li + 1}</span> {l.title}
                       </div>
 
-                      {(l.kind ?? 'article') === 'article' && l.content && (
-                        <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-600">{l.content}</p>
-                      )}
+                      {(l.kind ?? 'article') === 'article' && l.content && <LessonContent content={l.content} />}
 
                       {l.kind === 'video' && l.video_url && (
                         embedSrc(l.video_url) ? (
