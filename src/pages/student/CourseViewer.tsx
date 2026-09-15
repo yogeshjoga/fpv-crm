@@ -23,7 +23,7 @@ function embedSrc(url: string): string | null {
 }
 
 interface ContentBlock {
-  type: 'section' | 'list' | 'callout' | 'paragraph';
+  type: 'section' | 'list' | 'callout' | 'paragraph' | 'image';
   key: number;
   title?: string;
   subtitle?: string | null;
@@ -33,6 +33,8 @@ interface ContentBlock {
   pipeStyle?: boolean;
   label?: string;
   text?: string;
+  src?: string;
+  alt?: string;
 }
 
 /**
@@ -54,6 +56,12 @@ function parseLessonContent(content: string): ContentBlock[] {
       .map((l) => l.trim())
       .filter(Boolean);
     if (!lines.length) return;
+
+    const imageMatch = lines[0].match(/^!\[([^\]]*)\]\((\S+)\)$/);
+    if (imageMatch) {
+      blocks.push({ type: 'image', key: i, alt: imageMatch[1], src: imageMatch[2], text: tidy(lines.slice(1).join(' ')) || undefined });
+      return;
+    }
 
     const headerMatch = lines[0].match(/^(?:--|===)\s*(.+?)\s*(?:--|===)$/);
     if (headerMatch) {
@@ -147,6 +155,13 @@ function LessonContent({ content }: { content: string }) {
                 })}
               </ul>
             </div>
+          );
+        if (b.type === 'image')
+          return (
+            <figure key={b.key} className="overflow-hidden rounded-xl border border-white/60 bg-white">
+              <img src={b.src} alt={b.alt} className="w-full object-contain" loading="lazy" />
+              {b.text && <figcaption className="border-t border-white/60 bg-white/60 p-2 text-xs text-neutral-500">{b.text}</figcaption>}
+            </figure>
           );
         if (b.type === 'callout')
           return (
