@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
+import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, Button, Checkbox, EmptyState, Field, Modal, PageHeader, Select, Spinner, TextArea, TextInput, useToast } from '../../components/ui/kit';
@@ -15,6 +16,8 @@ interface OptionDraft {
 export function QuestionBank() {
   const { courseId } = useParams();
   const { profile } = useAuth();
+  const { canWrite } = useAdminAccess();
+  const writable = canWrite('courses');
   const toast = useToast();
   const [editing, setEditing] = useState<any | null>(null);
 
@@ -105,9 +108,11 @@ export function QuestionBank() {
         title={`Question bank · ${q.data!.course.title}`}
         subtitle={`${activeCount} active questions · exam draws ${q.data!.course.exam_question_count}`}
         actions={
-          <Button onClick={openNew}>
-            <Plus size={16} /> Add question
-          </Button>
+          writable && (
+            <Button onClick={openNew}>
+              <Plus size={16} /> Add question
+            </Button>
+          )
         }
       />
 
@@ -118,7 +123,7 @@ export function QuestionBank() {
       )}
 
       {!q.data!.questions.length ? (
-        <EmptyState title="No questions yet" description="Add multiple-choice questions to power this course’s exam." action={<Button onClick={openNew}>Add question</Button>} />
+        <EmptyState title="No questions yet" description="Add multiple-choice questions to power this course’s exam." action={writable && <Button onClick={openNew}>Add question</Button>} />
       ) : (
         <div className="space-y-3">
           {q.data!.questions.map((row, i) => (
@@ -141,30 +146,32 @@ export function QuestionBank() {
                     ))}
                   </ul>
                 </div>
-                <button onClick={() => del(row.id)} className="text-neutral-400 hover:text-red-500">
-                  <Trash2 size={16} />
-                </button>
+                {writable && (
+                  <button onClick={() => del(row.id)} className="text-neutral-400 hover:text-red-500">
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </div>
             </GlassCard>
           ))}
         </div>
       )}
 
-      <Modal open={!!editing} onClose={() => setEditing(null)} title={editing?.id ? 'Edit question' : 'New question'} wide>
+      <Modal open={!!editing} onClose={() => setEditing(null)} title={writable ? (editing?.id ? 'Edit question' : 'New question') : 'View question'} wide>
         {editing && (
           <div className="space-y-4">
             <Field label="Prompt" required>
-              <TextArea value={editing.prompt} onChange={(e) => setEditing({ ...editing, prompt: e.target.value })} />
+              <TextArea disabled={!writable} value={editing.prompt} onChange={(e) => setEditing({ ...editing, prompt: e.target.value })} />
             </Field>
             <div className="grid grid-cols-2 gap-4">
               <Field label="Type">
-                <Select value={editing.type} onChange={(e) => setEditing({ ...editing, type: e.target.value })}>
+                <Select disabled={!writable} value={editing.type} onChange={(e) => setEditing({ ...editing, type: e.target.value })}>
                   <option value="single">single answer</option>
                   <option value="multi">multiple answers</option>
                 </Select>
               </Field>
               <div className="flex items-end pb-2">
-                <Checkbox label="Active (included in exams)" checked={editing.is_active} onChange={(e) => setEditing({ ...editing, is_active: e.target.checked })} />
+                <Checkbox disabled={!writable} label="Active (included in exams)" checked={editing.is_active} onChange={(e) => setEditing({ ...editing, is_active: e.target.checked })} />
               </div>
             </div>
 
@@ -176,6 +183,7 @@ export function QuestionBank() {
                     <input
                       type={editing.type === 'single' ? 'radio' : 'checkbox'}
                       name="correct"
+                      disabled={!writable}
                       checked={o.is_correct}
                       onChange={(e) => {
                         const next = [...editing.options];
@@ -185,6 +193,7 @@ export function QuestionBank() {
                       }}
                     />
                     <TextInput
+                      disabled={!writable}
                       value={o.label}
                       placeholder={`Option ${idx + 1}`}
                       onChange={(e) => {
@@ -193,29 +202,33 @@ export function QuestionBank() {
                         setEditing({ ...editing, options: next });
                       }}
                     />
-                    <button
-                      onClick={() => setEditing({ ...editing, options: editing.options.filter((_: unknown, i: number) => i !== idx) })}
-                      className="text-neutral-400 hover:text-red-500"
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                    {writable && (
+                      <button
+                        onClick={() => setEditing({ ...editing, options: editing.options.filter((_: unknown, i: number) => i !== idx) })}
+                        className="text-neutral-400 hover:text-red-500"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
-              <Button variant="ghost" className="mt-2" onClick={() => setEditing({ ...editing, options: [...editing.options, { label: '', is_correct: false }] })}>
-                <Plus size={14} /> Add option
-              </Button>
+              {writable && (
+                <Button variant="ghost" className="mt-2" onClick={() => setEditing({ ...editing, options: [...editing.options, { label: '', is_correct: false }] })}>
+                  <Plus size={14} /> Add option
+                </Button>
+              )}
             </div>
 
             <Field label="Explanation" hint="Shown after grading (optional)">
-              <TextInput value={editing.explanation} onChange={(e) => setEditing({ ...editing, explanation: e.target.value })} />
+              <TextInput disabled={!writable} value={editing.explanation} onChange={(e) => setEditing({ ...editing, explanation: e.target.value })} />
             </Field>
 
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setEditing(null)}>
-                Cancel
+                {writable ? 'Cancel' : 'Close'}
               </Button>
-              <Button onClick={save}>Save question</Button>
+              {writable && <Button onClick={save}>Save question</Button>}
             </div>
           </div>
         )}

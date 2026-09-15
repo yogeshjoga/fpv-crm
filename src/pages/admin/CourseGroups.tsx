@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { BookOpen, FolderPlus, Layers3, Trash2, Users as UsersIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
+import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { slugify } from '../../lib/slug';
 import { GlassCard } from '../../components/ui/shared';
@@ -16,6 +17,8 @@ type GroupMember = Tables<'course_group_members'>;
 
 export function CourseGroups() {
   const { profile } = useAuth();
+  const { canWrite } = useAdminAccess();
+  const writable = canWrite('course-groups');
   const toast = useToast();
   const [creating, setCreating] = useState(false);
   const [coursesFor, setCoursesFor] = useState<Group | null>(null);
@@ -52,9 +55,11 @@ export function CourseGroups() {
         title="Course groups"
         subtitle="Bundle courses into a workshop and grant a batch of students access at once"
         actions={
-          <Button onClick={() => setCreating(true)}>
-            <FolderPlus size={16} /> New group
-          </Button>
+          writable && (
+            <Button onClick={() => setCreating(true)}>
+              <FolderPlus size={16} /> New group
+            </Button>
+          )
         }
       />
 
@@ -65,7 +70,7 @@ export function CourseGroups() {
           icon={<Layers3 size={22} />}
           title="No course groups yet"
           description="Create a group for a workshop, add its courses, then add the enrolled students."
-          action={<Button onClick={() => setCreating(true)}>New group</Button>}
+          action={writable && <Button onClick={() => setCreating(true)}>New group</Button>}
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
@@ -78,13 +83,15 @@ export function CourseGroups() {
                     <div className="font-semibold text-neutral-900">{g.name}</div>
                     <div className="mt-0.5 text-xs text-neutral-400">/{g.slug}</div>
                   </div>
-                  <button
-                    onClick={() => setDeleting(g)}
-                    className="text-neutral-400 hover:text-red-600"
-                    title="Delete group"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  {writable && (
+                    <button
+                      onClick={() => setDeleting(g)}
+                      className="text-neutral-400 hover:text-red-600"
+                      title="Delete group"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
                 </div>
                 {g.description && <p className="mt-2 line-clamp-2 text-sm text-neutral-500">{g.description}</p>}
                 <div className="mt-3 flex gap-2 text-xs text-neutral-500">
@@ -106,7 +113,7 @@ export function CourseGroups() {
       )}
 
       <CreateGroupModal
-        open={creating}
+        open={creating && writable}
         onClose={() => setCreating(false)}
         createdBy={profile!.id}
         onCreated={() => {
@@ -121,6 +128,7 @@ export function CourseGroups() {
           allCourses={q.data?.courses ?? []}
           groupCourseIds={new Set((q.data?.groupCourses ?? []).filter((gc) => gc.group_id === coursesFor.id).map((gc) => gc.course_id))}
           memberIds={(q.data?.groupMembers ?? []).filter((gm) => gm.group_id === coursesFor.id).map((gm) => gm.student_id)}
+          writable={writable}
           onClose={() => setCoursesFor(null)}
           onChanged={q.refetch}
         />
@@ -133,6 +141,7 @@ export function CourseGroups() {
           memberIds={new Set((q.data?.groupMembers ?? []).filter((gm) => gm.group_id === studentsFor.id).map((gm) => gm.student_id))}
           courseIds={(q.data?.groupCourses ?? []).filter((gc) => gc.group_id === studentsFor.id).map((gc) => gc.course_id)}
           adminId={profile!.id}
+          writable={writable}
           onClose={() => setStudentsFor(null)}
           onChanged={q.refetch}
         />
@@ -220,6 +229,7 @@ function GroupCoursesModal({
   allCourses,
   groupCourseIds,
   memberIds,
+  writable,
   onClose,
   onChanged,
 }: {
@@ -227,6 +237,7 @@ function GroupCoursesModal({
   allCourses: Course[];
   groupCourseIds: Set<string>;
   memberIds: string[];
+  writable: boolean;
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -266,7 +277,9 @@ function GroupCoursesModal({
   return (
     <Modal open onClose={onClose} title={`Courses — ${group.name}`} wide>
       <p className="mb-3 text-xs text-neutral-500">
-        Adding a course here immediately enrolls every student already in this group.
+        {writable
+          ? 'Adding a course here immediately enrolls every student already in this group.'
+          : 'You have read-only access to Course Groups.'}
       </p>
       {!allCourses.length ? (
         <p className="text-sm text-neutral-500">No courses yet.</p>
@@ -282,6 +295,7 @@ function GroupCoursesModal({
                 <Checkbox
                   label={groupCourseIds.has(c.id) ? 'In group' : 'Not in group'}
                   checked={groupCourseIds.has(c.id)}
+                  disabled={!writable}
                   onChange={(e) => toggle(c, e.target.checked)}
                 />
               </span>
@@ -304,6 +318,7 @@ function GroupStudentsModal({
   memberIds,
   courseIds,
   adminId,
+  writable,
   onClose,
   onChanged,
 }: {
@@ -312,6 +327,7 @@ function GroupStudentsModal({
   memberIds: Set<string>;
   courseIds: string[];
   adminId: string;
+  writable: boolean;
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -357,7 +373,9 @@ function GroupStudentsModal({
   return (
     <Modal open onClose={onClose} title={`Students — ${group.name}`} wide>
       <p className="mb-3 text-xs text-neutral-500">
-        Adding a student here immediately enrolls them in every course currently in this group.
+        {writable
+          ? 'Adding a student here immediately enrolls them in every course currently in this group.'
+          : 'You have read-only access to Course Groups.'}
       </p>
       <TextInput placeholder="Search name or email…" value={search} onChange={(e) => setSearch(e.target.value)} className="mb-3" />
       {!rows.length ? (
@@ -374,6 +392,7 @@ function GroupStudentsModal({
                 <Checkbox
                   label={memberIds.has(p.id) ? 'In group' : 'Not in group'}
                   checked={memberIds.has(p.id)}
+                  disabled={!writable}
                   onChange={(e) => toggle(p, e.target.checked)}
                 />
               </span>

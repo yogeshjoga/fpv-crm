@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Inbox } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
+import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { invokeFn } from '../../lib/functions';
 import { GlassCard } from '../../components/ui/shared';
@@ -26,6 +27,8 @@ interface Req {
 
 export function EnrollmentRequests({ formId }: { formId?: string }) {
   const { profile } = useAuth();
+  const { canWrite } = useAdminAccess();
+  const writable = canWrite(formId ? 'forms' : 'enrollments');
   const toast = useToast();
   const [filter, setFilter] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending');
   const [viewing, setViewing] = useState<Req | null>(null);
@@ -102,7 +105,7 @@ export function EnrollmentRequests({ formId }: { formId?: string }) {
               <div className="flex items-center gap-2">
                 <Badge tone={r.status === 'approved' ? 'green' : r.status === 'rejected' ? 'red' : 'amber'}>{r.status}</Badge>
                 <Button variant="secondary" onClick={() => { setViewing(r); setNote(r.review_note ?? ''); }}>
-                  Review
+                  {writable ? 'Review' : 'View'}
                 </Button>
               </div>
             </div>
@@ -143,7 +146,7 @@ export function EnrollmentRequests({ formId }: { formId?: string }) {
               </dl>
             </div>
 
-            {viewing.status === 'pending' && (
+            {viewing.status === 'pending' && writable && (
               <>
                 <TextInput placeholder="Review note (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
                 <div className="flex justify-end gap-2">
@@ -153,6 +156,9 @@ export function EnrollmentRequests({ formId }: { formId?: string }) {
                   <Button onClick={() => decide(viewing, 'approved')}>Approve &amp; enroll</Button>
                 </div>
               </>
+            )}
+            {viewing.status === 'pending' && !writable && (
+              <p className="text-xs text-neutral-400">You have read-only access here — a super admin or a write-enabled instructor can approve or reject this.</p>
             )}
             {viewing.status !== 'pending' && viewing.review_note && (
               <p className="text-sm text-neutral-500">Note: {viewing.review_note}</p>

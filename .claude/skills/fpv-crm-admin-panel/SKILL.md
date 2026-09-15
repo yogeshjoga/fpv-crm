@@ -26,47 +26,76 @@ layer on top of each other:
    configurable permission system below — there's no toggle that can
    expose them to an instructor.
 2. **`RequireModule moduleKey="..."`** — configurable per-instructor
-   visibility, backed by the `instructor_module_access` table. A
-   `super_admin` always passes; an `instructor` is checked against that
-   table (default visible if unconfigured) and redirected to `/admin` if
-   the module is off. This wraps the "operational" pages: Registrations,
-   Enrollment Requests, Account Approvals, Courses, Course Groups,
-   Enrollment Forms, Calendar, Notifications, Certificates, Questions,
-   Help.
+   access, backed by the `instructor_module_access` table
+   (`module_key`, `access_level`: `'none' | 'read' | 'write'`, default
+   `'read'` if a module has no row yet — **read-only, not full access, is
+   the safe default**). A `super_admin` always passes; an `instructor` is
+   redirected to `/admin` only when their level is `'none'`. This wraps
+   the "operational" pages: Registrations, Enrollment Requests, Account
+   Approvals, Courses, Course Groups, Enrollment Forms, Calendar,
+   Notifications, Certificates, Questions, Help.
 3. The admin **Dashboard** (`/admin` index route) is wrapped in neither —
    it's always reachable, because both `RequireRole` and `RequireModule`
    redirect *to* `/admin` on failure, and gating the dashboard itself
    would loop.
+
+Getting into a module (`'read'` or `'write'`) is only half the story —
+**every write affordance inside that page (buttons, forms, uploads,
+toggles) is gated separately**, via `useAdminAccess().canWrite(moduleKey)`
+from `src/layout/AdminAccessContext.tsx`. `Shell.tsx` provides this
+context around `<Outlet/>`, computing `canWrite` from the same
+`access_level` data `RequireModule` uses. The pattern in every admin page
+that has write actions:
+```tsx
+const { canWrite } = useAdminAccess();
+const writable = canWrite('registrations'); // your module's key
+// ...
+{writable && <Button onClick={doTheWrite}>New thing</Button>}
+```
+When a page shows a view/edit modal for a single item (e.g. Registrations'
+"Review" modal), the read-only path isn't just "hide the button" — the
+modal itself renders a read-only summary instead of the editable
+form/action buttons (see `Registrations.tsx`'s `ReviewModal` for the
+reference shape), or the same form fields render with `disabled={!writable}`
+and the Save button disappears (see `CourseBuilder.tsx`'s lesson editor).
+**When you add a write action to any of these pages, gate it the same
+way** — an ungated mutation button is a real permission hole, not a
+cosmetic miss, since RLS still lets an `instructor` role write those
+tables directly (module access is an app-level UX/workflow gate on top of
+RLS, not a replacement for it).
 
 `src/layout/navConfig.ts`'s `adminNav` entries carry a `key` (matching
 `instructor_module_access.module_key`) and an optional `superAdminOnly`
 flag; `CONFIGURABLE_MODULES` is derived from that array (excluding
 `superAdminOnly` items and `dashboard`) and is what both the Settings UI
 and the nav-filtering logic iterate over — **add a new admin page by
-giving its `NavItem` a `key`, and it automatically becomes toggleable**
+giving its `NavItem` a `key`, and it automatically becomes configurable**
 (or add `superAdminOnly: true` if it should never be).
 
 ### Where the permission is configured and previewed
 
 - **Configure**: `/admin/settings` → "Instructor module access" — a
-  checkbox per configurable module, writing straight to
-  `instructor_module_access` (super_admin-only write per RLS).
+  Hidden/Read only/Read & write dropdown per configurable module, writing
+  straight to `instructor_module_access` (super_admin-only write per RLS).
 - **Preview**: a super_admin sees an "Instructor view" toggle in the admin
   header (`src/layout/Shell.tsx`, next to "Student view"). Toggling it
-  filters the *sidebar* using the same `isModuleVisible()` logic real
-  instructors get — it's a nav-only simulation for checking your
-  configuration, not a sandboxed session (a super_admin's own route access
-  is unaffected by the toggle, since `RequireModule`/`RequireRole` check
-  the real `profile.role`).
+  drives both the sidebar filter *and* the `AdminAccessContext` `canWrite`
+  value the same way a real instructor session would — so a super_admin
+  can click through and see the actual disabled/hidden write controls, not
+  just a filtered nav. It's still only a simulation for route access
+  itself: a super_admin's own `RequireModule`/`RequireRole` checks look at
+  the real `profile.role`, so they can still navigate anywhere by URL
+  while previewing.
 - **Enforcement logic** lives in `src/lib/moduleAccess.ts`
   (`useInstructorModuleAccess()` — a small in-memory cache per browser
-  tab, `isModuleVisible()`, `invalidateModuleAccessCache()` to call after
-  writing the table).
+  tab, `getAccessLevel()`/`isModuleVisible()`/`isModuleWritable()`,
+  `invalidateModuleAccessCache()` to call after writing the table).
 
-If you add a new admin page and want it instructor-configurable, wrap its
-route in `<RequireModule moduleKey="your-key">` in `routes.tsx`, give it
-a matching `key` in `navConfig.ts`, and add a row for it in the
-`instructor_module_access` seed data (or just let it default to visible).
+If you add a new admin page and want it instructor-configurable: wrap its
+route in `<RequireModule moduleKey="your-key">` in `routes.tsx`, give it a
+matching `key` in `navConfig.ts`, gate every write affordance inside it
+with `useAdminAccess().canWrite('your-key')`, and add a row for it in the
+`instructor_module_access` seed data (or just let it default to `'read'`).
 
 ## Course Groups — bulk enrollment, not a parallel access model
 

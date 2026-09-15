@@ -7,7 +7,7 @@ description: Reference for the fpv-crm Supabase schema — every table, the RLS 
 
 Supabase project ref: **`txbrnewcztixcagdnnfx`**. All schema changes live as
 numbered SQL files in `supabase/migrations/`, applied in order and never
-edited after the fact (0001 → 0019 as of this writing — check
+edited after the fact (0001 → 0020 as of this writing — check
 `ls supabase/migrations` for the current tip before assuming a number).
 
 ## RLS helper functions (defined once, used everywhere)
@@ -93,8 +93,11 @@ table rather than inventing a new pattern.
   `increment_study_time` / `increment_staff_activity` so a client can only
   ever add time for itself. `src/lib/streak.ts` derives daily-streak stats
   from `study_time` client-side — no separate streak table exists.
-- `instructor_module_access` — `(module_key, visible)`; drives which admin
-  sections an instructor role can reach. See `fpv-crm-admin-panel`.
+- `instructor_module_access` — `(module_key, access_level)` where
+  `access_level` is `'none' | 'read' | 'write'` (default `'read'` — not
+  `'write'` — when a module has no row yet). Drives both whether an
+  instructor role can reach an admin section at all and whether write
+  actions inside it render. See `fpv-crm-admin-panel`.
 
 ## Storage buckets
 

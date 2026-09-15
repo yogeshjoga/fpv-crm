@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Copy, FormInput, Globe, ListChecks, Plus, Settings2 } from 'lucide-react';
 import { supabase, APP_URL } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
+import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { slugify } from '../../lib/slug';
 import { GlassCard } from '../../components/ui/shared';
@@ -10,6 +11,8 @@ import { Badge, Button, Checkbox, EmptyState, Field, Modal, PageHeader, Select, 
 
 export function Forms() {
   const { profile } = useAuth();
+  const { canWrite } = useAdminAccess();
+  const writable = canWrite('forms');
   const toast = useToast();
   const [creating, setCreating] = useState(false);
 
@@ -50,9 +53,11 @@ export function Forms() {
         title="Enrollment forms"
         subtitle="Build a registration form per course/batch and share its link"
         actions={
-          <Button onClick={() => setCreating(true)} disabled={!q.data?.courses.length}>
-            <Plus size={16} /> New form
-          </Button>
+          writable && (
+            <Button onClick={() => setCreating(true)} disabled={!q.data?.courses.length}>
+              <Plus size={16} /> New form
+            </Button>
+          )
         }
       />
 
@@ -63,7 +68,7 @@ export function Forms() {
           icon={<FormInput size={22} />}
           title="No enrollment forms"
           description={q.data?.courses.length ? 'Create a form and share its URL with a cohort.' : 'Create a course first.'}
-          action={q.data?.courses.length ? <Button onClick={() => setCreating(true)}>New form</Button> : undefined}
+          action={writable && q.data?.courses.length ? <Button onClick={() => setCreating(true)}>New form</Button> : undefined}
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
@@ -102,19 +107,23 @@ export function Forms() {
                     </Button>
                   </Link>
                 )}
-                <Button variant="ghost" onClick={() => toggleOpen(f)}>
-                  {f.is_open ? 'Close' : 'Open'}
-                </Button>
-                <Button variant="ghost" onClick={() => togglePublic(f)}>
-                  <Globe size={13} /> {f.is_public ? 'Make private' : 'Make public'}
-                </Button>
+                {writable && (
+                  <>
+                    <Button variant="ghost" onClick={() => toggleOpen(f)}>
+                      {f.is_open ? 'Close' : 'Open'}
+                    </Button>
+                    <Button variant="ghost" onClick={() => togglePublic(f)}>
+                      <Globe size={13} /> {f.is_public ? 'Make private' : 'Make public'}
+                    </Button>
+                  </>
+                )}
               </div>
             </GlassCard>
           ))}
         </div>
       )}
 
-      <Modal open={creating} onClose={() => setCreating(false)} title="New enrollment form">
+      <Modal open={creating && writable} onClose={() => setCreating(false)} title="New enrollment form">
         {q.data && (
           <CreateForm
             courses={q.data.courses}
