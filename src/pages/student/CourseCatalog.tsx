@@ -1,10 +1,11 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, BookOpen, Lock } from 'lucide-react';
+import { ArrowRight, BookOpen, Eye, Lock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
-import { Badge, EmptyState, PageHeader, Spinner } from '../../components/ui/kit';
+import { Badge, EmptyState, PageHeader, Spinner, useToast } from '../../components/ui/kit';
 
 interface Course {
   id: string;
@@ -15,8 +16,10 @@ interface Course {
 }
 
 export function CourseCatalog() {
-  const { profile } = useAuth();
+  const { profile, isStaff } = useAuth();
+  const toast = useToast();
   const uid = profile?.id ?? '';
+  const [busy, setBusy] = useState<string | null>(null);
   const q = useQuery(async () => {
     // enrollments / requests are scoped to the current user explicitly — staff
     // RLS would otherwise return every student's rows and mislabel course cards.
@@ -33,6 +36,25 @@ export function CourseCatalog() {
   if (q.error) return <p className="text-sm text-red-600">{q.error}</p>;
 
   const { courses, enrollments, requests, forms } = q.data!;
+
+  const startPreview = async (courseId: string) => {
+    setBusy(courseId);
+    const { error } = await supabase
+      .from('enrollments')
+      .upsert({ student_id: uid, course_id: courseId, status: 'active', enrolled_by: uid }, { onConflict: 'student_id,course_id' });
+    setBusy(null);
+    if (error) return toast(error.message, 'error');
+    q.refetch();
+  };
+
+  const endPreview = async (courseId: string) => {
+    setBusy(courseId);
+    const { error } = await supabase.from('enrollments').update({ status: 'revoked' }).match({ student_id: uid, course_id: courseId });
+    setBusy(null);
+    if (error) return toast(error.message, 'error');
+    toast('Preview ended');
+    q.refetch();
+  };
 
   return (
     <div>
@@ -59,11 +81,19 @@ export function CourseCatalog() {
                   <div className="font-semibold text-neutral-900">{c.title}</div>
                   <p className="mt-1 line-clamp-3 text-sm text-neutral-500">{c.summary}</p>
                 </div>
-                <div className="mt-4">
+                <div className="mt-4 flex items-center justify-between gap-2">
                   {enrolled ? (
                     <Link to={`/app/courses/${c.slug}`} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:underline">
                       Open course <ArrowRight size={14} />
                     </Link>
+                  ) : isStaff ? (
+                    <button
+                      onClick={() => startPreview(c.id)}
+                      disabled={busy === c.id}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-white disabled:opacity-50"
+                    >
+                      <Eye size={13} /> {busy === c.id ? 'Starting…' : 'Preview as student'}
+                    </button>
                   ) : requested ? (
                     <Badge tone="amber">Enrollment pending review</Badge>
                   ) : form ? (
@@ -74,6 +104,15 @@ export function CourseCatalog() {
                     <span className="inline-flex items-center gap-1.5 text-sm text-neutral-400">
                       <Lock size={14} /> Enrollment closed
                     </span>
+                  )}
+                  {enrolled && isStaff && (
+                    <button
+                      onClick={() => endPreview(c.id)}
+                      disabled={busy === c.id}
+                      className="text-xs text-neutral-400 hover:text-red-500 disabled:opacity-50"
+                    >
+                      End preview
+                    </button>
                   )}
                 </div>
               </GlassCard>
