@@ -270,7 +270,9 @@ export function CourseViewer() {
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-4">
           {course.description && (
-            <GlassCard className="p-5 text-sm leading-relaxed text-neutral-600 whitespace-pre-wrap">{course.description}</GlassCard>
+            <GlassCard className="p-5">
+              <LessonContent content={course.description} />
+            </GlassCard>
           )}
           {modules.map((m: any, mi: number) => {
             const lessons = [...(m.lessons ?? [])].sort((a: any, b: any) => a.position - b.position);
