@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ScrollText } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, Button, EmptyState, PageHeader, Spinner, TextInput, useToast } from '../../components/ui/kit';
@@ -17,6 +18,8 @@ interface Cert {
 }
 
 export function AdminCertificates() {
+  const { canWrite } = useAdminAccess();
+  const writable = canWrite('certificates');
   const toast = useToast();
   const [search, setSearch] = useState('');
   const q = useQuery<Cert[]>(
@@ -74,7 +77,7 @@ export function AdminCertificates() {
                 <th className="px-4 py-3">Score</th>
                 <th className="px-4 py-3">Issued</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3"></th>
+                {writable && <th className="px-4 py-3"></th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-white/50">
@@ -91,11 +94,13 @@ export function AdminCertificates() {
                   <td className="px-4 py-3">
                     {c.revoked ? <Badge tone="red">revoked</Badge> : <Badge tone="green">valid</Badge>}
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    <Button variant="ghost" onClick={() => toggleRevoke(c)}>
-                      {c.revoked ? 'Reinstate' : 'Revoke'}
-                    </Button>
-                  </td>
+                  {writable && (
+                    <td className="px-4 py-3 text-right">
+                      <Button variant="ghost" onClick={() => toggleRevoke(c)}>
+                        {c.revoked ? 'Reinstate' : 'Revoke'}
+                      </Button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

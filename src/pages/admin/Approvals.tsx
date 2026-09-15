@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { invokeFn } from '../../lib/functions';
 import { GlassCard } from '../../components/ui/shared';
@@ -10,6 +11,8 @@ type Profile = Tables<'profiles'>;
 
 export function Approvals() {
   const toast = useToast();
+  const { canWrite } = useAdminAccess();
+  const writable = canWrite('approvals');
   const q = useQuery<Profile[]>(
     () =>
       unwrap(
@@ -49,13 +52,14 @@ export function Approvals() {
               </div>
               <div className="flex items-center gap-2">
                 <Badge tone={p.status === 'pending' ? 'amber' : 'red'}>{p.status}</Badge>
-                {p.status !== 'active' && <Button onClick={() => setStatus(p, 'active')}>Activate</Button>}
-                {p.status === 'pending' && (
+                {!writable && <span className="text-xs text-neutral-400">read-only</span>}
+                {writable && p.status !== 'active' && <Button onClick={() => setStatus(p, 'active')}>Activate</Button>}
+                {writable && p.status === 'pending' && (
                   <Button variant="ghost" onClick={() => setStatus(p, 'suspended')}>
                     Reject
                   </Button>
                 )}
-                {p.status === 'suspended' && (
+                {writable && p.status === 'suspended' && (
                   <Button variant="ghost" onClick={() => setStatus(p, 'active')}>
                     Reinstate
                   </Button>

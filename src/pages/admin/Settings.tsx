@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { CONFIGURABLE_MODULES } from '../../layout/navConfig';
-import { invalidateModuleAccessCache } from '../../lib/moduleAccess';
+import { invalidateModuleAccessCache, type AccessLevel } from '../../lib/moduleAccess';
 import { GlassCard } from '../../components/ui/shared';
-import { Button, Checkbox, Field, PageHeader, Spinner, TextArea, TextInput, useToast } from '../../components/ui/kit';
+import { Button, Field, PageHeader, Select, Spinner, TextArea, TextInput, useToast } from '../../components/ui/kit';
 import type { Tables } from '../../lib/database.types';
 
 const FUNCTIONS_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
@@ -129,21 +129,23 @@ export function Settings() {
   );
 }
 
+const LEVEL_LABEL: Record<AccessLevel, string> = { none: 'Hidden', read: 'Read only', write: 'Read & write' };
+
 function InstructorAccessCard() {
   const toast = useToast();
-  const q = useQuery<{ module_key: string; visible: boolean }[]>(
-    () => unwrap(supabase.from('instructor_module_access').select('module_key, visible')) as Promise<{ module_key: string; visible: boolean }[]>,
+  const q = useQuery<{ module_key: string; access_level: AccessLevel }[]>(
+    () => unwrap(supabase.from('instructor_module_access').select('module_key, access_level')) as Promise<{ module_key: string; access_level: AccessLevel }[]>,
     [],
   );
   const [busy, setBusy] = useState<string | null>(null);
 
-  const isVisible = (key: string) => q.data?.find((r) => r.module_key === key)?.visible ?? true;
+  const levelFor = (key: string): AccessLevel => q.data?.find((r) => r.module_key === key)?.access_level ?? 'read';
 
-  const toggle = async (key: string, visible: boolean) => {
+  const setLevel = async (key: string, access_level: AccessLevel) => {
     setBusy(key);
     const { error } = await supabase
       .from('instructor_module_access')
-      .upsert({ module_key: key, visible, updated_at: new Date().toISOString() }, { onConflict: 'module_key' });
+      .upsert({ module_key: key, access_level, updated_at: new Date().toISOString() }, { onConflict: 'module_key' });
     setBusy(null);
     if (error) return toast(error.message, 'error');
     invalidateModuleAccessCache();
@@ -154,21 +156,30 @@ function InstructorAccessCard() {
     <GlassCard className="mb-6 p-6">
       <h2 className="mb-1 font-semibold text-neutral-900">Instructor module access</h2>
       <p className="mb-4 text-sm text-neutral-500">
-        Choose which admin sections instructor accounts can see and open. Analytics, Employees, Users and Company
-        Settings always stay super-admin-only, regardless of these toggles.
+        For each admin section, choose whether instructor accounts have it hidden, can only view it, or can also
+        create/edit/delete there. This is enforced both in the sidebar and on the page itself — an instructor set to
+        "Read only" sees every write button, form and toggle disappear, and can't reach a write action by URL either.
+        Analytics, Employees, Users and this Settings page always stay super-admin-only, regardless of these settings.
       </p>
       {q.loading ? (
         <Spinner />
       ) : (
         <div className="grid gap-2 sm:grid-cols-2">
           {CONFIGURABLE_MODULES.map((m) => (
-            <div key={m.key} className={`rounded-xl border border-white/60 bg-white/40 px-3 py-2 ${busy === m.key ? 'opacity-50' : ''}`}>
-              <Checkbox
-                label={m.label}
-                checked={isVisible(m.key)}
+            <div key={m.key} className={`flex items-center justify-between gap-3 rounded-xl border border-white/60 bg-white/40 px-3 py-2 ${busy === m.key ? 'opacity-50' : ''}`}>
+              <span className="text-sm text-neutral-800">{m.label}</span>
+              <Select
+                value={levelFor(m.key)}
                 disabled={busy === m.key}
-                onChange={(e) => toggle(m.key, e.target.checked)}
-              />
+                onChange={(e) => setLevel(m.key, e.target.value as AccessLevel)}
+                className="w-36 py-1.5 text-xs"
+              >
+                {(Object.keys(LEVEL_LABEL) as AccessLevel[]).map((lvl) => (
+                  <option key={lvl} value={lvl}>
+                    {LEVEL_LABEL[lvl]}
+                  </option>
+                ))}
+              </Select>
             </div>
           ))}
         </div>

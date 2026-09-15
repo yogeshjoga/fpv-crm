@@ -805,19 +805,19 @@ export type Database = {
       }
       instructor_module_access: {
         Row: {
+          access_level: string
           module_key: string
           updated_at: string
-          visible: boolean
         }
         Insert: {
+          access_level?: string
           module_key: string
           updated_at?: string
-          visible?: boolean
         }
         Update: {
+          access_level?: string
           module_key?: string
           updated_at?: string
-          visible?: boolean
         }
         Relationships: []
       }

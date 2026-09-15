@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ChevronLeft, FileText, Plus, Trash2, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
+import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
 import { Button, Field, Modal, PageHeader, Select, Spinner, TextArea, TextInput, useToast } from '../../components/ui/kit';
@@ -10,6 +11,8 @@ import { Button, Field, Modal, PageHeader, Select, Spinner, TextArea, TextInput,
 export function CourseBuilder() {
   const { id } = useParams();
   const { profile } = useAuth();
+  const { canWrite } = useAdminAccess();
+  const writable = canWrite('courses');
   const toast = useToast();
   const [newModule, setNewModule] = useState('');
   const [editingLesson, setEditingLesson] = useState<any | null>(null);
@@ -104,12 +107,14 @@ export function CourseBuilder() {
       </Link>
       <PageHeader title={course.title} subtitle="Modules, lessons and PDF resources" />
 
-      <div className="mb-5 flex gap-2">
-        <TextInput placeholder="New module title…" value={newModule} onChange={(e) => setNewModule(e.target.value)} className="max-w-xs" />
-        <Button onClick={addModule}>
-          <Plus size={15} /> Add module
-        </Button>
-      </div>
+      {writable && (
+        <div className="mb-5 flex gap-2">
+          <TextInput placeholder="New module title…" value={newModule} onChange={(e) => setNewModule(e.target.value)} className="max-w-xs" />
+          <Button onClick={addModule}>
+            <Plus size={15} /> Add module
+          </Button>
+        </div>
+      )}
 
       <div className="space-y-4">
         {modules.map((m: any, mi: number) => {
@@ -121,14 +126,16 @@ export function CourseBuilder() {
                   <span className="text-neutral-400">Module {mi + 1} · </span>
                   {m.title}
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="ghost" onClick={() => addLesson(m.id, lessons.length)}>
-                    <Plus size={14} /> Lesson
-                  </Button>
-                  <button onClick={() => delModule(m.id)} className="text-neutral-400 hover:text-red-500">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
+                {writable && (
+                  <div className="flex gap-2">
+                    <Button variant="ghost" onClick={() => addLesson(m.id, lessons.length)}>
+                      <Plus size={14} /> Lesson
+                    </Button>
+                    <button onClick={() => delModule(m.id)} className="text-neutral-400 hover:text-red-500">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="mt-3 space-y-2">
@@ -138,29 +145,33 @@ export function CourseBuilder() {
                       <button onClick={() => setEditingLesson({ ...l })} className="text-left text-sm font-medium text-neutral-900 hover:text-blue-600">
                         {mi + 1}.{li + 1} {l.title}
                       </button>
-                      <div className="flex items-center gap-2">
-                        <label className="cursor-pointer text-neutral-400 hover:text-blue-600" title="Upload PDF">
-                          {uploadingFor === l.id ? '…' : <Upload size={15} />}
-                          <input
-                            type="file"
-                            accept=".pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,image/*"
-                            className="hidden"
-                            onChange={(e) => e.target.files?.[0] && uploadResource(l.id, e.target.files[0])}
-                          />
-                        </label>
-                        <button onClick={() => delLesson(l.id)} className="text-neutral-400 hover:text-red-500">
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
+                      {writable && (
+                        <div className="flex items-center gap-2">
+                          <label className="cursor-pointer text-neutral-400 hover:text-blue-600" title="Upload PDF">
+                            {uploadingFor === l.id ? '…' : <Upload size={15} />}
+                            <input
+                              type="file"
+                              accept=".pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,image/*"
+                              className="hidden"
+                              onChange={(e) => e.target.files?.[0] && uploadResource(l.id, e.target.files[0])}
+                            />
+                          </label>
+                          <button onClick={() => delLesson(l.id)} className="text-neutral-400 hover:text-red-500">
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                     {!!l.lesson_resources?.length && (
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {l.lesson_resources.map((r: any) => (
                           <span key={r.id} className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 text-xs text-neutral-600">
                             <FileText size={12} /> {r.file_name}
-                            <button onClick={() => delResource(r.id, r.file_path)} className="text-neutral-400 hover:text-red-500">
-                              <Trash2 size={11} />
-                            </button>
+                            {writable && (
+                              <button onClick={() => delResource(r.id, r.file_path)} className="text-neutral-400 hover:text-red-500">
+                                <Trash2 size={11} />
+                              </button>
+                            )}
                           </span>
                         ))}
                       </div>
@@ -175,14 +186,14 @@ export function CourseBuilder() {
         {!modules.length && <p className="text-sm text-neutral-400">Add a module to start building.</p>}
       </div>
 
-      <Modal open={!!editingLesson} onClose={() => setEditingLesson(null)} title="Edit lesson" wide>
+      <Modal open={!!editingLesson} onClose={() => setEditingLesson(null)} title={writable ? 'Edit lesson' : 'View lesson'} wide>
         {editingLesson && (
           <div className="space-y-4">
             <Field label="Title">
-              <TextInput value={editingLesson.title} onChange={(e) => setEditingLesson({ ...editingLesson, title: e.target.value })} />
+              <TextInput disabled={!writable} value={editingLesson.title} onChange={(e) => setEditingLesson({ ...editingLesson, title: e.target.value })} />
             </Field>
             <Field label="Lesson type">
-              <Select value={editingLesson.kind ?? 'article'} onChange={(e) => setEditingLesson({ ...editingLesson, kind: e.target.value })}>
+              <Select disabled={!writable} value={editingLesson.kind ?? 'article'} onChange={(e) => setEditingLesson({ ...editingLesson, kind: e.target.value })}>
                 <option value="article">Article (text / blog)</option>
                 <option value="video">Video</option>
                 <option value="embed">Embed (simulator, 3D model, slides…)</option>
@@ -192,6 +203,7 @@ export function CourseBuilder() {
             {(editingLesson.kind ?? 'article') === 'article' && (
               <Field label="Content" hint="Plain text or markdown">
                 <TextArea
+                  disabled={!writable}
                   value={editingLesson.content ?? ''}
                   onChange={(e) => setEditingLesson({ ...editingLesson, content: e.target.value })}
                   className="min-h-[160px]"
@@ -200,22 +212,24 @@ export function CourseBuilder() {
             )}
             {editingLesson.kind === 'video' && (
               <Field label="Video URL" hint="YouTube / Vimeo link">
-                <TextInput value={editingLesson.video_url ?? ''} onChange={(e) => setEditingLesson({ ...editingLesson, video_url: e.target.value })} />
+                <TextInput disabled={!writable} value={editingLesson.video_url ?? ''} onChange={(e) => setEditingLesson({ ...editingLesson, video_url: e.target.value })} />
               </Field>
             )}
             {editingLesson.kind === 'embed' && (
               <Field label="Embed URL" hint="Sketchfab 3D model, VelociDrone/Uncrashed/Betaflight sim, Google Slides, a hosted PDF — anything embeddable">
-                <TextInput value={editingLesson.embed_url ?? ''} onChange={(e) => setEditingLesson({ ...editingLesson, embed_url: e.target.value })} placeholder="https://…" />
+                <TextInput disabled={!writable} value={editingLesson.embed_url ?? ''} onChange={(e) => setEditingLesson({ ...editingLesson, embed_url: e.target.value })} placeholder="https://…" />
               </Field>
             )}
-            <p className="text-xs text-neutral-500">
-              Attach PDFs, PPTs, DOCs and images from each lesson row (upload icon). Images preview inline for students.
-            </p>
+            {writable && (
+              <p className="text-xs text-neutral-500">
+                Attach PDFs, PPTs, DOCs and images from each lesson row (upload icon). Images preview inline for students.
+              </p>
+            )}
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setEditingLesson(null)}>
-                Cancel
+                {writable ? 'Cancel' : 'Close'}
               </Button>
-              <Button onClick={saveLesson}>Save lesson</Button>
+              {writable && <Button onClick={saveLesson}>Save lesson</Button>}
             </div>
           </div>
         )}

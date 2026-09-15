@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ChevronLeft, GripVertical, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
 import { Button, Checkbox, Field, PageHeader, Select, Spinner, TextInput, useToast } from '../../components/ui/kit';
@@ -11,6 +12,8 @@ const HAS_OPTIONS = new Set(['select', 'multiselect']);
 
 export function FormBuilder() {
   const { id } = useParams();
+  const { canWrite } = useAdminAccess();
+  const writable = canWrite('forms');
   const toast = useToast();
 
   const q = useQuery(async () => {
@@ -71,9 +74,11 @@ export function FormBuilder() {
         title={form.title}
         subtitle={`${form.course?.title} · drag order by position`}
         actions={
-          <Button onClick={addField}>
-            <Plus size={16} /> Add field
-          </Button>
+          writable && (
+            <Button onClick={addField}>
+              <Plus size={16} /> Add field
+            </Button>
+          )
         }
       />
 
@@ -84,6 +89,7 @@ export function FormBuilder() {
             index={i}
             field={f}
             saving={savingId === f.id}
+            writable={writable}
             onSave={saveField}
             onDelete={() => delField(f.id)}
           />
@@ -98,12 +104,14 @@ function FieldEditor({
   index,
   field,
   saving,
+  writable,
   onSave,
   onDelete,
 }: {
   index: number;
   field: any;
   saving: boolean;
+  writable: boolean;
   onSave: (f: any) => void;
   onDelete: () => void;
 }) {
@@ -122,10 +130,10 @@ function FieldEditor({
         <div className="flex-1 space-y-3">
           <div className="grid gap-3 sm:grid-cols-[1fr_180px]">
             <Field label={`Field ${index + 1} label`}>
-              <TextInput value={local.label} onChange={(e) => set('label', e.target.value)} />
+              <TextInput disabled={!writable} value={local.label} onChange={(e) => set('label', e.target.value)} />
             </Field>
             <Field label="Type">
-              <Select value={local.field_type} onChange={(e) => set('field_type', e.target.value)}>
+              <Select disabled={!writable} value={local.field_type} onChange={(e) => set('field_type', e.target.value)}>
                 {FIELD_TYPES.map((t) => (
                   <option key={t} value={t}>
                     {t}
@@ -136,22 +144,24 @@ function FieldEditor({
           </div>
           {HAS_OPTIONS.has(local.field_type) && (
             <Field label="Options" hint="One per line">
-              <TextInput value={local._optionsText} onChange={(e) => set('_optionsText', e.target.value)} placeholder="Beginner, Intermediate, Advanced" />
+              <TextInput disabled={!writable} value={local._optionsText} onChange={(e) => set('_optionsText', e.target.value)} placeholder="Beginner, Intermediate, Advanced" />
             </Field>
           )}
           <Field label="Help text" hint="Optional">
-            <TextInput value={local.help_text ?? ''} onChange={(e) => set('help_text', e.target.value)} />
+            <TextInput disabled={!writable} value={local.help_text ?? ''} onChange={(e) => set('help_text', e.target.value)} />
           </Field>
           <div className="flex items-center justify-between">
-            <Checkbox label="Required" checked={local.required} onChange={(e) => set('required', e.target.checked)} />
-            <div className="flex gap-2">
-              <button onClick={onDelete} className="text-neutral-400 hover:text-red-500">
-                <Trash2 size={16} />
-              </button>
-              <Button onClick={() => onSave(local)} loading={saving} variant="secondary">
-                Save
-              </Button>
-            </div>
+            <Checkbox disabled={!writable} label="Required" checked={local.required} onChange={(e) => set('required', e.target.checked)} />
+            {writable && (
+              <div className="flex gap-2">
+                <button onClick={onDelete} className="text-neutral-400 hover:text-red-500">
+                  <Trash2 size={16} />
+                </button>
+                <Button onClick={() => onSave(local)} loading={saving} variant="secondary">
+                  Save
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </div>

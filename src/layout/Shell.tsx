@@ -6,7 +6,8 @@ import { useAuth } from '../auth/AuthProvider';
 import { NotificationBell } from '../components/NotificationBell';
 import { Logo } from '../components/Brand';
 import { useStaffActivityTracker } from '../lib/useTimeTracker';
-import { isModuleVisible, useInstructorModuleAccess } from '../lib/moduleAccess';
+import { isModuleVisible, isModuleWritable, useInstructorModuleAccess } from '../lib/moduleAccess';
+import { AdminAccessProvider } from './AdminAccessContext';
 
 export interface NavItem {
   to: string;
@@ -44,6 +45,14 @@ export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin'
       return isModuleVisible(moduleAccess.data, item.key);
     });
   }, [nav, asInstructor, moduleAccess.data]);
+
+  const accessValue = useMemo(
+    () => ({
+      restricted: asInstructor,
+      canWrite: (moduleKey: string) => !asInstructor || isModuleWritable(moduleAccess.data, moduleKey),
+    }),
+    [asInstructor, moduleAccess.data],
+  );
 
   const handleSignOut = async () => {
     await signOut();
@@ -129,11 +138,13 @@ export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin'
         </header>
         {canPreviewInstructor && previewInstructor && (
           <div className="flex shrink-0 items-center justify-center gap-2 bg-amber-100 px-4 py-2 text-center text-xs font-medium text-amber-800">
-            <Eye size={13} /> Previewing the sidebar as an Instructor sees it — configure this in Company Settings.
+            <Eye size={13} /> Previewing as an Instructor — sidebar and write access match your Company Settings configuration.
           </div>
         )}
         <main className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-4 py-8 md:px-8">
-          <Outlet />
+          <AdminAccessProvider value={accessValue}>
+            <Outlet />
+          </AdminAccessProvider>
         </main>
       </div>
     </div>

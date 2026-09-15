@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Megaphone, Send } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { invokeFn } from '../../lib/functions';
 import { GlassCard } from '../../components/ui/shared';
@@ -13,6 +14,8 @@ const AUDIENCES = [
 ] as const;
 
 export function Notifications() {
+  const { canWrite } = useAdminAccess();
+  const writable = canWrite('notifications');
   const toast = useToast();
   const [audienceType, setAudienceType] = useState<'all_students' | 'course' | 'all_staff'>('all_students');
   const [courseId, setCourseId] = useState('');
@@ -62,37 +65,39 @@ export function Notifications() {
     <div>
       <PageHeader title="Notifications" subtitle="Send an in-app + email notification to a group" />
 
-      <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
-        <GlassCard className="p-5">
-          <form onSubmit={send} className="space-y-4">
-            <Field label="Audience">
-              <Select value={audienceType} onChange={(e) => setAudienceType(e.target.value as typeof audienceType)}>
-                {AUDIENCES.map((a) => (
-                  <option key={a.value} value={a.value}>{a.label}</option>
-                ))}
-              </Select>
-            </Field>
-            {audienceType === 'course' && (
-              <Field label="Course">
-                <Select value={courseId} onChange={(e) => setCourseId(e.target.value)}>
-                  <option value="">Select…</option>
-                  {q.data?.courses.map((c) => (
-                    <option key={c.id} value={c.id}>{c.title}</option>
+      <div className={`grid gap-6 ${writable ? 'lg:grid-cols-[420px_1fr]' : ''}`}>
+        {writable && (
+          <GlassCard className="p-5">
+            <form onSubmit={send} className="space-y-4">
+              <Field label="Audience">
+                <Select value={audienceType} onChange={(e) => setAudienceType(e.target.value as typeof audienceType)}>
+                  {AUDIENCES.map((a) => (
+                    <option key={a.value} value={a.value}>{a.label}</option>
                   ))}
                 </Select>
               </Field>
-            )}
-            <Field label="Subject" required>
-              <TextInput value={subject} onChange={(e) => setSubject(e.target.value)} />
-            </Field>
-            <Field label="Message">
-              <TextArea value={body} onChange={(e) => setBody(e.target.value)} className="min-h-[140px]" />
-            </Field>
-            <Button type="submit" loading={busy} className="w-full">
-              <Send size={15} /> Send now
-            </Button>
-          </form>
-        </GlassCard>
+              {audienceType === 'course' && (
+                <Field label="Course">
+                  <Select value={courseId} onChange={(e) => setCourseId(e.target.value)}>
+                    <option value="">Select…</option>
+                    {q.data?.courses.map((c) => (
+                      <option key={c.id} value={c.id}>{c.title}</option>
+                    ))}
+                  </Select>
+                </Field>
+              )}
+              <Field label="Subject" required>
+                <TextInput value={subject} onChange={(e) => setSubject(e.target.value)} />
+              </Field>
+              <Field label="Message">
+                <TextArea value={body} onChange={(e) => setBody(e.target.value)} className="min-h-[140px]" />
+              </Field>
+              <Button type="submit" loading={busy} className="w-full">
+                <Send size={15} /> Send now
+              </Button>
+            </form>
+          </GlassCard>
+        )}
 
         <div>
           <div className="mb-2 text-sm font-semibold text-neutral-700">Recent broadcasts</div>

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { FileQuestion, ImageIcon, Layers, Plus } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
+import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { slugify } from '../../lib/slug';
 import { GlassCard } from '../../components/ui/shared';
@@ -14,6 +15,8 @@ type Org = Tables<'org_settings'>;
 
 export function AdminCourses() {
   const { profile } = useAuth();
+  const { canWrite } = useAdminAccess();
+  const writable = canWrite('courses');
   const toast = useToast();
   const [creating, setCreating] = useState(false);
   const [uploadingCover, setUploadingCover] = useState<string | null>(null);
@@ -56,16 +59,23 @@ export function AdminCourses() {
         title="Courses"
         subtitle="Build course content and exams"
         actions={
-          <Button onClick={() => setCreating(true)}>
-            <Plus size={16} /> New course
-          </Button>
+          writable && (
+            <Button onClick={() => setCreating(true)}>
+              <Plus size={16} /> New course
+            </Button>
+          )
         }
       />
 
       {q.loading ? (
         <Spinner />
       ) : !q.data?.courses.length ? (
-        <EmptyState icon={<Layers size={22} />} title="No courses yet" description="Create your first FPV course." action={<Button onClick={() => setCreating(true)}>New course</Button>} />
+        <EmptyState
+          icon={<Layers size={22} />}
+          title="No courses yet"
+          description="Create your first FPV course."
+          action={writable && <Button onClick={() => setCreating(true)}>New course</Button>}
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {q.data.courses.map((c) => (
@@ -77,15 +87,17 @@ export function AdminCourses() {
                   <ImageIcon className="text-blue-400" size={28} />
                 )}
               </div>
-              <label className="mb-3 -mt-1 inline-block cursor-pointer text-xs font-medium text-blue-600 hover:underline">
-                {uploadingCover === c.id ? 'Uploading…' : c.cover_image_url ? 'Change cover image' : 'Upload cover image'}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => e.target.files?.[0] && uploadCover(c, e.target.files[0])}
-                />
-              </label>
+              {writable && (
+                <label className="mb-3 -mt-1 inline-block cursor-pointer text-xs font-medium text-blue-600 hover:underline">
+                  {uploadingCover === c.id ? 'Uploading…' : c.cover_image_url ? 'Change cover image' : 'Upload cover image'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => e.target.files?.[0] && uploadCover(c, e.target.files[0])}
+                  />
+                </label>
+              )}
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="font-semibold text-neutral-900">{c.title}</div>
@@ -110,16 +122,18 @@ export function AdminCourses() {
                     <FileQuestion size={14} /> Question bank
                   </Button>
                 </Link>
-                <Button variant="ghost" onClick={() => toggleStatus(c)}>
-                  {c.status === 'published' ? 'Unpublish' : 'Publish'}
-                </Button>
+                {writable && (
+                  <Button variant="ghost" onClick={() => toggleStatus(c)}>
+                    {c.status === 'published' ? 'Unpublish' : 'Publish'}
+                  </Button>
+                )}
               </div>
             </GlassCard>
           ))}
         </div>
       )}
 
-      {q.data && (
+      {q.data && writable && (
         <CreateCourseModal
           open={creating}
           onClose={() => setCreating(false)}

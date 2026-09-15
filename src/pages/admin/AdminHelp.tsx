@@ -186,7 +186,7 @@ const SECTIONS: Section[] = [
       'Certificate ID prefix, authorized signatory name, support email, and the verification base URL encoded into every certificate\'s QR code.',
       'Default exam parameters (pass %, time limit, questions per exam, max attempts, cooldown) — these only seed new courses; existing courses keep whatever they were set to.',
       'Google Forms integration: gives you a webhook URL and an Apps Script to paste into a Google Form so its responses flow straight into Registrations, including uploaded files. "Regenerate secret" invalidates the old webhook URL, so update any Form still using it afterward.',
-      'Instructor module access: checkboxes controlling which sections an instructor account can open (Registrations, Enrollment Requests, Account Approvals, Courses, Course Groups, Enrollment Forms, Calendar, Notifications, Certificates, Questions, Help). This is real access control, not just hiding a nav link — an instructor typing the URL directly for a module you\'ve turned off is redirected away. Analytics, Employees, Users and this Settings page always stay super-admin-only and aren\'t on this list.',
+      'Instructor module access: per-section dropdown — Hidden / Read only / Read & write — for Registrations, Enrollment Requests, Account Approvals, Courses, Course Groups, Enrollment Forms, Calendar, Notifications, Certificates, Questions, and Help. "Read only" is the safe default: the instructor can open and view the section, but every button, form and toggle that would create/edit/delete something disappears — this is enforced on the page itself, not just in the sidebar, so it can\'t be bypassed by typing a URL. Analytics, Employees, Users and this Settings page always stay super-admin-only and aren\'t on this list.',
     ],
   },
 ];
@@ -229,7 +229,7 @@ export function AdminHelp() {
         </p>
         <p className="mt-2 text-xs text-neutral-500">
           As a super admin, an <strong>Instructor view</strong> button sits in the top-right header of every admin page — click it
-          to preview the sidebar exactly as an instructor sees it, based on the toggles in Company Settings → Instructor module access.
+          to preview both the sidebar and the read/write restrictions an instructor sees, based on Company Settings → Instructor module access.
         </p>
       </GlassCard>
 

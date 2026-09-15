@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { MessageCircle, Send } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
+import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { invokeFn } from '../../lib/functions';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
@@ -26,6 +27,8 @@ const toneFor = (status: string): 'green' | 'neutral' | 'amber' =>
   status === 'answered' ? 'green' : status === 'closed' ? 'neutral' : 'amber';
 
 export function AdminAsk() {
+  const { canWrite } = useAdminAccess();
+  const writable = canWrite('ask');
   const [filter, setFilter] = useState<'open' | 'answered' | 'closed' | 'all'>('open');
   const [open, setOpen] = useState<Thread | null>(null);
 
@@ -78,6 +81,7 @@ export function AdminAsk() {
       {open && (
         <ThreadModal
           thread={open}
+          writable={writable}
           onClose={() => {
             setOpen(null);
             q.refetch();
@@ -88,7 +92,7 @@ export function AdminAsk() {
   );
 }
 
-function ThreadModal({ thread, onClose }: { thread: Thread; onClose: () => void }) {
+function ThreadModal({ thread, writable, onClose }: { thread: Thread; writable: boolean; onClose: () => void }) {
   const { profile } = useAuth();
   const toast = useToast();
   const [reply, setReply] = useState('');
@@ -139,17 +143,21 @@ function ThreadModal({ thread, onClose }: { thread: Thread; onClose: () => void 
           })}
         </div>
       )}
-      <form onSubmit={send} className="flex gap-2">
-        <TextInput className="flex-1" placeholder="Write a reply…" value={reply} onChange={(e) => setReply(e.target.value)} />
-        <Button type="submit" loading={busy}>
-          <Send size={14} />
-        </Button>
-        {thread.status !== 'closed' && (
-          <Button type="button" variant="ghost" onClick={closeThread}>
-            Close
+      {writable ? (
+        <form onSubmit={send} className="flex gap-2">
+          <TextInput className="flex-1" placeholder="Write a reply…" value={reply} onChange={(e) => setReply(e.target.value)} />
+          <Button type="submit" loading={busy}>
+            <Send size={14} />
           </Button>
-        )}
-      </form>
+          {thread.status !== 'closed' && (
+            <Button type="button" variant="ghost" onClick={closeThread}>
+              Close
+            </Button>
+          )}
+        </form>
+      ) : (
+        <p className="text-xs text-neutral-400">You have read-only access to Questions.</p>
+      )}
     </Modal>
   );
 }

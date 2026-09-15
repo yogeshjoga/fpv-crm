@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Inbox, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
+import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { invokeFn } from '../../lib/functions';
 import { GlassCard } from '../../components/ui/shared';
@@ -34,6 +35,8 @@ const SOURCE_LABEL: Record<Registration['source'], string> = {
 
 export function Registrations() {
   const { profile } = useAuth();
+  const { canWrite } = useAdminAccess();
+  const writable = canWrite('registrations');
   const toast = useToast();
   const [filter, setFilter] = useState<'pending' | 'accepted' | 'rejected' | 'all'>('pending');
   const [viewing, setViewing] = useState<Registration | null>(null);
@@ -94,16 +97,18 @@ export function Registrations() {
         subtitle={`${pendingCount} awaiting review`}
         actions={
           <div className="flex items-center gap-2">
-            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-white/70 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-white">
-              {importing ? '…' : <Upload size={14} />} Import CSV
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".csv,text/csv"
-                className="hidden"
-                onChange={(e) => e.target.files?.[0] && onCsv(e.target.files[0])}
-              />
-            </label>
+            {writable && (
+              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-white/70 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-white">
+                {importing ? '…' : <Upload size={14} />} Import CSV
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && onCsv(e.target.files[0])}
+                />
+              </label>
+            )}
             <Select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} className="w-36">
               <option value="pending">Pending</option>
               <option value="accepted">Accepted</option>
@@ -139,7 +144,7 @@ export function Registrations() {
                 </Badge>
                 <Badge tone={r.status === 'accepted' ? 'green' : r.status === 'rejected' ? 'red' : 'amber'}>{r.status}</Badge>
                 <Button variant="secondary" onClick={() => setViewing(r)}>
-                  Review
+                  {writable ? 'Review' : 'View'}
                 </Button>
               </div>
             </div>
@@ -151,6 +156,7 @@ export function Registrations() {
         <ReviewModal
           reg={viewing}
           courses={q.data.courses}
+          writable={writable}
           onClose={() => setViewing(null)}
           onReject={reject}
           onAccepted={() => {
@@ -166,12 +172,14 @@ export function Registrations() {
 function ReviewModal({
   reg,
   courses,
+  writable,
   onClose,
   onReject,
   onAccepted,
 }: {
   reg: Registration;
   courses: { id: string; title: string }[];
+  writable: boolean;
   onClose: () => void;
   onReject: (r: Registration, note: string) => void;
   onAccepted: () => void;
@@ -298,7 +306,25 @@ function ReviewModal({
             </div>
           )}
 
-          {reg.status === 'pending' ? (
+          {reg.status === 'pending' && !writable ? (
+            <div className="space-y-3">
+              <div className="rounded-2xl border border-white/60 bg-white/40 p-4 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-500">Payment</span>
+                  <Badge tone={reg.payment_status === 'unpaid' ? 'neutral' : 'green'}>
+                    {reg.payment_status === 'waived' ? 'fee waived' : reg.payment_status}
+                  </Badge>
+                </div>
+                {reg.requested_course && (
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-neutral-500">Requested course</span>
+                    <span className="text-neutral-900">{reg.requested_course.title}</span>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-neutral-400">You have read-only access to Registrations — a super admin or a write-enabled instructor can accept or reject this.</p>
+            </div>
+          ) : reg.status === 'pending' ? (
             <>
               <div className="rounded-2xl border border-white/60 bg-white/40 p-4">
                 <div className="mb-2 text-sm font-medium text-neutral-700">Payment</div>

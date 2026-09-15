@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
+import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { CalendarView } from '../../components/CalendarView';
 import type { CalEvent } from '../../components/CalendarView';
@@ -37,6 +38,8 @@ const emptyDraft = (date = ''): Draft => ({
 
 export function AdminCalendar() {
   const { profile } = useAuth();
+  const { canWrite } = useAdminAccess();
+  const writable = canWrite('calendar');
   const toast = useToast();
   const [draft, setDraft] = useState<Draft | null>(null);
 
@@ -112,34 +115,36 @@ export function AdminCalendar() {
         title="Calendar"
         subtitle="Plan sessions, exam windows, deadlines and holidays"
         actions={
-          <Button onClick={() => setDraft(emptyDraft())}>
-            <Plus size={16} /> New event
-          </Button>
+          writable && (
+            <Button onClick={() => setDraft(emptyDraft())}>
+              <Plus size={16} /> New event
+            </Button>
+          )
         }
       />
       {q.loading ? (
         <Spinner />
       ) : (
-        <CalendarView events={q.data!.events} onEventClick={openEdit} onAddOnDay={(iso) => setDraft(emptyDraft(iso))} />
+        <CalendarView events={q.data!.events} onEventClick={openEdit} onAddOnDay={writable ? (iso) => setDraft(emptyDraft(iso)) : undefined} />
       )}
 
-      <Modal open={!!draft} onClose={() => setDraft(null)} title={draft?.id ? 'Edit event' : 'New event'} wide>
+      <Modal open={!!draft} onClose={() => setDraft(null)} title={writable ? (draft?.id ? 'Edit event' : 'New event') : 'Event'} wide>
         {draft && (
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <Field label="Title" required>
-                <TextInput value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+                <TextInput disabled={!writable} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
               </Field>
             </div>
             <Field label="Type">
-              <Select value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value as Draft['type'] })}>
+              <Select disabled={!writable} value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value as Draft['type'] })}>
                 {TYPES.map((t) => (
                   <option key={t} value={t}>{t.replace('_', ' ')}</option>
                 ))}
               </Select>
             </Field>
             <Field label="Course (optional)">
-              <Select value={draft.course_id} onChange={(e) => setDraft({ ...draft, course_id: e.target.value })}>
+              <Select disabled={!writable} value={draft.course_id} onChange={(e) => setDraft({ ...draft, course_id: e.target.value })}>
                 <option value="">Org-wide (all students)</option>
                 {q.data!.courses.map((c) => (
                   <option key={c.id} value={c.id}>{c.title}</option>
@@ -147,33 +152,33 @@ export function AdminCalendar() {
               </Select>
             </Field>
             <Field label="Date">
-              <TextInput type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
+              <TextInput disabled={!writable} type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
             </Field>
             <div className="flex items-end pb-2">
-              <Checkbox label="All day" checked={draft.all_day} onChange={(e) => setDraft({ ...draft, all_day: e.target.checked })} />
+              <Checkbox disabled={!writable} label="All day" checked={draft.all_day} onChange={(e) => setDraft({ ...draft, all_day: e.target.checked })} />
             </div>
             {!draft.all_day && (
               <>
                 <Field label="Start time">
-                  <TextInput type="time" value={draft.start_time} onChange={(e) => setDraft({ ...draft, start_time: e.target.value })} />
+                  <TextInput disabled={!writable} type="time" value={draft.start_time} onChange={(e) => setDraft({ ...draft, start_time: e.target.value })} />
                 </Field>
                 <Field label="End time">
-                  <TextInput type="time" value={draft.end_time} onChange={(e) => setDraft({ ...draft, end_time: e.target.value })} />
+                  <TextInput disabled={!writable} type="time" value={draft.end_time} onChange={(e) => setDraft({ ...draft, end_time: e.target.value })} />
                 </Field>
               </>
             )}
             <div className="sm:col-span-2">
               <Field label="Location">
-                <TextInput value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} placeholder="Online / room / address" />
+                <TextInput disabled={!writable} value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} placeholder="Online / room / address" />
               </Field>
             </div>
             <div className="sm:col-span-2">
               <Field label="Description">
-                <TextArea value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
+                <TextArea disabled={!writable} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
               </Field>
             </div>
             <div className="sm:col-span-2 flex justify-between">
-              {draft.id ? (
+              {writable && draft.id ? (
                 <Button variant="ghost" onClick={del}>
                   <Trash2 size={14} /> Delete
                 </Button>
@@ -181,8 +186,8 @@ export function AdminCalendar() {
                 <span />
               )}
               <div className="flex gap-2">
-                <Button variant="ghost" onClick={() => setDraft(null)}>Cancel</Button>
-                <Button onClick={save}>Save event</Button>
+                <Button variant="ghost" onClick={() => setDraft(null)}>{writable ? 'Cancel' : 'Close'}</Button>
+                {writable && <Button onClick={save}>Save event</Button>}
               </div>
             </div>
           </div>
