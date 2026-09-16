@@ -69,7 +69,7 @@ export function CalendarView({
   const today = new Date().toDateString();
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
       <div className="rounded-[1.75rem] border border-white/60 bg-white/50 p-4">
         <div className="mb-3 flex items-center justify-between">
           <div className="font-semibold text-neutral-900">

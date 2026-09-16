@@ -128,7 +128,7 @@ function FieldEditor({
           <GripVertical size={16} />
         </div>
         <div className="flex-1 space-y-3">
-          <div className="grid gap-3 sm:grid-cols-[1fr_180px]">
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">
             <Field label={`Field ${index + 1} label`}>
               <TextInput disabled={!writable} value={local.label} onChange={(e) => set('label', e.target.value)} />
             </Field>

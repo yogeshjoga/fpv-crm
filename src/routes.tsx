@@ -39,6 +39,7 @@ import { QuestionBank } from './pages/admin/QuestionBank';
 import { Forms } from './pages/admin/Forms';
 import { FormBuilder } from './pages/admin/FormBuilder';
 import { FormResponses } from './pages/admin/FormResponses';
+import { FormAnalytics } from './pages/admin/FormAnalytics';
 import { EnrollmentRequests } from './pages/admin/EnrollmentRequests';
 import { AdminCertificates } from './pages/admin/AdminCertificates';
 import { AdminAnalytics } from './pages/admin/AdminAnalytics';
@@ -180,6 +181,14 @@ export function AppRoutes() {
           element={
             <RequireModule moduleKey="forms">
               <FormResponses />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="forms/:id/analytics"
+          element={
+            <RequireModule moduleKey="forms">
+              <FormAnalytics />
             </RequireModule>
           }
         />
