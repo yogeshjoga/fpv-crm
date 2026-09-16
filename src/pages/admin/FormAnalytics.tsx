@@ -1,21 +1,16 @@
 import { Link, useParams } from 'react-router-dom';
-import { ChevronLeft, BarChart3 } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useQuery, unwrap } from '../../lib/useQuery';
-import { GlassCard } from '../../components/ui/shared';
-import { Badge, EmptyState, PageHeader, Spinner } from '../../components/ui/kit';
+import { answerValueToStrings, topAnswerRows } from '../../lib/formAnalytics';
+import { FormFieldStatsGrid, type FieldStat } from '../../components/FormFieldStats';
+import { Badge, PageHeader, Spinner } from '../../components/ui/kit';
 
 interface FieldRow {
   id: string;
   label: string;
   field_type: string;
   position: number;
-}
-
-interface FieldStat {
-  field: FieldRow;
-  total: number;
-  rows: { label: string; count: number }[];
 }
 
 const FIELD_TYPE_LABEL: Record<string, string> = {
@@ -30,21 +25,6 @@ const FIELD_TYPE_LABEL: Record<string, string> = {
   file: 'File',
   checkbox: 'Checkbox',
 };
-
-/** Any answer shape (string, number, boolean, string[]) -> a list of trimmed, non-empty strings. */
-function valueToStrings(v: unknown): string[] {
-  if (v == null || v === '') return [];
-  if (Array.isArray(v)) return v.map((x) => String(x).trim()).filter(Boolean);
-  return [String(v).trim()].filter(Boolean);
-}
-
-/** Bucket a value->count map into the top N entries plus a single "Other" row for the long tail. */
-function topRows(counts: Map<string, number>, cap = 8): { label: string; count: number }[] {
-  const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
-  const top = sorted.slice(0, cap).map(([label, count]) => ({ label, count }));
-  const restCount = sorted.slice(cap).reduce((s, [, c]) => s + c, 0);
-  return restCount > 0 ? [...top, { label: `Other (${sorted.length - cap})`, count: restCount }] : top;
-}
 
 export function FormAnalytics() {
   const { id } = useParams();
@@ -73,7 +53,7 @@ export function FormAnalytics() {
       responseCount = regs.length;
       for (const r of regs) {
         for (const f of fields) {
-          const vals = valueToStrings((r.answers ?? {})[f.label]);
+          const vals = answerValueToStrings((r.answers ?? {})[f.label]);
           if (vals.length) answersByField.get(f.label)!.push(...vals);
         }
       }
@@ -92,7 +72,7 @@ export function FormAnalytics() {
         for (const a of r.enrollment_request_answers) {
           if (!a.field) continue;
           const raw = Array.isArray(a.value_json) && (a.value_json as unknown[]).length ? a.value_json : a.value_text;
-          const vals = valueToStrings(raw);
+          const vals = answerValueToStrings(raw);
           if (vals.length) answersByField.get(a.field.label)?.push(...vals);
         }
       }
@@ -104,7 +84,7 @@ export function FormAnalytics() {
         const values = answersByField.get(f.label) ?? [];
         const counts = new Map<string, number>();
         for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1);
-        return { field: f, total: values.length, rows: topRows(counts) };
+        return { key: f.id, label: f.label, typeLabel: FIELD_TYPE_LABEL[f.field_type] ?? f.field_type, total: values.length, rows: topAnswerRows(counts) };
       })
       .filter((s) => s.total > 0);
 
@@ -126,44 +106,7 @@ export function FormAnalytics() {
         actions={<Badge tone="blue">{responseCount} response{responseCount === 1 ? '' : 's'}</Badge>}
       />
 
-      {!stats.length ? (
-        <EmptyState
-          icon={<BarChart3 size={22} />}
-          title="Not enough data yet"
-          description="Analytics fill in automatically once people start submitting this form."
-        />
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {stats.map((s) => (
-            <GlassCard key={s.field.id} className="p-5">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div className="font-semibold text-neutral-900">{s.field.label}</div>
-                <Badge>{FIELD_TYPE_LABEL[s.field.field_type] ?? s.field.field_type}</Badge>
-              </div>
-              <div className="space-y-2">
-                {s.rows.map((row) => (
-                  <div key={row.label}>
-                    <div className="mb-0.5 flex items-center justify-between gap-2 text-xs">
-                      <span className="truncate text-neutral-600" title={row.label}>
-                        {row.label}
-                      </span>
-                      <span className="shrink-0 text-neutral-400">
-                        {row.count} · {Math.round((row.count / s.total) * 100)}%
-                      </span>
-                    </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-black/[0.05]">
-                      <div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.max(4, (row.count / s.total) * 100)}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-3 text-xs text-neutral-400">
-                {s.total} answer{s.total === 1 ? '' : 's'}
-              </div>
-            </GlassCard>
-          ))}
-        </div>
-      )}
+      <FormFieldStatsGrid stats={stats} />
     </div>
   );
 }
