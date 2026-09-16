@@ -8,6 +8,8 @@ import { invokeFn } from '../../lib/functions';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, Button, Checkbox, EmptyState, Modal, PageHeader, Select, Spinner, TextInput, useToast } from '../../components/ui/kit';
 
+const PAYMENT_AMOUNTS = [2000, 5000, 10000, 15000, 20000, 25000, 30000, 40000, 50000, 100000];
+
 interface Registration {
   id: string;
   source: 'registration_form' | 'google_form' | 'csv';
@@ -334,7 +336,14 @@ function ReviewModal({
                     <option value="paid">Paid</option>
                     <option value="waived">Fee waived</option>
                   </Select>
-                  <TextInput type="number" placeholder="Amount ₹" value={pay.amount} onChange={(e) => setPay({ ...pay, amount: e.target.value })} />
+                  <Select value={pay.amount} onChange={(e) => setPay({ ...pay, amount: e.target.value })}>
+                    <option value="">Amount ₹</option>
+                    {PAYMENT_AMOUNTS.map((a) => (
+                      <option key={a} value={a}>
+                        ₹{a.toLocaleString('en-IN')}
+                      </option>
+                    ))}
+                  </Select>
                   <TextInput placeholder="Reference / UTR" value={pay.ref} onChange={(e) => setPay({ ...pay, ref: e.target.value })} />
                   <Select value={pay.method} onChange={(e) => setPay({ ...pay, method: e.target.value })}>
                     <option>UPI</option>
