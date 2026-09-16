@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Copy, FormInput, Globe, ListChecks, Plus, Settings2 } from 'lucide-react';
+import { BarChart3, Copy, FormInput, Globe, ListChecks, Plus, Settings2 } from 'lucide-react';
 import { supabase, APP_URL } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
@@ -95,6 +95,11 @@ export function Forms() {
                 </button>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
+                <Link to={`/admin/forms/${f.id}/analytics`}>
+                  <Button variant="secondary">
+                    <BarChart3 size={14} /> Analytics
+                  </Button>
+                </Link>
                 <Link to={`/admin/forms/${f.id}/edit`}>
                   <Button variant="secondary">
                     <Settings2 size={14} /> Build
