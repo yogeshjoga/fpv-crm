@@ -92,6 +92,41 @@ export function Registrations() {
       .filter((s): s is FieldStat => s !== null);
   }, [q.data]);
 
+  // Ad-hoc filter by a single custom field/value — e.g. "Academic Branch" = "EEE" — built the same
+  // dynamic way as the analytics above, from whatever fields these registrations actually carry.
+  const [fieldFilterKey, setFieldFilterKey] = useState('');
+  const [fieldFilterValue, setFieldFilterValue] = useState('');
+
+  const filterableFields = useMemo(() => {
+    const rows = q.data?.rows ?? [];
+    const order: string[] = [];
+    const seen = new Set<string>();
+    for (const r of rows) {
+      for (const key of Object.keys(r.answers ?? {})) {
+        if (!seen.has(key)) {
+          seen.add(key);
+          order.push(key);
+        }
+      }
+    }
+    return order;
+  }, [q.data]);
+
+  const fieldValueOptions = useMemo(() => {
+    if (!fieldFilterKey) return [];
+    const counts = new Map<string, number>();
+    for (const r of q.data?.rows ?? []) {
+      for (const v of answerValueToStrings((r.answers ?? {})[fieldFilterKey])) counts.set(v, (counts.get(v) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }, [q.data, fieldFilterKey]);
+
+  const filteredRows = useMemo(() => {
+    const rows = q.data?.rows ?? [];
+    if (!fieldFilterKey || !fieldFilterValue) return rows;
+    return rows.filter((r) => answerValueToStrings((r.answers ?? {})[fieldFilterKey]).includes(fieldFilterValue));
+  }, [q.data, fieldFilterKey, fieldFilterValue]);
+
   const reject = async (r: Registration, note: string) => {
     const { error } = await supabase
       .from('registrations')
@@ -152,6 +187,47 @@ export function Registrations() {
         }
       />
 
+      {!!filterableFields.length && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <Select
+            value={fieldFilterKey}
+            onChange={(e) => {
+              setFieldFilterKey(e.target.value);
+              setFieldFilterValue('');
+            }}
+            className="w-52"
+          >
+            <option value="">Filter by field…</option>
+            {filterableFields.map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
+          </Select>
+          {fieldFilterKey && (
+            <Select value={fieldFilterValue} onChange={(e) => setFieldFilterValue(e.target.value)} className="w-52">
+              <option value="">Any value</option>
+              {fieldValueOptions.map(([value, count]) => (
+                <option key={value} value={value}>
+                  {value} ({count})
+                </option>
+              ))}
+            </Select>
+          )}
+          {(fieldFilterKey || fieldFilterValue) && (
+            <button
+              onClick={() => {
+                setFieldFilterKey('');
+                setFieldFilterValue('');
+              }}
+              className="text-xs text-neutral-400 hover:text-neutral-700"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+
       {q.loading ? (
         <Spinner />
       ) : !q.data?.rows.length ? (
@@ -160,9 +236,15 @@ export function Registrations() {
           title="Nothing here"
           description="Registrations from your public form or a linked Google Form will show up here. You can also import a CSV."
         />
+      ) : !filteredRows.length ? (
+        <EmptyState
+          icon={<Inbox size={22} />}
+          title="No matches"
+          description={`Nobody in this filter has "${fieldFilterKey}" = "${fieldFilterValue}".`}
+        />
       ) : (
         <GlassCard className="divide-y divide-white/50 p-2">
-          {q.data.rows.map((r) => (
+          {filteredRows.map((r) => (
             <div key={r.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
               <div>
                 <div className="font-medium text-neutral-900">{r.full_name || '—'}</div>
