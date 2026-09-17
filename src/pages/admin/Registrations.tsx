@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Inbox, Upload } from 'lucide-react';
+import { BarChart3, Inbox, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { invokeFn } from '../../lib/functions';
+import { answerValueToStrings, looksLikeLinks, topAnswerRows } from '../../lib/formAnalytics';
+import { FormFieldStatsGrid, type FieldStat } from '../../components/FormFieldStats';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, Button, Checkbox, EmptyState, Modal, PageHeader, Select, Spinner, TextInput, useToast } from '../../components/ui/kit';
 
@@ -44,6 +46,7 @@ export function Registrations() {
   const [viewing, setViewing] = useState<Registration | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   const q = useQuery<{ rows: Registration[]; courses: { id: string; title: string }[] }>(async () => {
     let sel = supabase
@@ -63,6 +66,66 @@ export function Registrations() {
   }, [filter]);
 
   const pendingCount = useMemo(() => q.data?.rows.filter((r) => r.status === 'pending').length ?? 0, [q.data]);
+
+  // Dynamic analytics over whatever custom fields these registrations actually carry — not tied to one
+  // form's schema, since rows here can come from our form, a Google Form, or a CSV import.
+  const analyticsStats = useMemo<FieldStat[]>(() => {
+    const rows = q.data?.rows ?? [];
+    const order: string[] = [];
+    const seen = new Set<string>();
+    for (const r of rows) {
+      for (const key of Object.keys(r.answers ?? {})) {
+        if (!seen.has(key)) {
+          seen.add(key);
+          order.push(key);
+        }
+      }
+    }
+    return order
+      .map((label) => {
+        const values = rows.flatMap((r) => answerValueToStrings((r.answers ?? {})[label]));
+        if (!values.length || looksLikeLinks(values)) return null;
+        const counts = new Map<string, number>();
+        for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1);
+        return { key: label, label, total: values.length, rows: topAnswerRows(counts) };
+      })
+      .filter((s): s is FieldStat => s !== null);
+  }, [q.data]);
+
+  // Ad-hoc filter by a single custom field/value — e.g. "Academic Branch" = "EEE" — built the same
+  // dynamic way as the analytics above, from whatever fields these registrations actually carry.
+  const [fieldFilterKey, setFieldFilterKey] = useState('');
+  const [fieldFilterValue, setFieldFilterValue] = useState('');
+
+  const filterableFields = useMemo(() => {
+    const rows = q.data?.rows ?? [];
+    const order: string[] = [];
+    const seen = new Set<string>();
+    for (const r of rows) {
+      for (const key of Object.keys(r.answers ?? {})) {
+        if (!seen.has(key)) {
+          seen.add(key);
+          order.push(key);
+        }
+      }
+    }
+    return order;
+  }, [q.data]);
+
+  const fieldValueOptions = useMemo(() => {
+    if (!fieldFilterKey) return [];
+    const counts = new Map<string, number>();
+    for (const r of q.data?.rows ?? []) {
+      for (const v of answerValueToStrings((r.answers ?? {})[fieldFilterKey])) counts.set(v, (counts.get(v) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }, [q.data, fieldFilterKey]);
+
+  const filteredRows = useMemo(() => {
+    const rows = q.data?.rows ?? [];
+    if (!fieldFilterKey || !fieldFilterValue) return rows;
+    return rows.filter((r) => answerValueToStrings((r.answers ?? {})[fieldFilterKey]).includes(fieldFilterValue));
+  }, [q.data, fieldFilterKey, fieldFilterValue]);
 
   const reject = async (r: Registration, note: string) => {
     const { error } = await supabase
@@ -99,6 +162,9 @@ export function Registrations() {
         subtitle={`${pendingCount} awaiting review`}
         actions={
           <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={() => setShowAnalytics(true)}>
+              <BarChart3 size={14} /> Form analytics
+            </Button>
             {writable && (
               <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-white/70 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-white">
                 {importing ? '…' : <Upload size={14} />} Import CSV
@@ -121,6 +187,47 @@ export function Registrations() {
         }
       />
 
+      {!!filterableFields.length && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <Select
+            value={fieldFilterKey}
+            onChange={(e) => {
+              setFieldFilterKey(e.target.value);
+              setFieldFilterValue('');
+            }}
+            className="w-52"
+          >
+            <option value="">Filter by field…</option>
+            {filterableFields.map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
+          </Select>
+          {fieldFilterKey && (
+            <Select value={fieldFilterValue} onChange={(e) => setFieldFilterValue(e.target.value)} className="w-52">
+              <option value="">Any value</option>
+              {fieldValueOptions.map(([value, count]) => (
+                <option key={value} value={value}>
+                  {value} ({count})
+                </option>
+              ))}
+            </Select>
+          )}
+          {(fieldFilterKey || fieldFilterValue) && (
+            <button
+              onClick={() => {
+                setFieldFilterKey('');
+                setFieldFilterValue('');
+              }}
+              className="text-xs text-neutral-400 hover:text-neutral-700"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+
       {q.loading ? (
         <Spinner />
       ) : !q.data?.rows.length ? (
@@ -129,9 +236,15 @@ export function Registrations() {
           title="Nothing here"
           description="Registrations from your public form or a linked Google Form will show up here. You can also import a CSV."
         />
+      ) : !filteredRows.length ? (
+        <EmptyState
+          icon={<Inbox size={22} />}
+          title="No matches"
+          description={`Nobody in this filter has "${fieldFilterKey}" = "${fieldFilterValue}".`}
+        />
       ) : (
         <GlassCard className="divide-y divide-white/50 p-2">
-          {q.data.rows.map((r) => (
+          {filteredRows.map((r) => (
             <div key={r.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
               <div>
                 <div className="font-medium text-neutral-900">{r.full_name || '—'}</div>
@@ -153,6 +266,14 @@ export function Registrations() {
           ))}
         </GlassCard>
       )}
+
+      <Modal open={showAnalytics} onClose={() => setShowAnalytics(false)} title="Form analytics" wide>
+        <p className="-mt-2 mb-4 text-sm text-neutral-500">
+          Based on the {q.data?.rows.length ?? 0} registration{q.data?.rows.length === 1 ? '' : 's'} matching the “{filter}” filter above — covering
+          every custom field these forms collected, from Gender to Branch to Semester.
+        </p>
+        <FormFieldStatsGrid stats={analyticsStats} />
+      </Modal>
 
       {viewing && q.data && (
         <ReviewModal
