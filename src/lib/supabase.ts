@@ -18,4 +18,7 @@ export const supabase = createClient<Database>(url, anonKey, {
   },
 });
 
-export const APP_URL = import.meta.env.VITE_APP_URL ?? window.location.origin;
+// Always the origin actually being browsed — never an env override. A stray
+// VITE_APP_URL baked in at build time (e.g. left over from local dev) previously
+// caused password-reset and invite links to point at localhost in production.
+export const APP_URL = window.location.origin;
