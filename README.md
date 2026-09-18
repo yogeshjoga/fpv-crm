@@ -158,6 +158,16 @@ Cloudflare) must resolve or the SMTP login is rejected with `535`.
 Project Settings → Authentication → SMTP Settings — not the edge-function transport
 above; without it, Supabase's default sender is capped at a few emails/hour.
 
+**Troubleshooting `535 "Invalid username"` on `/recover`** — if "forgot password" fails
+and the Auth logs (`auth_logs` source, `path: /recover`) show `error_code:
+unexpected_failure` with a `535 "Invalid username"` SMTP error, the Auth SMTP
+Username field doesn't match what the mail server accepts. Fix it in Project
+Settings → Authentication → SMTP Settings, not in code or `mail_config` (that table
+only feeds the edge-function transport above, never Supabase Auth's own emails):
+re-enter the Username as the exact mailbox login (e.g. `contact@egirerobotics.com`,
+matching the edge functions' `SMTP_USER` secret) with no typo or trailing space, and
+re-enter the password, then send a test reset and confirm `/recover` returns `200`.
+
 ### Bootstrapping the first admin
 
 Register through a public form and accept yourself, or in the Supabase SQL editor:
