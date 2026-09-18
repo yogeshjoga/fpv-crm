@@ -154,6 +154,10 @@ Every message sets `From:` and `Reply-To:` to `contact@egirerobotics.com`, so st
 replies land in that mailbox. SPF + DKIM (`secureserver1/2._domainkey` CNAMEs in
 Cloudflare) must resolve or the SMTP login is rejected with `535`.
 
+**Supabase Auth email** (password reset, invites) uses a separate SMTP setting —
+Project Settings → Authentication → SMTP Settings — not the edge-function transport
+above; without it, Supabase's default sender is capped at a few emails/hour.
+
 ### Bootstrapping the first admin
 
 Register through a public form and accept yourself, or in the Supabase SQL editor:
