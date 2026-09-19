@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   LayoutDashboard, UserPlus, Inbox, ClipboardCheck, GraduationCap, Layers3, FileQuestion,
   FormInput, CalendarDays, Megaphone, ScrollText, MessageCircle, BarChart3, Briefcase,
-  Users, Settings2, Workflow, ChevronRight, Lock,
+  Users, Settings2, Workflow, ChevronRight, Lock, IdCard,
 } from 'lucide-react';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, PageHeader } from '../../components/ui/kit';
@@ -129,6 +129,18 @@ const SECTIONS: Section[] = [
     points: [
       'Revoke invalidates a certificate (e.g. academic integrity issue) with a reason attached; Reinstate undoes that.',
       'The certificate\'s public verification page (linked from its QR code) reflects revoked status immediately.',
+    ],
+  },
+  {
+    id: 'id-cards',
+    icon: IdCard,
+    title: 'ID Cards',
+    summary: 'Every student ID card issued — a front-and-back PDF generated and emailed automatically the moment a registration is accepted.',
+    points: [
+      'One card per student (not per course) — accepting a second registration for someone who already has a card just skips re-issuing one.',
+      'Download opens the two-page PDF (front page, back page) via a signed URL; Resend re-sends that exact PDF to the student\'s email without regenerating it.',
+      '"Generate for a student" covers students who never went through Registrations (direct account creation, or accounts from before this feature existed) — it only lists active students who don\'t have a card yet.',
+      'Cards are numbered from the same certificate ID prefix in Company Settings (e.g. EGR-ID-000123) and default to a 1-year validity from issue date.',
     ],
   },
   {

@@ -803,6 +803,82 @@ export type Database = {
           },
         ]
       }
+      id_card_counters: {
+        Row: {
+          key: string
+          last_seq: number
+        }
+        Insert: {
+          key: string
+          last_seq?: number
+        }
+        Update: {
+          key?: string
+          last_seq?: number
+        }
+        Relationships: []
+      }
+      id_cards: {
+        Row: {
+          card_number: string
+          course_id: string | null
+          created_at: string
+          id: string
+          issued_at: string
+          issued_by: string | null
+          last_emailed_at: string | null
+          pdf_path: string
+          student_id: string
+          valid_until: string | null
+        }
+        Insert: {
+          card_number: string
+          course_id?: string | null
+          created_at?: string
+          id?: string
+          issued_at?: string
+          issued_by?: string | null
+          last_emailed_at?: string | null
+          pdf_path: string
+          student_id: string
+          valid_until?: string | null
+        }
+        Update: {
+          card_number?: string
+          course_id?: string | null
+          created_at?: string
+          id?: string
+          issued_at?: string
+          issued_by?: string | null
+          last_emailed_at?: string | null
+          pdf_path?: string
+          student_id?: string
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "id_cards_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "id_cards_issued_by_fkey"
+            columns: ["issued_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "id_cards_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       instructor_module_access: {
         Row: {
           access_level: string
@@ -1659,6 +1735,7 @@ export type Database = {
       is_staff: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
       next_cert_number: { Args: { p_course_code: string }; Returns: number }
+      next_id_card_number: { Args: never; Returns: number }
       verify_certificate: {
         Args: { p_cert_id: string }
         Returns: {

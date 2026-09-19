@@ -42,6 +42,7 @@ import { FormResponses } from './pages/admin/FormResponses';
 import { FormAnalytics } from './pages/admin/FormAnalytics';
 import { EnrollmentRequests } from './pages/admin/EnrollmentRequests';
 import { AdminCertificates } from './pages/admin/AdminCertificates';
+import { IdCards } from './pages/admin/IdCards';
 import { AdminAnalytics } from './pages/admin/AdminAnalytics';
 import { AdminAsk } from './pages/admin/AdminAsk';
 import { Settings } from './pages/admin/Settings';
@@ -221,6 +222,14 @@ export function AppRoutes() {
           element={
             <RequireModule moduleKey="certificates">
               <AdminCertificates />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="id-cards"
+          element={
+            <RequireModule moduleKey="id-cards">
+              <IdCards />
             </RequireModule>
           }
         />

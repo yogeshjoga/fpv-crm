@@ -87,6 +87,21 @@ Deno.serve(async (req) => {
         .upsert({ student_id: profileId, course_id: cid, status: 'active', enrolled_by: caller.id }, { onConflict: 'student_id,course_id' });
     }
 
+    // issue + email the student ID card (idempotent — a no-op if this student already has one)
+    try {
+      const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-id-card`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ student_id: profileId, course_id: courses[0] ?? null }),
+      });
+      if (!res.ok) console.error('generate-id-card failed', res.status, await res.text());
+    } catch (e) {
+      console.error('generate-id-card call failed', e);
+    }
+
     await admin
       .from('registrations')
       .update({
