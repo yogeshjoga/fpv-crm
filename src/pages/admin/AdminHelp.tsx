@@ -139,7 +139,7 @@ const SECTIONS: Section[] = [
     points: [
       'One card per student (not per course) — accepting a second registration for someone who already has a card just skips re-issuing one.',
       'Download opens the two-page PDF (front page, back page) via a signed URL; Resend re-sends that exact PDF to the student\'s email without regenerating it.',
-      '"Generate for a student" covers students who never went through Registrations (direct account creation, or accounts from before this feature existed) — it only lists active students who don\'t have a card yet.',
+      '"Generate (testing)" is a manual trigger for the same pipeline — useful for testing the email end-to-end, or covering an account that never went through Registrations. It lists every account without a card yet, including staff and pending/suspended ones, so you can generate one to your own login and check your own inbox.',
       'Cards are numbered from the same certificate ID prefix in Company Settings (e.g. EGR-ID-000123) and default to a 1-year validity from issue date.',
     ],
   },

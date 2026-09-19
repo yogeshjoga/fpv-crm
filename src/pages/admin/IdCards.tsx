@@ -22,6 +22,8 @@ interface StudentOption {
   id: string;
   full_name: string;
   email: string;
+  role: 'student' | 'instructor' | 'super_admin';
+  status: 'pending' | 'active' | 'suspended';
 }
 
 export function IdCards() {
@@ -44,7 +46,10 @@ export function IdCards() {
           .order('issued_at', { ascending: false }),
       ) as Promise<Card[]>,
       unwrap(
-        supabase.from('profiles').select('id, full_name, email').eq('role', 'student').eq('status', 'active').is('archived_at', null),
+        // Testing-only picker: every non-deleted account, not just active students — an admin
+        // may want to generate a card for a staff account, a pending/suspended student, etc.,
+        // to see the email land without waiting on a real registration.
+        supabase.from('profiles').select('id, full_name, email, role, status').is('archived_at', null).order('full_name'),
       ) as Promise<StudentOption[]>,
     ]);
     const cardedIds = new Set(cards.map((c) => c.student?.id).filter(Boolean));
@@ -108,7 +113,7 @@ export function IdCards() {
           <div className="flex items-center gap-2">
             {writable && !!q.data?.studentsWithoutCard.length && (
               <Button variant="secondary" onClick={() => setShowGenerate(true)}>
-                <IdCardIcon size={14} /> Generate for a student
+                <IdCardIcon size={14} /> Generate (testing)
               </Button>
             )}
             <TextInput placeholder="Search ID or student…" value={search} onChange={(e) => setSearch(e.target.value)} className="w-64" />
@@ -169,16 +174,19 @@ export function IdCards() {
         </GlassCard>
       )}
 
-      <Modal open={showGenerate} onClose={() => setShowGenerate(false)} title="Generate an ID card">
+      <Modal open={showGenerate} onClose={() => setShowGenerate(false)} title="Generate an ID card (testing)">
         <div className="space-y-4">
           <p className="text-sm text-neutral-500">
-            Only active students without a card yet are listed — every new registration already gets one automatically on acceptance.
+            Every registration already gets a card automatically the moment it's accepted — this is only for testing the
+            generation + email pipeline on demand. Every account without a card is listed here, including staff and
+            pending/suspended accounts, so you can pick your own login and check your own inbox.
           </p>
           <Select value={genStudent} onChange={(e) => setGenStudent(e.target.value)}>
-            <option value="">Choose a student…</option>
+            <option value="">Choose an account…</option>
             {q.data?.studentsWithoutCard.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.full_name} — {s.email}
+                {s.full_name} — {s.email} ({s.role}
+                {s.status !== 'active' ? `, ${s.status}` : ''})
               </option>
             ))}
           </Select>
