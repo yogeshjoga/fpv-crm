@@ -125,11 +125,12 @@ async function resolveMail(): Promise<{
   let replyTo = env('MAIL_REPLY_TO') ?? '';
   const resendKey = env('RESEND_API_KEY');
 
+  let dbResendKey: string | undefined;
   if (!host && !resendKey) {
     try {
       const { data } = await adminClient()
         .from('mail_config')
-        .select('smtp_host, smtp_port, smtp_user, smtp_pass, smtp_tls, mail_from, mail_reply_to')
+        .select('smtp_host, smtp_port, smtp_user, smtp_pass, smtp_tls, mail_from, mail_reply_to, resend_api_key')
         .eq('id', true)
         .maybeSingle();
       if (data) {
@@ -140,6 +141,7 @@ async function resolveMail(): Promise<{
         pass = data.smtp_pass ?? pass;
         from = from || (data.mail_from ?? '');
         replyTo = replyTo || (data.mail_reply_to ?? '');
+        dbResendKey = data.resend_api_key ?? undefined;
       }
     } catch (e) {
       console.error('mail_config lookup failed', e);
@@ -154,15 +156,21 @@ async function resolveMail(): Promise<{
     pass,
     from: from || 'EgireRobotics <contact@egirerobotics.com>',
     replyTo: replyTo || 'contact@egirerobotics.com',
-    resendKey,
+    // Resend (API key, from env or mail_config) is preferred over SMTP when both are
+    // configured — SMTP relay can be disabled on the mail provider's side independent
+    // of the mailbox password, so a working Resend key should win once it's set.
+    resendKey: resendKey ?? dbResendKey,
   };
 }
 
 /**
  * Send a transactional email. Transport is chosen by config:
- *   1. SMTP host set (env SMTP_HOST or mail_config.smtp_host) -> SMTP
- *   2. RESEND_API_KEY                                         -> Resend HTTP API
- *   3. neither                                                -> logged and skipped
+ *   1. Resend API key (env RESEND_API_KEY or mail_config.resend_api_key) -> Resend HTTP API
+ *   2. SMTP host set (env SMTP_HOST or mail_config.smtp_host)            -> SMTP
+ *   3. neither                                                          -> logged and skipped
+ * Resend is checked first: SMTP relay can be disabled by the mail provider independent
+ * of the mailbox password (as happened with GoDaddy here), so a configured Resend key
+ * should always win over a still-present but potentially-broken SMTP config.
  */
 export async function sendEmail(opts: {
   to: string;
@@ -173,6 +181,20 @@ export async function sendEmail(opts: {
   const cfg = await resolveMail();
   const from = cfg.from;
   const replyTo = cfg.replyTo;
+
+  if (cfg.resendKey) {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${cfg.resendKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to: opts.to, reply_to: replyTo, subject: opts.subject, html: opts.html, attachments: opts.attachments }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      console.error('Resend error', res.status, body);
+      return { sent: false, skipped: `resend_error_${res.status}: ${body}`.slice(0, 300) };
+    }
+    return { sent: true };
+  }
 
   if (cfg.host) {
     try {
@@ -206,19 +228,6 @@ export async function sendEmail(opts: {
     }
   }
 
-  const key = cfg.resendKey;
-  if (!key) {
-    console.log(`[email skipped — no transport] to=${opts.to} subject="${opts.subject}"`);
-    return { sent: false, skipped: 'no_transport' };
-  }
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from, to: opts.to, reply_to: replyTo, subject: opts.subject, html: opts.html, attachments: opts.attachments }),
-  });
-  if (!res.ok) {
-    console.error('Resend error', res.status, await res.text());
-    return { sent: false, skipped: `resend_${res.status}` };
-  }
-  return { sent: true };
+  console.log(`[email skipped — no transport] to=${opts.to} subject="${opts.subject}"`);
+  return { sent: false, skipped: 'no_transport' };
 }
