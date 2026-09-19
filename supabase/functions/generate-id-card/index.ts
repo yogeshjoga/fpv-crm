@@ -233,15 +233,7 @@ Deno.serve(async (req) => {
       .single();
     if (insErr) throw new HttpError(500, insErr.message);
 
-    await admin.from('notifications').insert({
-      recipient_id: student_id,
-      title: `Your ${orgName} student ID card is ready`,
-      body: `Card ${cardNumber} has been generated and emailed to you.`,
-      kind: 'id_card_issued',
-      link: '/app/profile',
-    });
-
-    await sendEmail({
+    const emailRes = await sendEmail({
       to: student.email,
       subject: `Your ${orgName} student ID card`,
       html: emailShell(
@@ -252,6 +244,20 @@ Deno.serve(async (req) => {
       ),
       attachments: [{ filename: `${cardNumber}.pdf`, content: encodeBase64(pdfBytes) }],
     });
+
+    await admin.from('notifications').insert({
+      recipient_id: student_id,
+      title: `Your ${orgName} student ID card is ready`,
+      body: emailRes.sent
+        ? `Card ${cardNumber} has been generated and emailed to you.`
+        : `Card ${cardNumber} has been generated, but the email could not be sent — ask an admin to resend it.`,
+      kind: 'id_card_issued',
+      link: '/app/profile',
+    });
+
+    // The card, PDF and DB row are already created at this point — only the email failed.
+    // Surface that as an error (instead of a false "success") so the admin can Resend once email is fixed.
+    if (!emailRes.sent) throw new HttpError(502, `Card ${cardNumber} was generated, but the email failed to send (${emailRes.skipped ?? 'unknown error'}). Use Resend once email delivery is fixed.`);
 
     return json(inserted);
   } catch (e) {
