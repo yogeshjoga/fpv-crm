@@ -23,7 +23,10 @@ Deno.serve(async (req) => {
     }
 
     const { kind, user_id, course_id } = await req.json();
-    const { data: org } = await admin.from('org_settings').select('org_name, support_email, verify_base_url, logo_url').single();
+    const { data: org } = await admin
+      .from('org_settings')
+      .select('org_name, support_email, verify_base_url, logo_url, signatory_name, signatory_title, signatory_image_url')
+      .single();
     const { data: user } = await admin.from('profiles').select('full_name, email').eq('id', user_id).single();
     if (!user) throw new HttpError(404, 'User not found.');
 
@@ -65,7 +68,7 @@ Deno.serve(async (req) => {
       link: links[kind] ?? null,
     });
 
-    const result = await sendEmail({ to: user.email, subject: tpl.subject, html: emailShell(tpl.html, org?.logo_url ?? null) });
+    const result = await sendEmail({ to: user.email, subject: tpl.subject, html: emailShell(tpl.html, org) });
     return json({ ok: true, ...result });
   } catch (e) {
     const status = e instanceof HttpError ? e.status : 500;

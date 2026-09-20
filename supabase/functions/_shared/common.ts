@@ -84,12 +84,36 @@ export function emailKeyValueCard(rows: { label: string; value: string; mono?: b
   );
 }
 
-/** Wrap an email body in the EgireRobotics header (logo image if available) + founder footer. */
-export function emailShell(bodyHtml: string, logoUrl?: string | null): string {
-  const header = logoUrl
-    ? `<img src="${esc(logoUrl)}" alt="EgireRobotics" height="38" style="height:38px;width:auto;border:0;display:block" />`
-    : `<span style="font-weight:800;letter-spacing:2px;font-size:18px;color:#0a0a0a">EGIRE ROBOTICS</span>` +
+export interface OrgBranding {
+  org_name?: string | null;
+  logo_url?: string | null;
+  signatory_name?: string | null;
+  signatory_title?: string | null;
+  signatory_image_url?: string | null;
+  support_email?: string | null;
+}
+
+/**
+ * Wrap an email body in the org's branded header (logo, or a text wordmark fallback)
+ * and a signature footer (signature image + name/title when set, org contact email).
+ * Accepts either a full branding object, or (for older call sites) just a logo URL.
+ */
+export function emailShell(bodyHtml: string, branding?: OrgBranding | string | null): string {
+  const org: OrgBranding = typeof branding === 'string' || branding == null ? { logo_url: branding } : branding;
+  const orgName = org.org_name || 'EgireRobotics';
+
+  const header = org.logo_url
+    ? `<img src="${esc(org.logo_url)}" alt="${esc(orgName)}" height="38" style="height:38px;width:auto;border:0;display:block" />`
+    : `<span style="font-weight:800;letter-spacing:2px;font-size:18px;color:#0a0a0a">${esc(orgName.toUpperCase())}</span>` +
       `<span style="display:block;margin-top:3px;color:#9a9a9a;font-size:10px;letter-spacing:3px">EXPLORE &middot; ENGINEER &middot; EXCEL</span>`;
+
+  const signatoryName = org.signatory_name || 'Yogesh Joga';
+  const signatoryTitle = org.signatory_title || `Founder, ${orgName}`;
+  const supportEmail = org.support_email || 'contact@egirerobotics.com';
+  const signatureImg = org.signatory_image_url
+    ? `<img src="${esc(org.signatory_image_url)}" alt="${esc(signatoryName)}" height="30" style="height:30px;width:auto;display:block;margin-bottom:6px" />`
+    : '';
+
   return (
     `<div style="background:#f0f0f0;padding:24px 12px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif">` +
     `<div style="max-width:544px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e8e8e8">` +
@@ -98,8 +122,9 @@ export function emailShell(bodyHtml: string, logoUrl?: string | null): string {
     bodyHtml +
     `</div>` +
     `<div style="padding:18px 28px;border-top:1px solid #efefef;color:#9a9a9a;font-size:12px;line-height:1.7">` +
-    `<strong style="color:#555">Yogesh Joga</strong> &mdash; Founder, EgireRobotics<br/>` +
-    `<a href="mailto:contact@egirerobotics.com" style="color:#9a9a9a;text-decoration:none">contact@egirerobotics.com</a> &middot; egirerobotics.com` +
+    signatureImg +
+    `<strong style="color:#555">${esc(signatoryName)}</strong> &mdash; ${esc(signatoryTitle)}<br/>` +
+    `<a href="mailto:${esc(supportEmail)}" style="color:#9a9a9a;text-decoration:none">${esc(supportEmail)}</a> &middot; egirerobotics.com` +
     `</div></div></div>`
   );
 }

@@ -27,7 +27,10 @@ Deno.serve(async (req) => {
     if (!me) throw new HttpError(404, 'Profile not found.');
     const iAmStaff = ['instructor', 'super_admin'].includes(me.role);
 
-    const { data: org } = await admin.from('org_settings').select('org_name, logo_url, verify_base_url').single();
+    const { data: org } = await admin
+      .from('org_settings')
+      .select('org_name, logo_url, verify_base_url, signatory_name, signatory_title, signatory_image_url, support_email')
+      .single();
     const appUrl = String(org?.verify_base_url ?? '').replace(/\/+$/, '');
     const student = thread.student as unknown as { full_name: string; email: string } | null;
 
@@ -47,7 +50,7 @@ Deno.serve(async (req) => {
             `<p>Hi ${student.full_name || 'there'},</p>` +
               `<p>You have a new reply to your question &ldquo;<strong>${thread.subject}</strong>&rdquo;.</p>` +
               `<p><a href="${appUrl}/app/ask">Open the conversation</a></p>`,
-            org?.logo_url ?? null,
+            org,
           ),
         });
       }
@@ -78,7 +81,7 @@ Deno.serve(async (req) => {
           `<p><strong>${askerName}</strong> asked a new question:</p>` +
             `<p>&ldquo;${thread.subject}&rdquo;</p>` +
             `<p><a href="${appUrl}/admin/ask">Open in admin</a></p>`,
-          org?.logo_url ?? null,
+          org,
         ),
       });
     }

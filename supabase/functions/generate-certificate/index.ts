@@ -223,7 +223,7 @@ Deno.serve(async (req) => {
           `<p style="margin:0 0 16px;color:#444">You passed <strong>${esc(course.title)}</strong> with a score of ${Number(score_pct ?? 0)}%.</p>` +
           `<p style="margin:0 0 16px;color:#444">Your certificate <strong>${certId}</strong> is attached to this email. Anyone can confirm it here:</p>` +
           `<p style="margin:0"><a href="${verifyUrl}" style="color:#0a0a0a">${verifyUrl}</a></p>`,
-        org.logo_url ?? null,
+        org,
       ),
       attachments: [{ filename: `${certId}.pdf`, content: encodeBase64(pdfBytes) }],
     });

@@ -43,7 +43,10 @@ Deno.serve(async (req) => {
     const { data: link } = await admin.auth.admin.generateLink({ type: 'recovery', email: email.trim() });
     inviteLink = link?.properties?.action_link ?? null;
 
-    const { data: org } = await admin.from('org_settings').select('org_name, logo_url').single();
+    const { data: org } = await admin
+      .from('org_settings')
+      .select('org_name, logo_url, signatory_name, signatory_title, signatory_image_url, support_email')
+      .single();
     const orgName = org?.org_name ?? 'EgireRobotics';
     const firstName = String(full_name ?? 'there').replace(/</g, '&lt;').split(' ')[0] || 'there';
 
@@ -55,7 +58,7 @@ Deno.serve(async (req) => {
           `<p style="margin:0 0 16px;color:#444">Hi ${firstName}, an account has been created for you (${wantRole.replace('_', ' ')}). ` +
           `Set your password to sign in:</p>` +
           `<p style="margin:0">${emailButton(inviteLink ?? '', 'Set my password')}</p>`,
-        org?.logo_url ?? null,
+        org,
       ),
     });
 

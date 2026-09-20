@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
     if (!card) throw new HttpError(404, 'ID card not found.');
 
     const [{ data: org }, { data: student }] = await Promise.all([
-      admin.from('org_settings').select('org_name, logo_url').single(),
+      admin.from('org_settings').select('org_name, logo_url, signatory_name, signatory_title, signatory_image_url, support_email').single(),
       admin.from('profiles').select('full_name, email').eq('id', card.student_id).single(),
     ]);
     if (!student) throw new HttpError(404, 'Student not found.');
@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
         `<h1 style="font-size:20px;margin:0 0 12px;color:#0a0a0a">Hi ${esc(student.full_name || 'there')} 🪪</h1>` +
           `<p style="margin:0 0 16px;color:#444">Here's your ${typeLabel} ID card <strong>${esc(card.card_number)}</strong> again — front and back on one PDF.</p>` +
           (validUntil ? `<p style="margin:0 0 16px;color:#444">It's valid until ${validUntil}.</p>` : ''),
-        org?.logo_url ?? null,
+        org,
       ),
       attachments: [{ filename: `${card.card_number}.pdf`, content: encodeBase64(pdfBytes) }],
     });

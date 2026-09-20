@@ -61,7 +61,10 @@ Deno.serve(async (req) => {
       })),
     );
 
-    const { data: org } = await admin.from('org_settings').select('logo_url').single();
+    const { data: org } = await admin
+      .from('org_settings')
+      .select('org_name, logo_url, signatory_name, signatory_title, signatory_image_url, support_email')
+      .single();
 
     let emailSent = 0;
     let lastSkip: string | undefined;
@@ -70,7 +73,7 @@ Deno.serve(async (req) => {
         .split('\n')
         .map((l: string) => `<p>${l.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</p>`)
         .join(''),
-      org?.logo_url ?? null,
+      org,
     );
     for (const r of recipients) {
       const res = await sendEmail({ to: r.email, subject, html });
