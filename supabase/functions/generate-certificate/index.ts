@@ -17,6 +17,32 @@ function callerIsServiceRole(req: Request): boolean {
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+const PAGE_W = 842;
+const PAGE_H = 595;
+
+function wrap(text: string, font: Awaited<ReturnType<PDFDocument['embedFont']>>, size: number, maxWidth: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let line = '';
+  for (const w of words) {
+    const trial = line ? `${line} ${w}` : w;
+    if (font.widthOfTextAtSize(trial, size) > maxWidth && line) {
+      lines.push(line);
+      line = w;
+    } else {
+      line = trial;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+async function embedRemoteImage(pdf: PDFDocument, url: string) {
+  const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
+  const lower = url.toLowerCase();
+  return lower.endsWith('.jpg') || lower.endsWith('.jpeg') ? await pdf.embedJpg(bytes) : await pdf.embedPng(bytes);
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
@@ -37,7 +63,7 @@ Deno.serve(async (req) => {
 
     const [{ data: org }, { data: course }, { data: student }] = await Promise.all([
       admin.from('org_settings').select('*').single(),
-      admin.from('courses').select('title, course_code').eq('id', course_id).single(),
+      admin.from('courses').select('title, course_code, cert_type').eq('id', course_id).single(),
       admin.from('profiles').select('full_name, email').eq('id', student_id).single(),
     ]);
     if (!org || !course || !student) throw new HttpError(404, 'Missing data for certificate.');
@@ -50,59 +76,113 @@ Deno.serve(async (req) => {
     const issuedAt = new Date();
 
     const pdf = await PDFDocument.create();
-    const page = pdf.addPage([842, 595]);
+    const page = pdf.addPage([PAGE_W, PAGE_H]);
     const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
     const reg = await pdf.embedFont(StandardFonts.Helvetica);
+    const serifBold = await pdf.embedFont(StandardFonts.TimesRomanBold);
     const ink = rgb(0.1, 0.1, 0.1);
     const muted = rgb(0.42, 0.42, 0.42);
     const accent = rgb(0.15, 0.39, 0.92);
+    const navy = rgb(0.059, 0.165, 0.29);
+    const gold = rgb(0.788, 0.635, 0.153);
 
-    page.drawRectangle({ x: 24, y: 24, width: 794, height: 547, borderColor: accent, borderWidth: 2 });
-    page.drawRectangle({ x: 32, y: 32, width: 778, height: 531, borderColor: rgb(0.8, 0.85, 0.95), borderWidth: 1 });
-
-    const centre = (text: string, y: number, font: typeof bold, size: number, color = ink) => {
+    const centre = (text: string, y: number, font: Awaited<ReturnType<PDFDocument['embedFont']>>, size: number, color = ink) => {
       const w = font.widthOfTextAtSize(text, size);
-      page.drawText(text, { x: 421 - w / 2, y, size, font, color });
+      page.drawText(text, { x: PAGE_W / 2 - w / 2, y, size, font, color });
     };
 
-    centre(String(org.org_name || 'EgireRobotics').toUpperCase(), 500, bold, 20, accent);
-    centre('CERTIFICATE OF COMPLETION', 452, bold, 30);
-    centre('This is to certify that', 402, reg, 13, muted);
-    centre(student.full_name || student.email, 358, bold, 26);
-    centre('has successfully completed the course', 320, reg, 13, muted);
-    centre(course.title, 286, bold, 19, accent);
-    centre(
-      `Score ${Number(score_pct ?? 0)}%   -   Issued ${issuedAt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`,
-      250,
-      reg,
-      12,
-      muted,
-    );
-
-    page.drawText(`Certificate ID: ${certId}`, { x: 60, y: 70, size: 10, font: reg, color: muted });
-    page.drawText(`Verify at ${verifyUrl}`, { x: 60, y: 54, size: 9, font: reg, color: muted });
-
-    page.drawLine({ start: { x: 520, y: 120 }, end: { x: 720, y: 120 }, thickness: 1, color: muted });
-    page.drawText(String(org.signatory_name || 'Authorized Signatory'), { x: 520, y: 104, size: 10, font: bold, color: ink });
-    page.drawText(String(org.signatory_title || org.org_name || 'EgireRobotics'), { x: 520, y: 90, size: 9, font: reg, color: muted });
-
-    try {
-      const qrDataUrl: string = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 300 });
-      const qrPng = await pdf.embedPng(qrDataUrl);
-      page.drawImage(qrPng, { x: 92, y: 96, width: 96, height: 96 });
-    } catch (e) {
-      console.error('QR render failed', e);
+    let backgroundImg: Awaited<ReturnType<typeof embedRemoteImage>> | null = null;
+    if (org.cert_background_url) {
+      try {
+        backgroundImg = await embedRemoteImage(pdf, org.cert_background_url);
+      } catch (e) {
+        console.error('certificate background embed failed', e);
+      }
     }
 
-    if (org.logo_url) {
+    if (backgroundImg) {
+      // Branded background (logo, borders, signature already baked in) with dynamic
+      // fields printed on top, positions tuned to this exact template layout.
+      page.drawImage(backgroundImg, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
+
+      // Mask the template's plain "OF" line so the certificate type can replace it.
+      page.drawRectangle({ x: PAGE_W * 0.2, y: PAGE_H * 0.675, width: PAGE_W * 0.6, height: PAGE_H * 0.052, color: rgb(0.992, 0.988, 0.976) });
+      centre(`OF ${String(course.cert_type || 'Participation').toUpperCase()}`, PAGE_H * 0.685, serifBold, 20, gold);
+
+      centre(student.full_name || student.email, PAGE_H * 0.585, serifBold, 22, navy);
+
+      const scoreLine = score_pct != null ? ` and achieved a score of ${Number(score_pct)}% in the certification exam.` : '.';
+      const blurb =
+        `has successfully completed the ${course.title} program conducted by ${org.org_name}${scoreLine}`;
+      let by = PAGE_H * 0.465;
+      for (const line of wrap(blurb, reg, 12, PAGE_W * 0.55)) {
+        centre(line, by, reg, 12, rgb(0.2, 0.2, 0.2));
+        by -= 18;
+      }
+
+      const verifyX = PAGE_W * 0.95;
+      const verifyRight = (text: string, y: number, font: Awaited<ReturnType<PDFDocument['embedFont']>>, size: number, color = navy) => {
+        const w = font.widthOfTextAtSize(text, size);
+        page.drawText(text, { x: verifyX - w, y, size, font, color });
+      };
+      verifyRight('Scan or visit', PAGE_H * 0.955, reg, 8, navy);
+      verifyRight(String(org.verify_base_url || 'egirerobotics.com').replace(/^https?:\/\//, ''), PAGE_H * 0.935, bold, 8, gold);
+      for (const [i, line] of wrap("to confirm this certificate's holder, course and issue date.", reg, 7.5, PAGE_W * 0.19).entries()) {
+        verifyRight(line, PAGE_H * 0.918 - i * 11, reg, 7.5, navy);
+      }
+
+      page.drawText(`Certificate ID`, { x: PAGE_W * 0.06, y: PAGE_H * 0.135, size: 9, font: bold, color: navy });
+      page.drawText(certId, { x: PAGE_W * 0.06 + bold.widthOfTextAtSize('Certificate ID  ', 9), y: PAGE_H * 0.135, size: 9, font: reg, color: rgb(0.3, 0.3, 0.3) });
+      page.drawText(`Date of issue`, { x: PAGE_W * 0.06, y: PAGE_H * 0.11, size: 9, font: bold, color: navy });
+      page.drawText(issuedAt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }), {
+        x: PAGE_W * 0.06 + bold.widthOfTextAtSize('Date of issue  ', 9),
+        y: PAGE_H * 0.11,
+        size: 9,
+        font: reg,
+        color: rgb(0.3, 0.3, 0.3),
+      });
+    } else {
+      // Fallback plain layout, used only until an org uploads a certificate background.
+      page.drawRectangle({ x: 24, y: 24, width: 794, height: 547, borderColor: accent, borderWidth: 2 });
+      page.drawRectangle({ x: 32, y: 32, width: 778, height: 531, borderColor: rgb(0.8, 0.85, 0.95), borderWidth: 1 });
+
+      centre(String(org.org_name || 'EgireRobotics').toUpperCase(), 500, bold, 20, accent);
+      centre('CERTIFICATE OF COMPLETION', 452, bold, 30);
+      centre('This is to certify that', 402, reg, 13, muted);
+      centre(student.full_name || student.email, 358, bold, 26);
+      centre('has successfully completed the course', 320, reg, 13, muted);
+      centre(course.title, 286, bold, 19, accent);
+      centre(
+        `Score ${Number(score_pct ?? 0)}%   -   Issued ${issuedAt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`,
+        250,
+        reg,
+        12,
+        muted,
+      );
+
+      page.drawText(`Certificate ID: ${certId}`, { x: 60, y: 70, size: 10, font: reg, color: muted });
+      page.drawText(`Verify at ${verifyUrl}`, { x: 60, y: 54, size: 9, font: reg, color: muted });
+
+      page.drawLine({ start: { x: 520, y: 120 }, end: { x: 720, y: 120 }, thickness: 1, color: muted });
+      page.drawText(String(org.signatory_name || 'Authorized Signatory'), { x: 520, y: 104, size: 10, font: bold, color: ink });
+      page.drawText(String(org.signatory_title || org.org_name || 'EgireRobotics'), { x: 520, y: 90, size: 9, font: reg, color: muted });
+
       try {
-        const bytes = new Uint8Array(await (await fetch(org.logo_url)).arrayBuffer());
-        const lower = String(org.logo_url).toLowerCase();
-        const img = lower.endsWith('.jpg') || lower.endsWith('.jpeg') ? await pdf.embedJpg(bytes) : await pdf.embedPng(bytes);
-        const scale = 60 / img.height;
-        page.drawImage(img, { x: 421 - (img.width * scale) / 2, y: 512, width: img.width * scale, height: 60 });
+        const qrDataUrl: string = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 300 });
+        const qrPng = await pdf.embedPng(qrDataUrl);
+        page.drawImage(qrPng, { x: 92, y: 96, width: 96, height: 96 });
       } catch (e) {
-        console.error('logo embed failed', e);
+        console.error('QR render failed', e);
+      }
+
+      if (org.logo_url) {
+        try {
+          const logo = await embedRemoteImage(pdf, org.logo_url);
+          const scale = 60 / logo.height;
+          page.drawImage(logo, { x: 421 - (logo.width * scale) / 2, y: 512, width: logo.width * scale, height: 60 });
+        } catch (e) {
+          console.error('logo embed failed', e);
+        }
       }
     }
 
