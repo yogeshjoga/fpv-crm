@@ -231,6 +231,14 @@ Deno.serve(async (req) => {
 
     // ---- back ----------------------------------------------------------------
     const back = pdf.addPage([CARD_W, CARD_H]);
+    if (logo) {
+      // Faint centered watermark — the back is already tight on space for terms,
+      // workshop/fee lines and the signature, so a subtle mark behind them (rather
+      // than a second full-size logo) keeps everything else readable.
+      const w = 130;
+      const h = (logo.height * w) / logo.width;
+      back.drawImage(logo, { x: (CARD_W - w) / 2, y: (CARD_H - h) / 2, width: w, height: h, opacity: 0.07 });
+    }
     back.drawRectangle({ x: 0, y: CARD_H - 18, width: CARD_W, height: 18, color: navy });
     back.drawText('TERMS OF USE', { x: 10, y: CARD_H - 12, size: 7, font: bold, color: goldOnNavy });
 
