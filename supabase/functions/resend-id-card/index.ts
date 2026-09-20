@@ -33,16 +33,17 @@ Deno.serve(async (req) => {
     const pdfBytes = new Uint8Array(await dl.data.arrayBuffer());
 
     const orgName = org?.org_name ?? 'EgireRobotics';
+    const typeLabel = card.card_type === 'coordinator' ? 'coordinator' : card.card_type === 'volunteer' ? 'volunteer' : 'student';
     const validUntil = card.valid_until
       ? new Date(card.valid_until).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
       : null;
 
     const res = await sendEmail({
       to: student.email,
-      subject: `Your ${orgName} student ID card (resent)`,
+      subject: `Your ${orgName} ${typeLabel} ID card (resent)`,
       html: emailShell(
         `<h1 style="font-size:20px;margin:0 0 12px;color:#0a0a0a">Hi ${esc(student.full_name || 'there')} 🪪</h1>` +
-          `<p style="margin:0 0 16px;color:#444">Here's your student ID card <strong>${esc(card.card_number)}</strong> again — front and back on one PDF.</p>` +
+          `<p style="margin:0 0 16px;color:#444">Here's your ${typeLabel} ID card <strong>${esc(card.card_number)}</strong> again — front and back on one PDF.</p>` +
           (validUntil ? `<p style="margin:0 0 16px;color:#444">It's valid until ${validUntil}.</p>` : ''),
         org?.logo_url ?? null,
       ),

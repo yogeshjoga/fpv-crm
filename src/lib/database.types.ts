@@ -821,42 +821,101 @@ export type Database = {
         }
         Relationships: []
       }
+      id_card_presets: {
+        Row: {
+          card_type: string
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          valid_from: string | null
+          valid_until: string | null
+          workshop_location: string | null
+          workshop_name: string | null
+        }
+        Insert: {
+          card_type?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          valid_from?: string | null
+          valid_until?: string | null
+          workshop_location?: string | null
+          workshop_name?: string | null
+        }
+        Update: {
+          card_type?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          valid_from?: string | null
+          valid_until?: string | null
+          workshop_location?: string | null
+          workshop_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "id_card_presets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       id_cards: {
         Row: {
           card_number: string
+          card_type: string
           course_id: string | null
           created_at: string
+          fee_paid: string | null
           id: string
           issued_at: string
           issued_by: string | null
           last_emailed_at: string | null
           pdf_path: string
           student_id: string
+          valid_from: string | null
           valid_until: string | null
+          workshop_location: string | null
+          workshop_name: string | null
         }
         Insert: {
           card_number: string
+          card_type?: string
           course_id?: string | null
           created_at?: string
+          fee_paid?: string | null
           id?: string
           issued_at?: string
           issued_by?: string | null
           last_emailed_at?: string | null
           pdf_path: string
           student_id: string
+          valid_from?: string | null
           valid_until?: string | null
+          workshop_location?: string | null
+          workshop_name?: string | null
         }
         Update: {
           card_number?: string
+          card_type?: string
           course_id?: string | null
           created_at?: string
+          fee_paid?: string | null
           id?: string
           issued_at?: string
           issued_by?: string | null
           last_emailed_at?: string | null
           pdf_path?: string
           student_id?: string
+          valid_from?: string | null
           valid_until?: string | null
+          workshop_location?: string | null
+          workshop_name?: string | null
         }
         Relationships: [
           {
