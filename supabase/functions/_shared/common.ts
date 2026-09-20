@@ -123,29 +123,31 @@ async function resolveMail(): Promise<{
   let pass = env('SMTP_PASS') ?? '';
   let from = env('MAIL_FROM') ?? env('CERT_EMAIL_FROM') ?? '';
   let replyTo = env('MAIL_REPLY_TO') ?? '';
-  const resendKey = env('RESEND_API_KEY');
+  let resendKey = env('RESEND_API_KEY');
 
-  let dbResendKey: string | undefined;
-  if (!host && !resendKey) {
-    try {
-      const { data } = await adminClient()
-        .from('mail_config')
-        .select('smtp_host, smtp_port, smtp_user, smtp_pass, smtp_tls, mail_from, mail_reply_to, resend_api_key')
-        .eq('id', true)
-        .maybeSingle();
-      if (data) {
+  // Always consult mail_config for whatever isn't already set via env — in particular
+  // resend_api_key must be checked independently of whether an env SMTP_HOST happens to
+  // be set, so a configured Resend key always wins regardless of leftover SMTP env vars.
+  try {
+    const { data } = await adminClient()
+      .from('mail_config')
+      .select('smtp_host, smtp_port, smtp_user, smtp_pass, smtp_tls, mail_from, mail_reply_to, resend_api_key')
+      .eq('id', true)
+      .maybeSingle();
+    if (data) {
+      resendKey = resendKey || data.resend_api_key || undefined;
+      if (!host) {
         host = data.smtp_host ?? host;
         port = data.smtp_port ?? port;
         tls = data.smtp_tls ?? tls;
         user = data.smtp_user ?? user;
         pass = data.smtp_pass ?? pass;
-        from = from || (data.mail_from ?? '');
-        replyTo = replyTo || (data.mail_reply_to ?? '');
-        dbResendKey = data.resend_api_key ?? undefined;
       }
-    } catch (e) {
-      console.error('mail_config lookup failed', e);
+      from = from || (data.mail_from ?? '');
+      replyTo = replyTo || (data.mail_reply_to ?? '');
     }
+  } catch (e) {
+    console.error('mail_config lookup failed', e);
   }
 
   return {
@@ -158,7 +160,7 @@ async function resolveMail(): Promise<{
     replyTo: replyTo || 'contact@egirerobotics.com',
     // Resend is preferred over SMTP: GoDaddy's SMTP relay rejects Edge Functions'
     // shared/rotating cloud IPs with a 535 regardless of password correctness.
-    resendKey: resendKey ?? dbResendKey,
+    resendKey,
   };
 }
 
