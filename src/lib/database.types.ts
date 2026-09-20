@@ -313,6 +313,7 @@ export type Database = {
       }
       courses: {
         Row: {
+          cert_type: string
           cooldown_hours: number
           course_code: string
           cover_image_url: string | null
@@ -335,6 +336,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cert_type?: string
           cooldown_hours?: number
           course_code: string
           cover_image_url?: string | null
@@ -357,6 +359,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cert_type?: string
           cooldown_hours?: number
           course_code?: string
           cover_image_url?: string | null
@@ -1113,6 +1116,7 @@ export type Database = {
       }
       org_settings: {
         Row: {
+          cert_background_url: string | null
           cert_id_prefix: string
           default_cooldown_hours: number
           default_max_attempts: number
@@ -1131,6 +1135,7 @@ export type Database = {
           verify_base_url: string
         }
         Insert: {
+          cert_background_url?: string | null
           cert_id_prefix?: string
           default_cooldown_hours?: number
           default_max_attempts?: number
@@ -1149,6 +1154,7 @@ export type Database = {
           verify_base_url?: string
         }
         Update: {
+          cert_background_url?: string | null
           cert_id_prefix?: string
           default_cooldown_hours?: number
           default_max_attempts?: number

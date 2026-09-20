@@ -37,6 +37,13 @@ export function AdminCourses() {
     q.refetch();
   };
 
+  const updateCertType = async (c: Course, cert_type: string) => {
+    if (!cert_type.trim() || cert_type === c.cert_type) return;
+    const { error } = await supabase.from('courses').update({ cert_type: cert_type.trim() }).eq('id', c.id);
+    if (error) return toast(error.message, 'error');
+    q.refetch();
+  };
+
   const uploadCover = async (c: Course, file: File) => {
     setUploadingCover(c.id);
     const path = `${c.id}-${Date.now()}-${file.name}`;
@@ -111,6 +118,13 @@ export function AdminCourses() {
               <div className="mt-3 text-xs text-neutral-400">
                 Exam: {c.exam_question_count} Q · {c.exam_time_limit_min} min · pass {c.pass_pct}% · {c.max_attempts} attempts
               </div>
+              {writable ? (
+                <Field label="Certificate type" hint="Printed as “OF ___” on the certificate">
+                  <TextInput defaultValue={c.cert_type} key={c.cert_type} onBlur={(e) => updateCertType(c, e.target.value)} />
+                </Field>
+              ) : (
+                <div className="mt-2 text-xs text-neutral-400">Certificate: OF {c.cert_type.toUpperCase()}</div>
+              )}
               <div className="mt-4 flex flex-wrap gap-2">
                 <Link to={`/admin/courses/${c.id}/build`}>
                   <Button variant="secondary">
@@ -175,6 +189,7 @@ function CreateCourseModal({
     max_attempts: org.default_max_attempts,
     cooldown_hours: org.default_cooldown_hours,
     status: 'draft' as Course['status'],
+    cert_type: 'Participation',
   });
 
   const set = (k: keyof typeof form, v: string | number) => setForm((f) => ({ ...f, [k]: v }));
@@ -235,6 +250,9 @@ function CreateCourseModal({
         </Field>
         <Field label="Cooldown (hours)">
           <TextInput type="number" value={form.cooldown_hours} onChange={(e) => set('cooldown_hours', Number(e.target.value))} />
+        </Field>
+        <Field label="Certificate type" hint="Printed as “OF ___”, e.g. Participation, L1 Pilot, Coordinator">
+          <TextInput value={form.cert_type} onChange={(e) => set('cert_type', e.target.value)} />
         </Field>
         <div className="sm:col-span-2 mt-2 flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>
