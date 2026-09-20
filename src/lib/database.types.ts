@@ -994,6 +994,7 @@ export type Database = {
           id: boolean
           mail_from: string | null
           mail_reply_to: string | null
+          resend_api_key: string | null
           smtp_host: string | null
           smtp_pass: string | null
           smtp_port: number
@@ -1005,6 +1006,7 @@ export type Database = {
           id?: boolean
           mail_from?: string | null
           mail_reply_to?: string | null
+          resend_api_key?: string | null
           smtp_host?: string | null
           smtp_pass?: string | null
           smtp_port?: number
@@ -1016,6 +1018,7 @@ export type Database = {
           id?: boolean
           mail_from?: string | null
           mail_reply_to?: string | null
+          resend_api_key?: string | null
           smtp_host?: string | null
           smtp_pass?: string | null
           smtp_port?: number
