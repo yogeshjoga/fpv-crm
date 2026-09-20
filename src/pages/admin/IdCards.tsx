@@ -25,7 +25,7 @@ interface Card {
   last_emailed_at: string | null;
   pdf_path: string;
   student: { id: string; full_name: string; email: string } | null;
-  course: { title: string } | null;
+  course: { id: string; title: string } | null;
 }
 
 type Preset = Tables<'id_card_presets'>;
@@ -74,7 +74,7 @@ export function IdCards() {
           .from('id_cards')
           .select(
             'id, card_number, card_type, workshop_name, workshop_location, fee_paid, issued_at, valid_from, valid_until, ' +
-              'last_emailed_at, pdf_path, student:profiles!id_cards_student_id_fkey(id, full_name, email), course:courses(title)',
+              'last_emailed_at, pdf_path, student:profiles!id_cards_student_id_fkey(id, full_name, email), course:courses(id, title)',
           )
           .order('issued_at', { ascending: false }),
       ) as Promise<Card[]>,
@@ -123,6 +123,24 @@ export function IdCards() {
   const [draft, setDraft] = useState(emptyDraft());
   const set = <K extends keyof ReturnType<typeof emptyDraft>>(k: K, v: ReturnType<typeof emptyDraft>[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));
+
+  // Re-open the generate form pre-filled from an existing card, so fixing a typo or
+  // picking up a design change is "adjust and click", not re-entering everything.
+  const regenerate = (c: Card) => {
+    if (!c.student) return;
+    setDraft({
+      student_id: c.student.id,
+      card_type: c.card_type,
+      course_id: c.course?.id ?? '',
+      preset_id: '',
+      workshop_name: c.workshop_name ?? '',
+      workshop_location: c.workshop_location ?? '',
+      fee_paid: c.fee_paid ?? '',
+      valid_from: c.valid_from ?? emptyDraft().valid_from,
+      valid_until: c.valid_until ?? emptyDraft().valid_until,
+    });
+    setShowGenerate(true);
+  };
 
   const applyPreset = (presetId: string) => {
     const p = q.data?.presets.find((x) => x.id === presetId);
@@ -259,9 +277,19 @@ export function IdCards() {
                         Download
                       </Button>
                       {writable && (
-                        <Button variant="ghost" onClick={() => resend(c)} loading={resendingId === c.id}>
-                          <Send size={13} /> Resend
-                        </Button>
+                        <>
+                          <Button variant="ghost" onClick={() => regenerate(c)} title="Create a fresh card for this person — picks up any design or detail changes">
+                            Regenerate
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            onClick={() => resend(c)}
+                            loading={resendingId === c.id}
+                            title="Re-sends this exact file, unchanged — use Regenerate to pick up design or detail changes"
+                          >
+                            <Send size={13} /> Resend
+                          </Button>
+                        </>
                       )}
                     </div>
                   </td>
