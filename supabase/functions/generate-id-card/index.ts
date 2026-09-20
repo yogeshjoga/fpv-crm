@@ -321,7 +321,7 @@ Deno.serve(async (req) => {
         `<h1 style="font-size:20px;margin:0 0 12px;color:#0a0a0a">Welcome, ${esc(student.full_name || 'there')}! 🪪</h1>` +
           `<p style="margin:0 0 16px;color:#444">Your ${TYPE_LABEL[cardType].toLowerCase()} ID card <strong>${esc(cardNumber)}</strong> is attached to this email — front and back on one PDF.</p>` +
           `<p style="margin:0 0 16px;color:#444">Please keep it with you during sessions. It's valid ${fmtDate(validFrom)} to ${fmtDate(validUntil)}.</p>`,
-        org.logo_url ?? null,
+        org,
       ),
       attachments: [{ filename: `${cardNumber}.pdf`, content: encodeBase64(pdfBytes) }],
     });

@@ -114,10 +114,12 @@ Deno.serve(async (req) => {
       })
       .eq('id', registration_id);
 
-    const { data: org } = await admin.from('org_settings').select('org_name, verify_base_url, logo_url').single();
+    const { data: org } = await admin
+      .from('org_settings')
+      .select('org_name, verify_base_url, logo_url, signatory_name, signatory_title, signatory_image_url, support_email')
+      .single();
     const appUrl = String(org?.verify_base_url ?? '').replace(/\/+$/, '');
     const orgName = org?.org_name ?? 'EgireRobotics';
-    const logoUrl = org?.logo_url ?? null;
 
     await admin.from('notifications').insert({
       recipient_id: profileId,
@@ -154,7 +156,7 @@ Deno.serve(async (req) => {
             `<p style="margin:0 0 18px;color:#666;font-size:13px">For your security you'll be asked to set your own password the first time you sign in.</p>` +
             `<p style="margin:0 0 6px">${emailButton(loginUrl, 'Log in to your account')}</p>` +
             `<p style="margin:14px 0 0;color:#9a9a9a;font-size:12px">Or paste this link into your browser:<br/>${loginUrl}</p>`,
-          logoUrl,
+          org,
         ),
       });
       emailSent = res.sent;
@@ -170,7 +172,7 @@ Deno.serve(async (req) => {
             coursesLine +
             `<p style="margin:0 0 18px;color:#444">Sign in with your existing password to get started.</p>` +
             `<p style="margin:0">${emailButton(loginUrl, 'Log in')}</p>`,
-          logoUrl,
+          org,
         ),
       });
       emailSent = res.sent;
