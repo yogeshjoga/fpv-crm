@@ -95,9 +95,12 @@ Deno.serve(async (req) => {
     const reg = await pdf.embedFont(StandardFonts.Helvetica);
     const ink = rgb(0.1, 0.1, 0.1);
     const muted = rgb(0.45, 0.45, 0.45);
-    const accent = rgb(0.15, 0.39, 0.92);
-    const accentLight = rgb(0.9, 0.94, 0.99);
-    const white = rgb(1, 1, 1);
+    // Navy + gold, matching the certificate's palette.
+    const navy = rgb(0.059, 0.165, 0.29);
+    const navyTint = rgb(0.933, 0.949, 0.968);
+    const gold = rgb(0.788, 0.635, 0.153);
+    const goldDark = rgb(0.55, 0.42, 0.06);
+    const goldOnNavy = rgb(0.91, 0.83, 0.54);
 
     const orgName = String(org.org_name || 'EgireRobotics');
     const courseTitle = course?.title || 'General Student';
@@ -129,19 +132,22 @@ Deno.serve(async (req) => {
 
     // ---- front -------------------------------------------------------------
     const front = pdf.addPage([CARD_W, CARD_H]);
-    front.drawRectangle({ x: 0, y: CARD_H - 34, width: CARD_W, height: 34, color: accent });
-    if (logo) {
-      const h = 20;
-      const w = (logo.width * h) / logo.height;
-      front.drawImage(logo, { x: 8, y: CARD_H - 27, width: w, height: h });
-      front.drawText(orgName.toUpperCase(), { x: 8 + w + 6, y: CARD_H - 16, size: 8.5, font: bold, color: white });
-    } else {
-      front.drawText(orgName.toUpperCase(), { x: 8, y: CARD_H - 16, size: 9, font: bold, color: white });
-    }
-    front.drawText('STUDENT IDENTITY CARD', { x: 8, y: CARD_H - 27, size: 5.5, font: reg, color: white });
+    // Corner accents, matching the certificate's navy/gold trim.
+    front.drawSvgPath('M0 0 L60 0 L0 34 Z', { x: 0, y: CARD_H, color: navy, opacity: 0.9 });
+    front.drawSvgPath('M0 0 L-46 0 L0 26 Z', { x: CARD_W, y: CARD_H, color: gold });
 
-    const photoBox = { x: 10, y: 49, w: 52, h: 64 };
-    front.drawRectangle({ x: photoBox.x, y: photoBox.y, width: photoBox.w, height: photoBox.h, borderColor: muted, borderWidth: 1, color: accentLight });
+    if (logo) {
+      const h = 24;
+      const w = (logo.width * h) / logo.height;
+      front.drawImage(logo, { x: 10, y: CARD_H - 32, width: w, height: h });
+    } else {
+      front.drawText(orgName.toUpperCase(), { x: 10, y: CARD_H - 22, size: 10, font: bold, color: navy });
+    }
+    front.drawText('S T U D E N T   I D E N T I T Y   C A R D', { x: 10, y: CARD_H - 40, size: 5, font: reg, color: goldDark });
+    front.drawLine({ start: { x: 10, y: CARD_H - 45 }, end: { x: CARD_W - 10, y: CARD_H - 45 }, thickness: 0.75, color: gold });
+
+    const photoBox = { x: 10, y: 47, w: 52, h: 62 };
+    front.drawRectangle({ x: photoBox.x, y: photoBox.y, width: photoBox.w, height: photoBox.h, borderColor: gold, borderWidth: 1, color: navyTint });
     if (photo) {
       const scale = Math.min(photoBox.w / photo.width, photoBox.h / photo.height);
       const w = photo.width * scale;
@@ -151,65 +157,68 @@ Deno.serve(async (req) => {
       const label = initials(student.full_name || student.email);
       const size = 22;
       const w = bold.widthOfTextAtSize(label, size);
-      front.drawText(label, { x: photoBox.x + (photoBox.w - w) / 2, y: photoBox.y + photoBox.h / 2 - 8, size, font: bold, color: accent });
+      front.drawText(label, { x: photoBox.x + (photoBox.w - w) / 2, y: photoBox.y + photoBox.h / 2 - 8, size, font: bold, color: navy });
     }
 
     const textX = photoBox.x + photoBox.w + 8;
     const textW = CARD_W - textX - 8;
     const name = student.full_name || student.email;
-    front.drawText(name, { x: textX, y: 101, size: fitSize(name, bold, textW, 10.5), font: bold, color: ink });
-    front.drawText('ID', { x: textX, y: 87, size: 6.5, font: reg, color: muted });
-    front.drawText(cardNumber, { x: textX + 12, y: 87, size: 7.5, font: bold, color: ink });
+    front.drawText(name, { x: textX, y: 99, size: fitSize(name, bold, textW, 11), font: bold, color: navy });
+    front.drawText('ID', { x: textX, y: 85, size: 6.5, font: reg, color: muted });
+    front.drawText(cardNumber, { x: textX + 12, y: 85, size: 7.5, font: bold, color: ink });
     for (const [i, line] of wrap(courseTitle, reg, 7, textW).slice(0, 2).entries()) {
-      front.drawText(line, { x: textX, y: 74 - i * 9, size: 7, font: reg, color: ink });
+      front.drawText(line, { x: textX, y: 72 - i * 9, size: 7, font: reg, color: ink });
     }
     front.drawText(
       `Valid until ${validUntil.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`,
       { x: textX, y: 51, size: 6.5, font: reg, color: muted },
     );
 
-    front.drawLine({ start: { x: 0, y: 14 }, end: { x: CARD_W, y: 14 }, thickness: 0.5, color: rgb(0.85, 0.85, 0.85) });
-    front.drawText(String(org.support_email || 'contact@egirerobotics.com'), {
-      x: CARD_W / 2 - reg.widthOfTextAtSize(String(org.support_email || 'contact@egirerobotics.com'), 6) / 2,
-      y: 5,
+    front.drawRectangle({ x: 0, y: 0, width: CARD_W, height: 18, color: navy });
+    const tagline = 'EXPLORE  ·  ENGINEER  ·  EXCEL';
+    front.drawText(tagline, {
+      x: CARD_W / 2 - reg.widthOfTextAtSize(tagline, 6) / 2,
+      y: 7,
       size: 6,
       font: reg,
-      color: muted,
+      color: goldOnNavy,
     });
 
     // ---- back ----------------------------------------------------------------
     const back = pdf.addPage([CARD_W, CARD_H]);
-    back.drawText('TERMS OF USE', { x: 8, y: CARD_H - 12, size: 7, font: bold, color: accent });
+    back.drawRectangle({ x: 0, y: CARD_H - 18, width: CARD_W, height: 18, color: navy });
+    back.drawText('TERMS OF USE', { x: 10, y: CARD_H - 12, size: 7, font: bold, color: goldOnNavy });
+
     const terms =
       `This card certifies that the holder is a registered student of ${orgName}. It remains the property of ` +
       `${orgName} and must be produced on request during training sessions. Non-transferable.`;
-    let ty = CARD_H - 23;
-    for (const line of wrap(terms, reg, 6, CARD_W - 16)) {
-      back.drawText(line, { x: 8, y: ty, size: 6, font: reg, color: muted });
+    let ty = CARD_H - 29;
+    for (const line of wrap(terms, reg, 6, CARD_W - 20)) {
+      back.drawText(line, { x: 10, y: ty, size: 6, font: reg, color: muted });
       ty -= 7.5;
     }
 
-    back.drawText('If found, please return to:', { x: 8, y: ty - 6, size: 6, font: bold, color: ink });
-    back.drawText(orgName, { x: 8, y: ty - 15, size: 6, font: reg, color: muted });
-    back.drawText(String(org.support_email || 'contact@egirerobotics.com'), { x: 8, y: ty - 24, size: 6, font: reg, color: muted });
+    back.drawText('If found, please return to', { x: 10, y: ty - 6, size: 6.5, font: bold, color: navy });
+    back.drawText(orgName, { x: 10, y: ty - 15, size: 6, font: reg, color: muted });
+    back.drawText(String(org.support_email || 'contact@egirerobotics.com'), { x: 10, y: ty - 24, size: 6, font: reg, color: muted });
 
     if (signatureImg) {
-      const h = 20;
+      const h = 18;
       const w = (signatureImg.width * h) / signatureImg.height;
-      back.drawImage(signatureImg, { x: CARD_W - w - 14, y: 40, width: w, height: h });
+      back.drawImage(signatureImg, { x: CARD_W - Math.max(w, 90) - 10 + (Math.max(w, 90) - w) / 2, y: 38, width: w, height: h });
     }
-    back.drawLine({ start: { x: CARD_W - 90, y: 36 }, end: { x: CARD_W - 10, y: 36 }, thickness: 0.75, color: muted });
-    back.drawText(String(org.signatory_name || 'Authorized Signatory'), { x: CARD_W - 90, y: 26, size: 6.5, font: bold, color: ink });
-    back.drawText(String(org.signatory_title || orgName), { x: CARD_W - 90, y: 18, size: 5.5, font: reg, color: muted });
+    back.drawLine({ start: { x: CARD_W - 100, y: 36 }, end: { x: CARD_W - 10, y: 36 }, thickness: 0.75, color: gold });
+    back.drawText(String(org.signatory_name || 'Authorized Signatory'), { x: CARD_W - 100, y: 26, size: 6.5, font: bold, color: navy });
+    back.drawText(String(org.signatory_title || orgName), { x: CARD_W - 100, y: 18, size: 5.5, font: reg, color: muted });
 
-    back.drawText(cardNumber, { x: 8, y: 8, size: 5.5, font: reg, color: muted });
-    back.drawText(`Issued ${issuedAt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`, {
-      x: 8,
-      y: 8 + 0,
+    back.drawText(`${cardNumber}  ·  Issued ${issuedAt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`, {
+      x: 10,
+      y: 8,
       size: 5.5,
       font: reg,
       color: muted,
     });
+    back.drawSvgPath('M0 0 L-60 0 L0 -34 Z', { x: CARD_W, y: 0, color: navy, opacity: 0.9 });
 
     const pdfBytes = await pdf.save();
     const pdfPath = `${student_id}/${cardNumber}.pdf`;
