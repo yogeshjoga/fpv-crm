@@ -294,15 +294,15 @@ Deno.serve(async (req) => {
       // A real seal overlaps the signature slightly rather than sitting neatly beside
       // it — that's what makes a stamped document read as genuine rather than staged.
       const sealAspect = sealImg.width / sealImg.height;
-      const sealH = 32;
+      const sealH = 48; // 50% larger than the original 32
       const sealW = sealH * sealAspect;
-      back.drawImage(sealImg, { x: sigBoxLeft - sealW * 0.35, y: 16, width: sealW, height: sealH, opacity: 0.9 });
+      back.drawImage(sealImg, { x: sigBoxLeft - sealW * 0.35, y: 12, width: sealW, height: sealH, opacity: 0.9 });
     }
 
     if (signatureImg) {
-      const h = 18;
+      const h = 27; // 50% larger than the original 18
       const w = (signatureImg.width * h) / signatureImg.height;
-      back.drawImage(signatureImg, { x: CARD_W - Math.max(w, 90) - 10 + (Math.max(w, 90) - w) / 2, y: 38, width: w, height: h });
+      back.drawImage(signatureImg, { x: CARD_W - Math.max(w, 90) - 10 + (Math.max(w, 90) - w) / 2, y: 34, width: w, height: h });
     }
     back.drawLine({ start: { x: sigBoxLeft, y: 36 }, end: { x: sigBoxRight, y: 36 }, thickness: 0.75, color: gold });
     back.drawText(String(org.signatory_name || 'Authorized Signatory'), { x: sigBoxLeft, y: 26, size: 6.5, font: bold, color: navy });
