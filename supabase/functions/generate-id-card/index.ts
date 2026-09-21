@@ -24,6 +24,11 @@ async function callerAuthorized(req: Request, admin: ReturnType<typeof adminClie
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+/** pdf-lib's default font encoding (WinAnsi) can't encode ₹, emoji, or most non-Latin
+ * text — drawing them crashes PDF generation outright. Strip anything outside that range
+ * from free-text fields (fee, workshop name/location) before they reach drawText. */
+const winAnsiSafe = (s: string) => s.replace(/[^\x00-\xFF]/g, '').trim();
+
 /** Card is CR80 size — 3.375in x 2.125in — at 72pt/in. */
 const CARD_W = 243;
 const CARD_H = 153;
@@ -90,8 +95,8 @@ Deno.serve(async (req) => {
     if (!student_id) throw new HttpError(400, 'student_id is required.');
 
     const cardType: CardType = CARD_TYPES.includes(body.card_type) ? body.card_type : 'student';
-    const workshopName: string | null = body.workshop_name?.trim() || null;
-    const workshopLocation: string | null = body.workshop_location?.trim() || null;
+    const workshopName: string | null = winAnsiSafe(body.workshop_name ?? '') || null;
+    const workshopLocation: string | null = winAnsiSafe(body.workshop_location ?? '') || null;
 
     const issuedAt = new Date();
     const validFrom = body.valid_from ? new Date(body.valid_from) : issuedAt;
@@ -112,7 +117,8 @@ Deno.serve(async (req) => {
 
     // Fee paid isn't typed in per card — pull it from the person's own registration
     // (payment recorded there) so the admin doesn't have to re-enter it by hand.
-    let feePaid: string | null = body.fee_paid?.trim() || null;
+    // "Rs." not "₹": pdf-lib's default font encoding (WinAnsi) can't render the Rupee sign.
+    let feePaid: string | null = winAnsiSafe(body.fee_paid ?? '') || null;
     if (!feePaid && cardType === 'student') {
       const { data: latestReg } = await admin
         .from('registrations')
@@ -123,7 +129,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (latestReg?.payment_amount != null) {
         const status = String(latestReg.payment_status || '').replace(/^./, (c) => c.toUpperCase());
-        feePaid = `₹${Number(latestReg.payment_amount).toLocaleString('en-IN')}${status ? ` · ${status}` : ''}`;
+        feePaid = `Rs. ${Number(latestReg.payment_amount).toLocaleString('en-IN')}${status ? ` · ${status}` : ''}`;
       }
     }
 
@@ -143,8 +149,9 @@ Deno.serve(async (req) => {
     const goldDark = rgb(0.55, 0.42, 0.06);
     const goldOnNavy = rgb(0.91, 0.83, 0.54);
 
-    const orgName = String(org.org_name || 'EgireRobotics');
-    const roleLine = cardType === 'student' ? course?.title || 'General Student' : workshopName || `${orgName} Workshop`;
+    const orgName = winAnsiSafe(String(org.org_name || '')) || 'EgireRobotics';
+    const roleLine =
+      winAnsiSafe(cardType === 'student' ? course?.title || 'General Student' : workshopName || `${orgName} Workshop`) || 'General Student';
 
     let photo: Awaited<ReturnType<typeof embedRemoteImage>> | null = null;
     if (student.avatar_url) {
@@ -196,7 +203,7 @@ Deno.serve(async (req) => {
       const h = photo.height * scale;
       front.drawImage(photo, { x: photoBox.x + (photoBox.w - w) / 2, y: photoBox.y + (photoBox.h - h) / 2, width: w, height: h });
     } else {
-      const label = initials(student.full_name || student.email);
+      const label = initials(winAnsiSafe(student.full_name || '') || student.email);
       const size = 22;
       const w = bold.widthOfTextAtSize(label, size);
       front.drawText(label, { x: photoBox.x + (photoBox.w - w) / 2, y: photoBox.y + photoBox.h / 2 - 8, size, font: bold, color: navy });
@@ -204,7 +211,7 @@ Deno.serve(async (req) => {
 
     const textX = photoBox.x + photoBox.w + 8;
     const textW = CARD_W - textX - 8;
-    const name = student.full_name || student.email;
+    const name = winAnsiSafe(student.full_name || '') || student.email;
     front.drawText(name, { x: textX, y: 99, size: fitSize(name, bold, textW, 11), font: bold, color: navy });
     front.drawText('ID', { x: textX, y: 85, size: 6.5, font: reg, color: muted });
     front.drawText(cardNumber, { x: textX + 12, y: 85, size: 7.5, font: bold, color: ink });
