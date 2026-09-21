@@ -1,9 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from 'https://esm.sh/pdf-lib@1.17.1';
-import fontkit from 'https://esm.sh/@pdf-lib/fontkit@1.1.1';
 import { encodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
 import { adminClient, cors, emailShell, HttpError, json, sendEmail } from '../_shared/common.ts';
-
-const SIGNATURE_FONT_URL = 'https://raw.githubusercontent.com/google/fonts/main/ofl/sacramento/Sacramento-Regular.ttf';
 
 /** True for our own service-role calls (e.g. accept-registration) or a signed-in instructor/super_admin. */
 async function callerAuthorized(req: Request, admin: ReturnType<typeof adminClient>): Promise<boolean> {
@@ -141,18 +138,8 @@ Deno.serve(async (req) => {
     const cardNumber = `${org.cert_id_prefix || 'EGR'}-${TYPE_PREFIX[cardType]}-${String(seq.data ?? 1).padStart(6, '0')}`;
 
     const pdf = await PDFDocument.create();
-    pdf.registerFontkit(fontkit);
     const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
     const reg = await pdf.embedFont(StandardFonts.Helvetica);
-    // A real cursive font for the signature line when there's no scanned signature
-    // image yet — falls back to a plain italic if the font can't be fetched.
-    let signatureFont = await pdf.embedFont(StandardFonts.TimesRomanItalic);
-    try {
-      const fontBytes = new Uint8Array(await (await fetch(SIGNATURE_FONT_URL)).arrayBuffer());
-      signatureFont = await pdf.embedFont(fontBytes);
-    } catch (e) {
-      console.error('signature font embed failed', e);
-    }
     const ink = rgb(0.1, 0.1, 0.1);
     const muted = rgb(0.45, 0.45, 0.45);
     // Navy + gold, matching the certificate's palette.
@@ -316,13 +303,6 @@ Deno.serve(async (req) => {
       const h = 18;
       const w = (signatureImg.width * h) / signatureImg.height;
       back.drawImage(signatureImg, { x: CARD_W - Math.max(w, 90) - 10 + (Math.max(w, 90) - w) / 2, y: 38, width: w, height: h });
-    } else {
-      // No scanned signature yet — render the name in a cursive font as a stand-in
-      // signature rather than just the plain printed name below.
-      const sigText = winAnsiSafe(String(org.signatory_name || 'Authorized Signatory'));
-      const sigSize = fitSize(sigText, signatureFont, 90, 18, 10);
-      const sigW = signatureFont.widthOfTextAtSize(sigText, sigSize);
-      back.drawText(sigText, { x: Math.max(sigBoxLeft, sigBoxRight - sigW), y: 39, size: sigSize, font: signatureFont, color: navy });
     }
     back.drawLine({ start: { x: sigBoxLeft, y: 36 }, end: { x: sigBoxRight, y: 36 }, thickness: 0.75, color: gold });
     back.drawText(String(org.signatory_name || 'Authorized Signatory'), { x: sigBoxLeft, y: 26, size: 6.5, font: bold, color: navy });
