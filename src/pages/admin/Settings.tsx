@@ -42,7 +42,7 @@ export function Settings() {
     q.refetch();
   };
 
-  const uploadBranding = async (kind: 'logo_url' | 'signatory_image_url' | 'cert_background_url', file: File) => {
+  const uploadBranding = async (kind: 'logo_url' | 'signatory_image_url' | 'cert_background_url' | 'company_seal_url', file: File) => {
     setUploading(kind);
     const path = `${kind}-${Date.now()}-${file.name}`;
     const up = await supabase.storage.from('branding').upload(path, file, { upsert: true });
@@ -77,6 +77,12 @@ export function Settings() {
             url={org.signatory_image_url}
             busy={uploading === 'signatory_image_url'}
             onFile={(f) => uploadBranding('signatory_image_url', f)}
+          />
+          <BrandingSlot
+            label="Company seal / stamp"
+            url={org.company_seal_url}
+            busy={uploading === 'company_seal_url'}
+            onFile={(f) => uploadBranding('company_seal_url', f)}
           />
           <div className="sm:col-span-2">
             <BrandingSlot

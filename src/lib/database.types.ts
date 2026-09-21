@@ -1177,6 +1177,7 @@ export type Database = {
         Row: {
           cert_background_url: string | null
           cert_id_prefix: string
+          company_seal_url: string | null
           default_cooldown_hours: number
           default_max_attempts: number
           default_pass_pct: number
@@ -1196,6 +1197,7 @@ export type Database = {
         Insert: {
           cert_background_url?: string | null
           cert_id_prefix?: string
+          company_seal_url?: string | null
           default_cooldown_hours?: number
           default_max_attempts?: number
           default_pass_pct?: number
@@ -1215,6 +1217,7 @@ export type Database = {
         Update: {
           cert_background_url?: string | null
           cert_id_prefix?: string
+          company_seal_url?: string | null
           default_cooldown_hours?: number
           default_max_attempts?: number
           default_pass_pct?: number
