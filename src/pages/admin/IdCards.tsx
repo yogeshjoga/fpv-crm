@@ -278,14 +278,14 @@ export function IdCards() {
                       </Button>
                       {writable && (
                         <>
-                          <Button variant="ghost" onClick={() => regenerate(c)} title="Create a fresh card for this person — picks up any design or detail changes">
+                          <Button variant="ghost" onClick={() => regenerate(c)} title="Open a form to change the type, workshop or dates before rebuilding this card">
                             Regenerate
                           </Button>
                           <Button
                             variant="ghost"
                             onClick={() => resend(c)}
                             loading={resendingId === c.id}
-                            title="Re-sends this exact file, unchanged — use Regenerate to pick up design or detail changes"
+                            title="Rebuilds this card from its current details (same type/workshop/dates) and re-sends it — always uses the latest template"
                           >
                             <Send size={13} /> Resend
                           </Button>
