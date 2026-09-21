@@ -180,22 +180,28 @@ Deno.serve(async (req) => {
 
     // ---- front -------------------------------------------------------------
     const front = pdf.addPage([CARD_W, CARD_H]);
-    // Corner accents, matching the certificate's navy/gold trim.
-    front.drawSvgPath('M0 0 L60 0 L0 34 Z', { x: 0, y: CARD_H, color: navy, opacity: 0.9 });
-    front.drawSvgPath('M0 0 L-46 0 L0 26 Z', { x: CARD_W, y: CARD_H, color: gold });
+    // Corner accents, matching the certificate's navy/gold trim. Kept small and tucked
+    // into the very corner (max x-reach ~22pt at the header's y-range) so they never sit
+    // under the logo/org-name text — they used to be large enough to swallow it whole,
+    // and since the fallback org-name text is also navy, the overlapping part vanished.
+    front.drawSvgPath('M0 0 L36 0 L0 20 Z', { x: 0, y: CARD_H, color: navy, opacity: 0.9 });
+    front.drawSvgPath('M0 0 L-28 0 L0 16 Z', { x: CARD_W, y: CARD_H, color: gold });
 
+    const headerX = 26;
     if (logo) {
       const h = 24;
       const w = (logo.width * h) / logo.height;
-      front.drawImage(logo, { x: 10, y: CARD_H - 32, width: w, height: h });
+      front.drawImage(logo, { x: headerX, y: CARD_H - 32, width: w, height: h });
     } else {
-      front.drawText(orgName.toUpperCase(), { x: 10, y: CARD_H - 22, size: 10, font: bold, color: navy });
+      front.drawText(orgName.toUpperCase(), { x: headerX, y: CARD_H - 22, size: 10, font: bold, color: navy });
     }
     const frontLabel = `${TYPE_LABEL[cardType].split('').join(' ')}   I D E N T I T Y   C A R D`;
     front.drawText(frontLabel, { x: 10, y: CARD_H - 40, size: 5, font: reg, color: goldDark });
     front.drawLine({ start: { x: 10, y: CARD_H - 45 }, end: { x: CARD_W - 10, y: CARD_H - 45 }, thickness: 0.75, color: gold });
 
-    const photoBox = { x: 10, y: 47, w: 52, h: 62 };
+    // Shifted down 5pt from the divider line so the photo box has clear air below it
+    // instead of visually touching/cutting into the gold line.
+    const photoBox = { x: 10, y: 42, w: 52, h: 62 };
     front.drawRectangle({ x: photoBox.x, y: photoBox.y, width: photoBox.w, height: photoBox.h, borderColor: gold, borderWidth: 1, color: navyTint });
     if (photo) {
       const scale = Math.min(photoBox.w / photo.width, photoBox.h / photo.height);
@@ -212,15 +218,15 @@ Deno.serve(async (req) => {
     const textX = photoBox.x + photoBox.w + 8;
     const textW = CARD_W - textX - 8;
     const name = winAnsiSafe(student.full_name || '') || student.email;
-    front.drawText(name, { x: textX, y: 99, size: fitSize(name, bold, textW, 11), font: bold, color: navy });
-    front.drawText('ID', { x: textX, y: 85, size: 6.5, font: reg, color: muted });
-    front.drawText(cardNumber, { x: textX + 12, y: 85, size: 7.5, font: bold, color: ink });
+    front.drawText(name, { x: textX, y: 94, size: fitSize(name, bold, textW, 11), font: bold, color: navy });
+    front.drawText('ID', { x: textX, y: 80, size: 6.5, font: reg, color: muted });
+    front.drawText(cardNumber, { x: textX + 12, y: 80, size: 7.5, font: bold, color: ink });
     for (const [i, line] of wrap(roleLine, reg, 7, textW).slice(0, 2).entries()) {
-      front.drawText(line, { x: textX, y: 72 - i * 9, size: 7, font: reg, color: ink });
+      front.drawText(line, { x: textX, y: 67 - i * 9, size: 7, font: reg, color: ink });
     }
     front.drawText(`Valid ${fmtDate(validFrom)} – ${fmtDate(validUntil)}`, {
       x: textX,
-      y: 51,
+      y: 46,
       size: 6,
       font: reg,
       color: muted,
@@ -289,7 +295,7 @@ Deno.serve(async (req) => {
       font: reg,
       color: muted,
     });
-    back.drawSvgPath('M0 0 L-60 0 L0 -34 Z', { x: CARD_W, y: 0, color: navy, opacity: 0.9 });
+    back.drawSvgPath('M0 0 L-36 0 L0 -20 Z', { x: CARD_W, y: 0, color: navy, opacity: 0.9 });
 
     const pdfBytes = await pdf.save();
     const pdfPath = `${student_id}/${cardNumber}.pdf`;
