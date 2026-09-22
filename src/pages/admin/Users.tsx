@@ -185,31 +185,33 @@ export function Users() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-neutral-500">{new Date(p.created_at).toLocaleDateString()}</td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => setViewing(p)}
-                        title="View profile"
-                        className="mr-2 inline-flex items-center gap-1.5 rounded-full p-1.5 text-neutral-400 hover:bg-black/[0.05] hover:text-neutral-700"
-                      >
-                        <Eye size={15} />
-                      </button>
-                      {archived ? (
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-3">
                         <button
-                          onClick={() => restore(p)}
-                          className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:underline"
+                          onClick={() => setViewing(p)}
+                          title="View profile"
+                          className="inline-flex items-center gap-1.5 rounded-full p-1.5 text-neutral-400 hover:bg-black/[0.05] hover:text-neutral-700"
                         >
-                          <RotateCcw size={13} /> Restore
+                          <Eye size={15} />
                         </button>
-                      ) : (
-                        <button
-                          onClick={() => setDeleting(p)}
-                          disabled={isSelf || isLastSuperAdmin}
-                          title={isSelf ? "You can't delete your own account" : isLastSuperAdmin ? 'At least one super admin must remain' : 'Delete user'}
-                          className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-neutral-400"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
+                        {archived ? (
+                          <button
+                            onClick={() => restore(p)}
+                            className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:underline"
+                          >
+                            <RotateCcw size={13} /> Restore
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setDeleting(p)}
+                            disabled={isSelf || isLastSuperAdmin}
+                            title={isSelf ? "You can't delete your own account" : isLastSuperAdmin ? 'At least one super admin must remain' : 'Delete user'}
+                            className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-neutral-400"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
