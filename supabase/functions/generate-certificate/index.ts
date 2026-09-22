@@ -120,15 +120,28 @@ Deno.serve(async (req) => {
         by -= 18;
       }
 
-      const verifyX = PAGE_W * 0.95;
-      const verifyRight = (text: string, y: number, font: Awaited<ReturnType<PDFDocument['embedFont']>>, size: number, color = navy) => {
-        const w = font.widthOfTextAtSize(text, size);
-        page.drawText(text, { x: verifyX - w, y, size, font, color });
-      };
-      verifyRight('Scan or visit', PAGE_H * 0.955, reg, 8, navy);
-      verifyRight(String(org.verify_base_url || 'egirerobotics.com').replace(/^https?:\/\//, ''), PAGE_H * 0.935, bold, 8, gold);
-      for (const [i, line] of wrap("to confirm this certificate's holder, course and issue date.", reg, 7.5, PAGE_W * 0.19).entries()) {
-        verifyRight(line, PAGE_H * 0.918 - i * 11, reg, 7.5, navy);
+      // QR code straight to the public verification page — sits in the open sky area
+      // top-right that the template's own corner-bracket flourish already marks out,
+      // clear of the mountain art and the "Small Drones Big Dreams" script below it.
+      try {
+        const qrDataUrl: string = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 300 });
+        const qrPng = await pdf.embedPng(qrDataUrl);
+        const qrSize = 58;
+        const qrRight = PAGE_W * 0.95;
+        const qrTop = PAGE_H * 0.975;
+        const qrX = qrRight - qrSize;
+        const qrY = qrTop - qrSize;
+        page.drawImage(qrPng, { x: qrX, y: qrY, width: qrSize, height: qrSize });
+
+        const captionRight = qrX - 6;
+        const capRight = (text: string, y: number, font: Awaited<ReturnType<PDFDocument['embedFont']>>, size: number, color = navy) => {
+          const w = font.widthOfTextAtSize(text, size);
+          page.drawText(text, { x: captionRight - w, y, size, font, color });
+        };
+        capRight('Scan to verify', qrTop - 10, bold, 8, gold);
+        capRight(String(org.org_name || 'EgireRobotics'), qrTop - 22, reg, 7, navy);
+      } catch (e) {
+        console.error('certificate QR render failed', e);
       }
 
       page.drawText(`Certificate ID`, { x: PAGE_W * 0.06, y: PAGE_H * 0.135, size: 9, font: bold, color: navy });
