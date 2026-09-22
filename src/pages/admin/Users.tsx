@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { GraduationCap, RotateCcw, Trash2 } from 'lucide-react';
+import { CreditCard, Download, Eye, GraduationCap, RotateCcw, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { invokeFn } from '../../lib/functions';
 import { useQuery, unwrap } from '../../lib/useQuery';
+import { AnswerValue } from '../../components/FormAnswerValue';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, Button, Checkbox, Field, Modal, PageHeader, PasswordInput, Select, Spinner, TextInput, useToast } from '../../components/ui/kit';
 import type { Tables } from '../../lib/database.types';
@@ -22,12 +23,36 @@ interface EnrollmentRow {
   status: string;
 }
 
+interface RegistrationDetail {
+  id: string;
+  source: 'registration_form' | 'google_form' | 'csv';
+  answers: Record<string, unknown>;
+  status: 'pending' | 'accepted' | 'rejected';
+  review_note: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  payment_status: 'unpaid' | 'paid' | 'waived';
+  payment_amount: number | null;
+  payment_ref: string | null;
+  payment_method: string | null;
+  requested_course: { title: string } | null;
+}
+
+interface IdCardDetail {
+  card_number: string;
+  card_type: string;
+  pdf_path: string;
+  issued_at: string;
+  valid_until: string | null;
+}
+
 export function Users() {
   const { profile: me } = useAuth();
   const toast = useToast();
   const [search, setSearch] = useState('');
   const [manage, setManage] = useState<Profile | null>(null);
   const [deleting, setDeleting] = useState<Profile | null>(null);
+  const [viewing, setViewing] = useState<Profile | null>(null);
   const [showArchived, setShowArchived] = useState(false);
 
   const q = useQuery(async () => {
@@ -161,6 +186,13 @@ export function Users() {
                     </td>
                     <td className="px-4 py-3 text-neutral-500">{new Date(p.created_at).toLocaleDateString()}</td>
                     <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => setViewing(p)}
+                        title="View profile"
+                        className="mr-2 inline-flex items-center gap-1.5 rounded-full p-1.5 text-neutral-400 hover:bg-black/[0.05] hover:text-neutral-700"
+                      >
+                        <Eye size={15} />
+                      </button>
                       {archived ? (
                         <button
                           onClick={() => restore(p)}
@@ -200,6 +232,15 @@ export function Users() {
 
       {deleting && (
         <DeleteUserModal target={deleting} onClose={() => setDeleting(null)} onDeleted={q.refetch} />
+      )}
+
+      {viewing && (
+        <ProfileModal
+          student={viewing}
+          courses={q.data?.courses ?? []}
+          activeCourseIds={activeCourseIds(viewing.id)}
+          onClose={() => setViewing(null)}
+        />
       )}
     </div>
   );
@@ -315,6 +356,170 @@ function ManageAccessModal({
         <Button variant="ghost" onClick={onClose}>
           Done
         </Button>
+      </div>
+    </Modal>
+  );
+}
+
+/** Everything staff would want to see about a student in one place: photo, contact
+ * info, active enrollments, their ID card, and the original registration intake
+ * (form answers, uploaded documents, payment) that was captured before they were
+ * accepted — that record lives on, but nothing on the Users page surfaced it. */
+function ProfileModal({
+  student,
+  courses,
+  activeCourseIds,
+  onClose,
+}: {
+  student: Profile;
+  courses: CourseRow[];
+  activeCourseIds: Set<string>;
+  onClose: () => void;
+}) {
+  const toast = useToast();
+
+  const q = useQuery(async () => {
+    const [registration, card] = await Promise.all([
+      unwrap(
+        supabase
+          .from('registrations')
+          .select(
+            'id, source, answers, status, review_note, reviewed_at, created_at, payment_status, payment_amount, payment_ref, payment_method, requested_course:courses(title)',
+          )
+          .eq('created_profile_id', student.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ) as Promise<RegistrationDetail | null>,
+      unwrap(
+        supabase
+          .from('id_cards')
+          .select('card_number, card_type, pdf_path, issued_at, valid_until')
+          .eq('student_id', student.id)
+          .maybeSingle(),
+      ) as Promise<IdCardDetail | null>,
+    ]);
+    return { registration, card };
+  }, [student.id]);
+
+  const downloadCard = async (path: string) => {
+    const { data, error } = await supabase.storage.from('id-cards').createSignedUrl(path, 120);
+    if (error || !data) return toast('Could not open the ID card', 'error');
+    window.open(data.signedUrl, '_blank');
+  };
+
+  const enrolledTitles = courses.filter((c) => activeCourseIds.has(c.id)).map((c) => c.title);
+  const reg = q.data?.registration ?? null;
+  const card = q.data?.card ?? null;
+  const answers = Object.entries(reg?.answers ?? {});
+
+  return (
+    <Modal open onClose={onClose} title="Student profile" wide>
+      <div className="space-y-4">
+        <div className="flex items-center gap-4">
+          {student.avatar_url ? (
+            <img
+              src={student.avatar_url}
+              alt={student.full_name}
+              className="h-16 w-16 rounded-full border border-white/60 object-cover"
+            />
+          ) : (
+            <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/60 bg-white/60 text-lg font-semibold text-neutral-500">
+              {(student.full_name || student.email).slice(0, 1).toUpperCase()}
+            </div>
+          )}
+          <div>
+            <div className="text-base font-semibold text-neutral-900">{student.full_name || '—'}</div>
+            <div className="text-sm text-neutral-500">
+              {student.email}
+              {student.phone ? ` · ${student.phone}` : ''}
+            </div>
+            <div className="mt-1.5 flex items-center gap-2">
+              <Badge tone="neutral">{student.role}</Badge>
+              <Badge tone={student.status === 'active' ? 'green' : student.status === 'suspended' ? 'red' : 'amber'}>
+                {student.status}
+              </Badge>
+              <span className="text-xs text-neutral-400">Joined {new Date(student.created_at).toLocaleDateString()}</span>
+            </div>
+          </div>
+        </div>
+
+        {q.loading ? (
+          <Spinner />
+        ) : (
+          <>
+            <div className="rounded-2xl border border-white/60 bg-white/40 p-4">
+              <div className="mb-2 text-sm font-medium text-neutral-700">Enrolled courses</div>
+              {enrolledTitles.length ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {enrolledTitles.map((t) => (
+                    <Badge key={t} tone="blue">
+                      {t}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-neutral-400">No active course access.</p>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-white/60 bg-white/40 p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-sm font-medium text-neutral-700">ID card</div>
+                {card && (
+                  <Button variant="ghost" onClick={() => downloadCard(card.pdf_path)}>
+                    <Download size={13} /> Download
+                  </Button>
+                )}
+              </div>
+              {card ? (
+                <div className="text-sm text-neutral-600">
+                  <span className="font-mono">{card.card_number}</span> · {card.card_type} · issued{' '}
+                  {new Date(card.issued_at).toLocaleDateString()}
+                  {card.valid_until && ` · valid until ${new Date(card.valid_until).toLocaleDateString()}`}
+                </div>
+              ) : (
+                <p className="flex items-center gap-1.5 text-sm text-neutral-400">
+                  <CreditCard size={14} /> No ID card issued yet.
+                </p>
+              )}
+            </div>
+
+            {reg && (
+              <div className="rounded-2xl border border-white/60 bg-white/40 p-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="text-sm font-medium text-neutral-700">Registration details</div>
+                  <Badge tone={reg.payment_status === 'unpaid' ? 'neutral' : 'green'}>
+                    {reg.payment_status === 'waived' ? 'fee waived' : reg.payment_status}
+                    {reg.payment_amount ? ` · ₹${reg.payment_amount.toLocaleString('en-IN')}` : ''}
+                  </Badge>
+                </div>
+                {reg.requested_course?.title && (
+                  <div className="mb-2 text-sm text-neutral-500">Requested: {reg.requested_course.title}</div>
+                )}
+                {!!answers.length && (
+                  <dl className="space-y-2 text-sm">
+                    {answers.map(([k, v]) => (
+                      <div key={k} className="grid grid-cols-[160px_1fr] gap-3">
+                        <dt className="text-neutral-500">{k}</dt>
+                        <dd className="text-neutral-900">
+                          <AnswerValue value={v} />
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+                {reg.review_note && <p className="mt-2 text-xs text-neutral-400">Note: {reg.review_note}</p>}
+              </div>
+            )}
+          </>
+        )}
+
+        <div className="flex justify-end">
+          <Button variant="ghost" onClick={onClose}>
+            Close
+          </Button>
+        </div>
       </div>
     </Modal>
   );
