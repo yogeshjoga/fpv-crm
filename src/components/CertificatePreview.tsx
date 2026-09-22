@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import QRCode from 'qrcode';
 
 /** CR80-style page size used by the generate-certificate edge function — kept in sync
  * with `PAGE_W`/`PAGE_H` there. Every position below is the exact px/pt value that
@@ -28,6 +29,7 @@ export function CertificatePreview({ data }: { data: CertificatePreviewData }) {
   const { certId, studentName, courseTitle, certType, scorePct, issuedAt, orgName, verifyBaseUrl, backgroundUrl } = data;
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const el = wrapperRef.current;
@@ -40,8 +42,21 @@ export function CertificatePreview({ data }: { data: CertificatePreviewData }) {
     return () => ro.disconnect();
   }, []);
 
+  // Same URL, and the same corner spot, that the real PDF's QR code links to and
+  // sits in — a scan (of the printed certificate) or this preview both land on
+  // the same /verify/<certId> page.
+  const verifyUrl = `${verifyBaseUrl.replace(/\/+$/, '')}/verify/${certId}`;
+  useEffect(() => {
+    let live = true;
+    QRCode.toDataURL(verifyUrl, { margin: 1, width: 300 })
+      .then((url) => live && setQrDataUrl(url))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [verifyUrl]);
+
   const issuedLabel = new Date(issuedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-  const domain = verifyBaseUrl.replace(/^https?:\/\//, '') || 'egirerobotics.com';
   const blurb =
     `has successfully completed the ${courseTitle} program conducted by ${orgName}` +
     (scorePct != null ? ` and achieved a score of ${Number(scorePct)}% in the certification exam.` : '.');
@@ -82,17 +97,25 @@ export function CertificatePreview({ data }: { data: CertificatePreviewData }) {
               {blurb}
             </div>
 
-            <div className="absolute text-right" style={{ right: PAGE_W - 0.95 * PAGE_W, bottom: 0.955 * PAGE_H, fontSize: 8, color: navy }}>
-              Scan or visit
-            </div>
-            <div className="absolute text-right font-bold" style={{ right: PAGE_W - 0.95 * PAGE_W, bottom: 0.935 * PAGE_H, fontSize: 8, color: gold }}>
-              {domain}
+            {qrDataUrl && (
+              <img
+                src={qrDataUrl}
+                alt="Scan to verify"
+                className="absolute"
+                style={{ right: PAGE_W - 0.95 * PAGE_W, bottom: 0.975 * PAGE_H - 58, width: 58, height: 58 }}
+              />
+            )}
+            <div
+              className="absolute text-right font-bold"
+              style={{ right: PAGE_W - (0.95 * PAGE_W - 58) + 6, bottom: 0.975 * PAGE_H - 10, fontSize: 8, color: gold }}
+            >
+              Scan to verify
             </div>
             <div
-              className="absolute text-right leading-[11px]"
-              style={{ right: PAGE_W - 0.95 * PAGE_W, bottom: 0.918 * PAGE_H - 22, width: 0.19 * PAGE_W, fontSize: 7.5, color: navy }}
+              className="absolute text-right"
+              style={{ right: PAGE_W - (0.95 * PAGE_W - 58) + 6, bottom: 0.975 * PAGE_H - 22, fontSize: 7, color: navy }}
             >
-              to confirm this certificate's holder, course and issue date.
+              {orgName}
             </div>
 
             <div className="absolute" style={{ left: 0.06 * PAGE_W, bottom: 0.135 * PAGE_H, fontSize: 9 }}>
