@@ -246,52 +246,35 @@ export function IdCards() {
           description="Student cards are issued and emailed automatically when a registration is accepted. Coordinator and volunteer cards are generated here."
         />
       ) : (
-        <GlassCard className="overflow-x-auto p-2">
-          <table className="w-full min-w-[760px] text-sm">
-            <thead>
-              <tr className="text-left text-xs uppercase tracking-wide text-neutral-400">
-                <th className="px-4 py-3">Card ID</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">Person</th>
-                <th className="px-4 py-3">Course / workshop</th>
-                <th className="px-4 py-3">Valid</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/50">
-              {rows.map((c) => (
-                <tr key={c.id}>
-                  <td className="px-4 py-3 font-mono text-neutral-800">{c.card_number}</td>
-                  <td className="px-4 py-3">
-                    <Badge tone={c.card_type === 'student' ? 'blue' : c.card_type === 'coordinator' ? 'amber' : 'green'}>
-                      {TYPE_LABEL[c.card_type] ?? c.card_type}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-neutral-900">{c.student?.full_name}</div>
-                    <div className="text-xs text-neutral-500">{c.student?.email}</div>
-                  </td>
-                  <td className="px-4 py-3 text-neutral-600">
-                    {c.course?.title ?? c.workshop_name ?? <Badge tone="neutral">General</Badge>}
-                    {c.workshop_location && <div className="text-xs text-neutral-400">{c.workshop_location}</div>}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
-                    <div>{fmtCardDateTime(c.valid_from)}</div>
-                    <div className="text-neutral-400">→ {fmtCardDateTime(c.valid_until)}</div>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => setViewingCard(c)}
-                      title="View card details"
-                      className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-white"
-                    >
-                      <Eye size={13} /> View
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <GlassCard className="divide-y divide-white/50 p-2">
+          {rows.map((c) => (
+            <div key={c.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+              <div className="min-w-[160px]">
+                <div className="font-mono text-xs text-neutral-500">{c.card_number}</div>
+                <div className="font-medium text-neutral-900">{c.student?.full_name}</div>
+                <div className="text-xs text-neutral-500">{c.student?.email}</div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone={c.card_type === 'student' ? 'blue' : c.card_type === 'coordinator' ? 'amber' : 'green'}>
+                  {TYPE_LABEL[c.card_type] ?? c.card_type}
+                </Badge>
+                <div className="text-xs text-neutral-500">
+                  {c.course?.title ?? c.workshop_name ?? 'General'}
+                  {c.workshop_location && <span className="text-neutral-400"> · {c.workshop_location}</span>}
+                </div>
+              </div>
+              <div className="whitespace-nowrap text-xs text-neutral-500">
+                {fmtCardDateTime(c.valid_from)} <span className="text-neutral-400">→</span> {fmtCardDateTime(c.valid_until)}
+              </div>
+              <button
+                onClick={() => setViewingCard(c)}
+                title="View card details"
+                className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-white"
+              >
+                <Eye size={13} /> View
+              </button>
+            </div>
+          ))}
         </GlassCard>
       )}
 
