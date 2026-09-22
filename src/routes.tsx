@@ -33,6 +33,7 @@ import { Approvals } from './pages/admin/Approvals';
 import { Users } from './pages/admin/Users';
 import { AdminCourses } from './pages/admin/AdminCourses';
 import { CourseGroups } from './pages/admin/CourseGroups';
+import { StudentActivity } from './pages/admin/StudentActivity';
 import { AdminHelp } from './pages/admin/AdminHelp';
 import { CourseBuilder } from './pages/admin/CourseBuilder';
 import { QuestionBank } from './pages/admin/QuestionBank';
@@ -99,7 +100,7 @@ export function AppRoutes() {
       <Route
         path="/admin"
         element={
-          <RequireRole roles={['instructor', 'super_admin']}>
+          <RequireRole roles={['instructor', 'coordinator', 'super_admin']}>
             <Shell nav={adminNav} area="Admin" />
           </RequireRole>
         }
@@ -142,6 +143,14 @@ export function AppRoutes() {
           element={
             <RequireModule moduleKey="course-groups">
               <CourseGroups />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="student-activity"
+          element={
+            <RequireModule moduleKey="student-activity">
+              <StudentActivity />
             </RequireModule>
           }
         />

@@ -23,6 +23,7 @@ interface Registration {
   answers: Record<string, unknown>;
   status: 'pending' | 'accepted' | 'rejected';
   review_note: string | null;
+  reviewed_at: string | null;
   created_at: string;
   requested_course_id: string | null;
   payment_status: 'unpaid' | 'paid' | 'waived';
@@ -31,6 +32,7 @@ interface Registration {
   payment_method: string | null;
   form: { title: string } | null;
   requested_course: { id: string; title: string } | null;
+  reviewer: { full_name: string; email: string } | null;
 }
 
 const SOURCE_LABEL: Record<Registration['source'], string> = {
@@ -58,9 +60,10 @@ export function Registrations() {
     let sel = supabase
       .from('registrations')
       .select(
-        'id, source, full_name, email, phone, answers, status, review_note, created_at, requested_course_id, ' +
+        'id, source, full_name, email, phone, answers, status, review_note, reviewed_at, created_at, requested_course_id, ' +
           'payment_status, payment_amount, payment_ref, payment_method, ' +
-          'form:enrollment_forms(title), requested_course:courses(id, title)',
+          'form:enrollment_forms(title), requested_course:courses(id, title), ' +
+          'reviewer:profiles!registrations_reviewed_by_fkey(full_name, email)',
       )
       .order('created_at', { ascending: false });
     if (filter !== 'all') sel = sel.eq('status', filter);
@@ -260,6 +263,12 @@ export function Registrations() {
                 <div className="text-sm text-neutral-500">
                   {r.email} · {new Date(r.created_at).toLocaleDateString()}
                 </div>
+                {r.reviewer && (
+                  <div className="text-xs text-neutral-400">
+                    {r.status === 'accepted' ? 'Accepted' : 'Reviewed'} by {r.reviewer.full_name || r.reviewer.email}
+                    {r.reviewed_at ? ` · ${new Date(r.reviewed_at).toLocaleDateString()}` : ''}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <Badge tone="neutral">{SOURCE_LABEL[r.source]}</Badge>
@@ -546,7 +555,9 @@ function ReviewModal({
             </>
           ) : (
             <p className="text-sm text-neutral-500">
-              {reg.status === 'accepted' ? 'Accepted.' : 'Rejected.'}
+              {reg.status === 'accepted' ? 'Accepted' : 'Rejected'}
+              {reg.reviewer ? ` by ${reg.reviewer.full_name || reg.reviewer.email}` : ''}
+              {reg.reviewed_at ? ` on ${new Date(reg.reviewed_at).toLocaleString()}` : ''}.
               {reg.review_note ? ` Note: ${reg.review_note}` : ''}
             </p>
           )}

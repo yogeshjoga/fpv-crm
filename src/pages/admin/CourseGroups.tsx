@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { BookOpen, FolderPlus, Layers3, Trash2, Users as UsersIcon } from 'lucide-react';
+import { BookOpen, FolderPlus, Layers3, ShieldCheck, Trash2, Users as UsersIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
@@ -14,6 +14,7 @@ type Course = Tables<'courses'>;
 type Profile = Tables<'profiles'>;
 type GroupCourse = Tables<'course_group_courses'>;
 type GroupMember = Tables<'course_group_members'>;
+type GroupCoordinator = Tables<'course_group_coordinators'>;
 
 export function CourseGroups() {
   const { profile } = useAuth();
@@ -23,22 +24,26 @@ export function CourseGroups() {
   const [creating, setCreating] = useState(false);
   const [coursesFor, setCoursesFor] = useState<Group | null>(null);
   const [studentsFor, setStudentsFor] = useState<Group | null>(null);
+  const [coordinatorsFor, setCoordinatorsFor] = useState<Group | null>(null);
   const [deleting, setDeleting] = useState<Group | null>(null);
 
   const q = useQuery(async () => {
-    const [groups, courses, students, groupCourses, groupMembers] = await Promise.all([
+    const [groups, courses, students, coordinators, groupCourses, groupMembers, groupCoordinators] = await Promise.all([
       unwrap(supabase.from('course_groups').select('*').order('created_at', { ascending: false })) as Promise<Group[]>,
       unwrap(supabase.from('courses').select('*').order('title')) as Promise<Course[]>,
       unwrap(supabase.from('profiles').select('*').eq('role', 'student').is('archived_at', null).order('full_name')) as Promise<Profile[]>,
+      unwrap(supabase.from('profiles').select('*').eq('role', 'coordinator').is('archived_at', null).order('full_name')) as Promise<Profile[]>,
       unwrap(supabase.from('course_group_courses').select('*')) as Promise<GroupCourse[]>,
       unwrap(supabase.from('course_group_members').select('*')) as Promise<GroupMember[]>,
+      unwrap(supabase.from('course_group_coordinators').select('*')) as Promise<GroupCoordinator[]>,
     ]);
-    return { groups, courses, students, groupCourses, groupMembers };
+    return { groups, courses, students, coordinators, groupCourses, groupMembers, groupCoordinators };
   }, []);
 
   const countsFor = (groupId: string) => ({
     courses: (q.data?.groupCourses ?? []).filter((gc) => gc.group_id === groupId).length,
     students: (q.data?.groupMembers ?? []).filter((gm) => gm.group_id === groupId).length,
+    coordinators: (q.data?.groupCoordinators ?? []).filter((gc) => gc.group_id === groupId).length,
   });
 
   const deleteGroup = async (g: Group) => {
@@ -94,9 +99,10 @@ export function CourseGroups() {
                   )}
                 </div>
                 {g.description && <p className="mt-2 line-clamp-2 text-sm text-neutral-500">{g.description}</p>}
-                <div className="mt-3 flex gap-2 text-xs text-neutral-500">
+                <div className="mt-3 flex flex-wrap gap-2 text-xs text-neutral-500">
                   <Badge tone="blue">{counts.courses} course{counts.courses === 1 ? '' : 's'}</Badge>
                   <Badge tone="green">{counts.students} student{counts.students === 1 ? '' : 's'}</Badge>
+                  <Badge tone="amber">{counts.coordinators} coordinator{counts.coordinators === 1 ? '' : 's'}</Badge>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Button variant="secondary" onClick={() => setCoursesFor(g)}>
@@ -104,6 +110,9 @@ export function CourseGroups() {
                   </Button>
                   <Button variant="secondary" onClick={() => setStudentsFor(g)}>
                     <UsersIcon size={14} /> Students
+                  </Button>
+                  <Button variant="secondary" onClick={() => setCoordinatorsFor(g)}>
+                    <ShieldCheck size={14} /> Coordinators
                   </Button>
                 </div>
               </GlassCard>
@@ -143,6 +152,20 @@ export function CourseGroups() {
           adminId={profile!.id}
           writable={writable}
           onClose={() => setStudentsFor(null)}
+          onChanged={q.refetch}
+        />
+      )}
+
+      {coordinatorsFor && (
+        <GroupCoordinatorsModal
+          group={coordinatorsFor}
+          allCoordinators={q.data?.coordinators ?? []}
+          memberIds={new Set(
+            (q.data?.groupCoordinators ?? []).filter((gc) => gc.group_id === coordinatorsFor.id).map((gc) => gc.coordinator_id),
+          )}
+          adminId={profile!.id}
+          writable={writable}
+          onClose={() => setCoordinatorsFor(null)}
           onChanged={q.refetch}
         />
       )}
@@ -399,6 +422,105 @@ function GroupStudentsModal({
             </div>
           ))}
         </div>
+      )}
+      <div className="mt-5 flex justify-end">
+        <Button variant="ghost" onClick={onClose}>
+          Done
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+/** Who supervises this group — unlike students, assigning a coordinator here
+ * doesn't touch enrollments at all; it's a pure responsibility assignment. */
+function GroupCoordinatorsModal({
+  group,
+  allCoordinators,
+  memberIds,
+  adminId,
+  writable,
+  onClose,
+  onChanged,
+}: {
+  group: Group;
+  allCoordinators: Profile[];
+  memberIds: Set<string>;
+  adminId: string;
+  writable: boolean;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const toast = useToast();
+  const [search, setSearch] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const rows = useMemo(() => {
+    const s = search.toLowerCase();
+    return allCoordinators.filter((p) => p.full_name.toLowerCase().includes(s) || p.email.toLowerCase().includes(s));
+  }, [allCoordinators, search]);
+
+  const toggle = async (coordinator: Profile, add: boolean) => {
+    setBusy(coordinator.id);
+    if (add) {
+      const { error } = await supabase
+        .from('course_group_coordinators')
+        .insert({ group_id: group.id, coordinator_id: coordinator.id, added_by: adminId });
+      if (error) {
+        setBusy(null);
+        return toast(error.message, 'error');
+      }
+      toast('Coordinator assigned');
+    } else {
+      const { error } = await supabase
+        .from('course_group_coordinators')
+        .delete()
+        .match({ group_id: group.id, coordinator_id: coordinator.id });
+      if (error) {
+        setBusy(null);
+        return toast(error.message, 'error');
+      }
+      toast('Coordinator removed');
+    }
+    setBusy(null);
+    onChanged();
+  };
+
+  return (
+    <Modal open onClose={onClose} title={`Coordinators — ${group.name}`} wide>
+      <p className="mb-3 text-xs text-neutral-500">
+        {writable
+          ? "Assigning a coordinator here doesn't change anyone's course access — it just marks who's responsible for this group."
+          : 'You have read-only access to Course Groups.'}
+      </p>
+      {!allCoordinators.length ? (
+        <p className="text-sm text-neutral-500">No coordinator accounts yet — promote a student to "coordinator" from Users first.</p>
+      ) : (
+        <>
+          <TextInput placeholder="Search name or email…" value={search} onChange={(e) => setSearch(e.target.value)} className="mb-3" />
+          {!rows.length ? (
+            <p className="text-sm text-neutral-500">No coordinators match.</p>
+          ) : (
+            <div className="max-h-[420px] space-y-2 overflow-y-auto">
+              {rows.map((p) => (
+                <div key={p.id} className="flex items-center justify-between rounded-xl border border-white/60 bg-white/40 px-3 py-2">
+                  <div>
+                    <span className="text-sm text-neutral-800">{p.full_name || p.email}</span>
+                    <span className="ml-2 text-xs text-neutral-400">{p.email}</span>
+                  </div>
+                  <span className={busy === p.id ? 'pointer-events-none opacity-50' : ''}>
+                    <Checkbox
+                      label={memberIds.has(p.id) ? 'Assigned' : 'Not assigned'}
+                      checked={memberIds.has(p.id)}
+                      disabled={!writable}
+                      onChange={(e) => toggle(p, e.target.checked)}
+                    />
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
       <div className="mt-5 flex justify-end">
         <Button variant="ghost" onClick={onClose}>

@@ -197,6 +197,49 @@ export type Database = {
           },
         ]
       }
+      course_group_coordinators: {
+        Row: {
+          added_at: string
+          added_by: string | null
+          coordinator_id: string
+          group_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by?: string | null
+          coordinator_id: string
+          group_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string | null
+          coordinator_id?: string
+          group_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_group_coordinators_added_by_fkey"
+            columns: ["added_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_group_coordinators_coordinator_id_fkey"
+            columns: ["coordinator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_group_coordinators_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "course_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_group_courses: {
         Row: {
           added_at: string
@@ -1857,7 +1900,7 @@ export type Database = {
       question_type: "single" | "multi"
       registration_source: "registration_form" | "google_form" | "csv"
       registration_status: "pending" | "accepted" | "rejected"
-      user_role: "super_admin" | "instructor" | "student"
+      user_role: "super_admin" | "instructor" | "student" | "coordinator"
       user_status: "pending" | "active" | "suspended"
     }
     CompositeTypes: {
@@ -2014,7 +2057,7 @@ export const Constants = {
       question_type: ["single", "multi"],
       registration_source: ["registration_form", "google_form", "csv"],
       registration_status: ["pending", "accepted", "rejected"],
-      user_role: ["super_admin", "instructor", "student"],
+      user_role: ["super_admin", "instructor", "student", "coordinator"],
       user_status: ["pending", "active", "suspended"],
     },
   },
