@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { invokeFn } from '../../lib/functions';
+import { toLocalInput, fromLocalInput } from '../../lib/localDateTime';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, Button, EmptyState, Field, Modal, PageHeader, Select, Spinner, TextInput, useToast } from '../../components/ui/kit';
 import type { Tables } from '../../lib/database.types';
@@ -51,12 +52,11 @@ const emptyDraft = () => ({
   workshop_name: '',
   workshop_location: '',
   fee_paid: '',
-  valid_from: new Date().toISOString().slice(0, 10),
-  valid_until: (() => {
-    const d = new Date();
-    d.setFullYear(d.getFullYear() + 1);
-    return d.toISOString().slice(0, 10);
-  })(),
+  // Left blank on purpose: the server fills these in from the registration form's
+  // configured validity window if it has one, else today → +1 year. Only set them
+  // here to override that for this one card.
+  valid_from: '',
+  valid_until: '',
 });
 
 export function IdCards() {
@@ -136,8 +136,8 @@ export function IdCards() {
       workshop_name: c.workshop_name ?? '',
       workshop_location: c.workshop_location ?? '',
       fee_paid: c.fee_paid ?? '',
-      valid_from: c.valid_from ?? emptyDraft().valid_from,
-      valid_until: c.valid_until ?? emptyDraft().valid_until,
+      valid_from: c.valid_from ? toLocalInput(c.valid_from) : emptyDraft().valid_from,
+      valid_until: c.valid_until ? toLocalInput(c.valid_until) : emptyDraft().valid_until,
     });
     setShowGenerate(true);
   };
@@ -151,8 +151,8 @@ export function IdCards() {
       card_type: (p.card_type as CardType) || d.card_type,
       workshop_name: p.workshop_name ?? d.workshop_name,
       workshop_location: p.workshop_location ?? d.workshop_location,
-      valid_from: p.valid_from ?? d.valid_from,
-      valid_until: p.valid_until ?? d.valid_until,
+      valid_from: p.valid_from ? toLocalInput(p.valid_from) : d.valid_from,
+      valid_until: p.valid_until ? toLocalInput(p.valid_until) : d.valid_until,
     }));
   };
 
@@ -190,8 +190,8 @@ export function IdCards() {
         workshop_name: draft.workshop_name || null,
         workshop_location: draft.workshop_location || null,
         fee_paid: draft.fee_paid || null,
-        valid_from: draft.valid_from || null,
-        valid_until: draft.valid_until || null,
+        valid_from: fromLocalInput(draft.valid_from),
+        valid_until: fromLocalInput(draft.valid_until),
       });
       toast('ID card generated and emailed');
       setShowGenerate(false);
@@ -266,9 +266,9 @@ export function IdCards() {
                     {c.workshop_location && <div className="text-xs text-neutral-400">{c.workshop_location}</div>}
                   </td>
                   <td className="px-4 py-3 text-neutral-500">
-                    {c.valid_from ? new Date(c.valid_from).toLocaleDateString() : '—'}
+                    {c.valid_from ? new Date(c.valid_from).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
                     {' – '}
-                    {c.valid_until ? new Date(c.valid_until).toLocaleDateString() : '—'}
+                    {c.valid_until ? new Date(c.valid_until).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
                   </td>
                   <td className="px-4 py-3 text-neutral-500">{c.last_emailed_at ? new Date(c.last_emailed_at).toLocaleDateString() : 'never'}</td>
                   <td className="px-4 py-3">
@@ -358,17 +358,17 @@ export function IdCards() {
             </Field>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Valid from">
-              <TextInput type="date" value={draft.valid_from} onChange={(e) => set('valid_from', e.target.value)} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Valid from" hint="Blank = the registration form's default window, else today">
+              <TextInput type="datetime-local" value={draft.valid_from} onChange={(e) => set('valid_from', e.target.value)} />
             </Field>
-            <Field label="Valid until (expiry)">
-              <TextInput type="date" value={draft.valid_until} onChange={(e) => set('valid_until', e.target.value)} />
-            </Field>
-            <Field label="Fee paid" hint="Auto-filled from their registration if found">
-              <TextInput value={draft.fee_paid} onChange={(e) => set('fee_paid', e.target.value)} placeholder="₹2,500 · Paid" />
+            <Field label="Valid until (expiry)" hint="Blank = the form's default, else 1 year from today">
+              <TextInput type="datetime-local" value={draft.valid_until} onChange={(e) => set('valid_until', e.target.value)} />
             </Field>
           </div>
+          <Field label="Fee paid" hint="Auto-filled from their registration if found">
+            <TextInput value={draft.fee_paid} onChange={(e) => set('fee_paid', e.target.value)} placeholder="₹2,500 · Paid" />
+          </Field>
 
           <div className="flex justify-end">
             <Button onClick={generate} loading={generating} disabled={!draft.student_id}>
@@ -388,11 +388,11 @@ const emptyPresetDraft = () => ({
   card_type: 'student' as CardType,
   workshop_name: '',
   workshop_location: '',
-  valid_from: new Date().toISOString().slice(0, 10),
+  valid_from: toLocalInput(new Date().toISOString()),
   valid_until: (() => {
     const d = new Date();
     d.setFullYear(d.getFullYear() + 1);
-    return d.toISOString().slice(0, 10);
+    return toLocalInput(d.toISOString());
   })(),
 });
 
@@ -411,8 +411,8 @@ function PresetsModal({ open, onClose, presets, onChanged }: { open: boolean; on
       card_type: draft.card_type,
       workshop_name: draft.workshop_name || null,
       workshop_location: draft.workshop_location || null,
-      valid_from: draft.valid_from || null,
-      valid_until: draft.valid_until || null,
+      valid_from: fromLocalInput(draft.valid_from),
+      valid_until: fromLocalInput(draft.valid_until),
     });
     setBusy(false);
     if (error) return toast(error.message, 'error');
@@ -476,10 +476,10 @@ function PresetsModal({ open, onClose, presets, onChanged }: { open: boolean; on
               <TextInput value={draft.workshop_location} onChange={(e) => set('workshop_location', e.target.value)} />
             </Field>
             <Field label="Valid from">
-              <TextInput type="date" value={draft.valid_from} onChange={(e) => set('valid_from', e.target.value)} />
+              <TextInput type="datetime-local" value={draft.valid_from} onChange={(e) => set('valid_from', e.target.value)} />
             </Field>
             <Field label="Valid until">
-              <TextInput type="date" value={draft.valid_until} onChange={(e) => set('valid_until', e.target.value)} />
+              <TextInput type="datetime-local" value={draft.valid_until} onChange={(e) => set('valid_until', e.target.value)} />
             </Field>
           </div>
           <div className="mt-3 flex justify-end">
