@@ -13,8 +13,9 @@ import {
 
 /**
  * Staff: accept a registration -> create (or reuse) the student account,
- * grant the chosen courses, email temp credentials, mark it accepted.
- * Body: { registration_id, course_ids: string[], review_note? }
+ * join them to the chosen course groups (granting every course each group
+ * currently holds), email temp credentials, mark it accepted.
+ * Body: { registration_id, course_group_ids: string[], review_note? }
  */
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -25,7 +26,7 @@ Deno.serve(async (req) => {
     const { data: me } = await admin.from('profiles').select('role').eq('id', caller.id).single();
     if (!me || !['instructor', 'super_admin'].includes(me.role)) throw new HttpError(403, 'Forbidden.');
 
-    const { registration_id, course_ids, review_note, payment } = await req.json();
+    const { registration_id, course_group_ids, review_note, payment } = await req.json();
     if (!registration_id) throw new HttpError(400, 'registration_id is required.');
 
     const { data: reg } = await admin.from('registrations').select('*').eq('id', registration_id).single();
@@ -46,11 +47,18 @@ Deno.serve(async (req) => {
     }
 
     const email = String(reg.email).trim().toLowerCase();
-    const courses: string[] = Array.isArray(course_ids) && course_ids.length
-      ? course_ids
-      : reg.requested_course_id
-        ? [reg.requested_course_id]
-        : [];
+    const groupIds: string[] = Array.isArray(course_group_ids) ? course_group_ids : [];
+
+    // Resolve the courses each selected group currently holds — the actual grant
+    // (below) also makes the student a real course_group_members row, not just an
+    // enrollments row, so a course added to the group later still reaches them.
+    let courses: string[] = [];
+    if (groupIds.length) {
+      const { data: groupCourses } = await admin.from('course_group_courses').select('course_id').in('group_id', groupIds);
+      courses = [...new Set((groupCourses ?? []).map((gc) => gc.course_id))];
+    } else if (reg.requested_course_id) {
+      courses = [reg.requested_course_id];
+    }
 
     // reuse an existing account with this email if there is one
     const { data: existing } = await admin.from('profiles').select('id').eq('email', email).maybeSingle();
@@ -78,6 +86,15 @@ Deno.serve(async (req) => {
         .from('profiles')
         .update({ role: 'student', status: 'active', full_name: reg.full_name ?? '', phone: reg.phone, must_change_password: true })
         .eq('id', profileId);
+    }
+
+    // join the selected groups — same mechanism as CourseGroups.tsx's "add student to
+    // group": a real membership row, not just enrollments, so future courses added to
+    // the group auto-enroll this student too.
+    for (const gid of groupIds) {
+      await admin
+        .from('course_group_members')
+        .upsert({ group_id: gid, student_id: profileId, added_by: caller.id }, { onConflict: 'group_id,student_id' });
     }
 
     // grant courses
