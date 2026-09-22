@@ -98,22 +98,40 @@ Deno.serve(async (req) => {
     const workshopName: string | null = winAnsiSafe(body.workshop_name ?? '') || null;
     const workshopLocation: string | null = winAnsiSafe(body.workshop_location ?? '') || null;
 
-    const issuedAt = new Date();
-    const validFrom = body.valid_from ? new Date(body.valid_from) : issuedAt;
-    const validUntil = body.valid_until
-      ? new Date(body.valid_until)
-      : (() => {
-          const d = new Date(issuedAt);
-          d.setFullYear(d.getFullYear() + 1);
-          return d;
-        })();
+    // If the caller didn't pin down explicit dates (e.g. accept-registration's
+    // auto-issued card never does), fall back to whatever validity window is
+    // configured on the form the student originally registered through.
+    const needsFormWindow = !body.valid_from || !body.valid_until;
 
-    const [{ data: org }, { data: student }, { data: course }] = await Promise.all([
+    const [{ data: org }, { data: student }, { data: course }, { data: latestReg }] = await Promise.all([
       admin.from('org_settings').select('*').single(),
       admin.from('profiles').select('full_name, email, phone, avatar_url').eq('id', student_id).single(),
       course_id ? admin.from('courses').select('title').eq('id', course_id).maybeSingle() : Promise.resolve({ data: null }),
+      needsFormWindow
+        ? admin
+            .from('registrations')
+            .select('form:enrollment_forms(id_card_valid_from, id_card_valid_until)')
+            .eq('created_profile_id', student_id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
     ]);
     if (!org || !student) throw new HttpError(404, 'Missing data for ID card.');
+
+    const formWindow = (latestReg as { form?: { id_card_valid_from: string | null; id_card_valid_until: string | null } } | null)?.form;
+
+    const issuedAt = new Date();
+    const validFrom = body.valid_from ? new Date(body.valid_from) : formWindow?.id_card_valid_from ? new Date(formWindow.id_card_valid_from) : issuedAt;
+    const validUntil = body.valid_until
+      ? new Date(body.valid_until)
+      : formWindow?.id_card_valid_until
+        ? new Date(formWindow.id_card_valid_until)
+        : (() => {
+            const d = new Date(issuedAt);
+            d.setFullYear(d.getFullYear() + 1);
+            return d;
+          })();
 
     // Fee paid isn't typed in per card — pull it from the person's own registration
     // (payment recorded there) so the admin doesn't have to re-enter it by hand.
@@ -337,8 +355,8 @@ Deno.serve(async (req) => {
           fee_paid: feePaid,
           pdf_path: pdfPath,
           issued_at: nowIso,
-          valid_from: validFrom.toISOString().slice(0, 10),
-          valid_until: validUntil.toISOString().slice(0, 10),
+          valid_from: validFrom.toISOString(),
+          valid_until: validUntil.toISOString(),
           last_emailed_at: nowIso,
         },
         { onConflict: 'student_id' },

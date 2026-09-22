@@ -440,6 +440,8 @@ export type Database = {
           created_by: string | null
           description: string
           id: string
+          id_card_valid_from: string | null
+          id_card_valid_until: string | null
           is_open: boolean
           is_public: boolean
           opens_at: string | null
@@ -454,6 +456,8 @@ export type Database = {
           created_by?: string | null
           description?: string
           id?: string
+          id_card_valid_from?: string | null
+          id_card_valid_until?: string | null
           is_open?: boolean
           is_public?: boolean
           opens_at?: string | null
@@ -468,6 +472,8 @@ export type Database = {
           created_by?: string | null
           description?: string
           id?: string
+          id_card_valid_from?: string | null
+          id_card_valid_until?: string | null
           is_open?: boolean
           is_public?: boolean
           opens_at?: string | null
