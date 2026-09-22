@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { BarChart3, Inbox, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
@@ -49,7 +50,11 @@ export function Registrations() {
   const [importing, setImporting] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
 
-  const q = useQuery<{ rows: Registration[]; courses: { id: string; title: string }[] }>(async () => {
+  const q = useQuery<{
+    rows: Registration[];
+    groups: { id: string; name: string }[];
+    groupCourses: { group_id: string; course_id: string }[];
+  }>(async () => {
     let sel = supabase
       .from('registrations')
       .select(
@@ -59,11 +64,14 @@ export function Registrations() {
       )
       .order('created_at', { ascending: false });
     if (filter !== 'all') sel = sel.eq('status', filter);
-    const [rows, courses] = await Promise.all([
+    const [rows, groups, groupCourses] = await Promise.all([
       unwrap(sel) as Promise<Registration[]>,
-      unwrap(supabase.from('courses').select('id, title').order('title')) as Promise<{ id: string; title: string }[]>,
+      unwrap(supabase.from('course_groups').select('id, name').order('name')) as Promise<{ id: string; name: string }[]>,
+      unwrap(supabase.from('course_group_courses').select('group_id, course_id')) as Promise<
+        { group_id: string; course_id: string }[]
+      >,
     ]);
-    return { rows, courses };
+    return { rows, groups, groupCourses };
   }, [filter]);
 
   const pendingCount = useMemo(() => q.data?.rows.filter((r) => r.status === 'pending').length ?? 0, [q.data]);
@@ -279,7 +287,8 @@ export function Registrations() {
       {viewing && q.data && (
         <ReviewModal
           reg={viewing}
-          courses={q.data.courses}
+          groups={q.data.groups}
+          groupCourses={q.data.groupCourses}
           writable={writable}
           onClose={() => setViewing(null)}
           onReject={reject}
@@ -295,21 +304,28 @@ export function Registrations() {
 
 function ReviewModal({
   reg,
-  courses,
+  groups,
+  groupCourses,
   writable,
   onClose,
   onReject,
   onAccepted,
 }: {
   reg: Registration;
-  courses: { id: string; title: string }[];
+  groups: { id: string; name: string }[];
+  groupCourses: { group_id: string; course_id: string }[];
   writable: boolean;
   onClose: () => void;
   onReject: (r: Registration, note: string) => void;
   onAccepted: () => void;
 }) {
   const toast = useToast();
-  const [selected, setSelected] = useState<string[]>(reg.requested_course_id ? [reg.requested_course_id] : []);
+  // Pre-select whichever group(s) already contain the course this person requested,
+  // so the common case (one requested course, that course lives in one workshop
+  // group) needs no extra clicking.
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([
+    ...new Set(groupCourses.filter((gc) => gc.course_id === reg.requested_course_id).map((gc) => gc.group_id)),
+  ]);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [creds, setCreds] = useState<{ email: string; temp_password: string | null; email_skip?: string | null } | null>(null);
@@ -357,7 +373,7 @@ function ReviewModal({
         granted_courses: number;
       }>('accept-registration', {
         registration_id: reg.id,
-        course_ids: selected,
+        course_group_ids: selectedGroups,
         review_note: note,
         payment: paymentPayload(),
       });
@@ -486,21 +502,35 @@ function ReviewModal({
               </div>
 
               <div>
-                <div className="mb-1.5 text-sm font-medium text-neutral-700">Grant access to courses</div>
-                {!courses.length ? (
-                  <p className="text-sm text-neutral-400">No courses yet — create one first.</p>
+                <div className="mb-1.5 text-sm font-medium text-neutral-700">Grant access to a course group</div>
+                <p className="mb-2 text-xs text-neutral-400">
+                  Access is granted per workshop bundle, not per individual course — checking a group enrolls this
+                  student in every course it currently contains, and keeps them enrolled in any course added to it
+                  later.
+                </p>
+                {!groups.length ? (
+                  <p className="text-sm text-neutral-400">
+                    No course groups yet —{' '}
+                    <Link to="/admin/course-groups" className="text-blue-600 underline">
+                      create one first
+                    </Link>
+                    .
+                  </p>
                 ) : (
                   <div className="grid gap-1.5 sm:grid-cols-2">
-                    {courses.map((c) => (
-                      <Checkbox
-                        key={c.id}
-                        label={c.title}
-                        checked={selected.includes(c.id)}
-                        onChange={(e) =>
-                          setSelected((s) => (e.target.checked ? [...s, c.id] : s.filter((x) => x !== c.id)))
-                        }
-                      />
-                    ))}
+                    {groups.map((g) => {
+                      const count = groupCourses.filter((gc) => gc.group_id === g.id).length;
+                      return (
+                        <Checkbox
+                          key={g.id}
+                          label={`${g.name} (${count} course${count === 1 ? '' : 's'})`}
+                          checked={selectedGroups.includes(g.id)}
+                          onChange={(e) =>
+                            setSelectedGroups((s) => (e.target.checked ? [...s, g.id] : s.filter((x) => x !== g.id)))
+                          }
+                        />
+                      );
+                    })}
                   </div>
                 )}
               </div>
