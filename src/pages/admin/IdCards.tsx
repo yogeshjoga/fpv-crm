@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { IdCard as IdCardIcon, Send, Trash2 } from 'lucide-react';
+import { Eye, IdCard as IdCardIcon, Send, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
@@ -12,6 +12,16 @@ import type { Tables } from '../../lib/database.types';
 type CardType = 'student' | 'coordinator' | 'volunteer';
 const CARD_TYPES: CardType[] = ['student', 'coordinator', 'volunteer'];
 const TYPE_LABEL: Record<CardType, string> = { student: 'Student', coordinator: 'Coordinator', volunteer: 'Volunteer' };
+
+/** Compact single-line "21 Sep 2026, 5:30 am" — the full toLocaleString() form wraps
+ * across several lines in the table's Valid column and blows up every row's height. */
+function fmtCardDateTime(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const date = d.toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
+  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return `${date}, ${time}`;
+}
 
 interface Card {
   id: string;
@@ -66,6 +76,7 @@ export function IdCards() {
   const [search, setSearch] = useState('');
   const [generating, setGenerating] = useState(false);
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const [viewingCard, setViewingCard] = useState<Card | null>(null);
 
   const q = useQuery<{ cards: Card[]; accounts: AccountOption[]; courses: CourseOption[]; presets: Preset[] }>(async () => {
     const [cards, accounts, courses, presets] = await Promise.all([
@@ -236,7 +247,7 @@ export function IdCards() {
         />
       ) : (
         <GlassCard className="overflow-x-auto p-2">
-          <table className="w-full min-w-[960px] text-sm">
+          <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-neutral-400">
                 <th className="px-4 py-3">Card ID</th>
@@ -244,7 +255,6 @@ export function IdCards() {
                 <th className="px-4 py-3">Person</th>
                 <th className="px-4 py-3">Course / workshop</th>
                 <th className="px-4 py-3">Valid</th>
-                <th className="px-4 py-3">Last emailed</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -265,33 +275,18 @@ export function IdCards() {
                     {c.course?.title ?? c.workshop_name ?? <Badge tone="neutral">General</Badge>}
                     {c.workshop_location && <div className="text-xs text-neutral-400">{c.workshop_location}</div>}
                   </td>
-                  <td className="px-4 py-3 text-neutral-500">
-                    {c.valid_from ? new Date(c.valid_from).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
-                    {' – '}
-                    {c.valid_until ? new Date(c.valid_until).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
+                  <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
+                    <div>{fmtCardDateTime(c.valid_from)}</div>
+                    <div className="text-neutral-400">→ {fmtCardDateTime(c.valid_until)}</div>
                   </td>
-                  <td className="px-4 py-3 text-neutral-500">{c.last_emailed_at ? new Date(c.last_emailed_at).toLocaleDateString() : 'never'}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" onClick={() => download(c.pdf_path)}>
-                        Download
-                      </Button>
-                      {writable && (
-                        <>
-                          <Button variant="ghost" onClick={() => regenerate(c)} title="Open a form to change the type, workshop or dates before rebuilding this card">
-                            Regenerate
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            onClick={() => resend(c)}
-                            loading={resendingId === c.id}
-                            title="Rebuilds this card from its current details (same type/workshop/dates) and re-sends it — always uses the latest template"
-                          >
-                            <Send size={13} /> Resend
-                          </Button>
-                        </>
-                      )}
-                    </div>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => setViewingCard(c)}
+                      title="View card details"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-white"
+                    >
+                      <Eye size={13} /> View
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -379,7 +374,111 @@ export function IdCards() {
       </Modal>
 
       {writable && <PresetsModal open={showPresets} onClose={() => setShowPresets(false)} presets={q.data?.presets ?? []} onChanged={q.refetch} />}
+
+      {viewingCard && (
+        <CardDetailModal
+          card={rows.find((r) => r.id === viewingCard.id) ?? viewingCard}
+          writable={writable}
+          resending={resendingId === viewingCard.id}
+          onClose={() => setViewingCard(null)}
+          onDownload={() => download(viewingCard.pdf_path)}
+          onRegenerate={() => {
+            setViewingCard(null);
+            regenerate(viewingCard);
+          }}
+          onResend={() => resend(viewingCard)}
+        />
+      )}
     </div>
+  );
+}
+
+/** Everything about one card in a single place — the table row only needs to fit an
+ * "open" action, so Download/Regenerate/Resend and the fuller date/fee/last-emailed
+ * detail live here instead of crowding every row. */
+function CardDetailModal({
+  card,
+  writable,
+  resending,
+  onClose,
+  onDownload,
+  onRegenerate,
+  onResend,
+}: {
+  card: Card;
+  writable: boolean;
+  resending: boolean;
+  onClose: () => void;
+  onDownload: () => void;
+  onRegenerate: () => void;
+  onResend: () => void;
+}) {
+  return (
+    <Modal open onClose={onClose} title={card.card_number}>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-medium text-neutral-900">{card.student?.full_name}</div>
+            <div className="text-sm text-neutral-500">{card.student?.email}</div>
+          </div>
+          <Badge tone={card.card_type === 'student' ? 'blue' : card.card_type === 'coordinator' ? 'amber' : 'green'}>
+            {TYPE_LABEL[card.card_type] ?? card.card_type}
+          </Badge>
+        </div>
+
+        <div className="space-y-2 rounded-2xl border border-white/60 bg-white/40 p-4 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-neutral-500">Course / workshop</span>
+            <span className="text-neutral-900">{card.course?.title ?? card.workshop_name ?? 'General'}</span>
+          </div>
+          {card.workshop_location && (
+            <div className="flex items-center justify-between">
+              <span className="text-neutral-500">Location</span>
+              <span className="text-neutral-900">{card.workshop_location}</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between">
+            <span className="text-neutral-500">Valid from</span>
+            <span className="text-neutral-900">{fmtCardDateTime(card.valid_from)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-neutral-500">Valid until</span>
+            <span className="text-neutral-900">{fmtCardDateTime(card.valid_until)}</span>
+          </div>
+          {card.fee_paid && (
+            <div className="flex items-center justify-between">
+              <span className="text-neutral-500">Fee</span>
+              <span className="text-neutral-900">{card.fee_paid}</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between">
+            <span className="text-neutral-500">Last emailed</span>
+            <span className="text-neutral-900">{card.last_emailed_at ? new Date(card.last_emailed_at).toLocaleString() : 'never'}</span>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="ghost" onClick={onDownload}>
+            Download
+          </Button>
+          {writable && (
+            <>
+              <Button variant="ghost" onClick={onRegenerate} title="Open a form to change the type, workshop or dates before rebuilding this card">
+                Regenerate
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={onResend}
+                loading={resending}
+                title="Rebuilds this card from its current details (same type/workshop/dates) and re-sends it — always uses the latest template"
+              >
+                <Send size={13} /> Resend
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+    </Modal>
   );
 }
 
