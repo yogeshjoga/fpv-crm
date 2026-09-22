@@ -45,7 +45,7 @@ interface AccountOption {
   id: string;
   full_name: string;
   email: string;
-  role: 'student' | 'instructor' | 'super_admin';
+  role: 'student' | 'instructor' | 'coordinator' | 'super_admin';
   status: 'pending' | 'active' | 'suspended';
 }
 

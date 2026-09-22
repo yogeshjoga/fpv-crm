@@ -10,7 +10,9 @@ import { Badge, Button, Checkbox, Field, Modal, PageHeader, PasswordInput, Selec
 import type { Tables } from '../../lib/database.types';
 
 type Profile = Tables<'profiles'>;
-const ROLES = ['student', 'instructor', 'super_admin'] as const;
+// Users manages only the two "user" access tiers, student and coordinator —
+// instructor/super_admin are staff accounts, managed from Employees instead.
+const ROLES = ['student', 'coordinator'] as const;
 const STATUSES = ['pending', 'active', 'suspended'] as const;
 
 interface CourseRow {
@@ -57,17 +59,14 @@ export function Users() {
 
   const q = useQuery(async () => {
     const [profiles, courses, enrollments] = await Promise.all([
-      unwrap(supabase.from('profiles').select('*').order('created_at', { ascending: false })) as Promise<Profile[]>,
+      unwrap(
+        supabase.from('profiles').select('*').in('role', ['student', 'coordinator']).order('created_at', { ascending: false }),
+      ) as Promise<Profile[]>,
       unwrap(supabase.from('courses').select('id, title').eq('status', 'published').order('title')) as Promise<CourseRow[]>,
       unwrap(supabase.from('enrollments').select('student_id, course_id, status')) as Promise<EnrollmentRow[]>,
     ]);
     return { profiles, courses, enrollments };
   }, []);
-
-  const activeSuperAdmins = useMemo(
-    () => (q.data?.profiles ?? []).filter((p) => p.role === 'super_admin' && !p.archived_at),
-    [q.data],
-  );
 
   const rows = useMemo(() => {
     const s = search.toLowerCase();
@@ -103,7 +102,7 @@ export function Users() {
     <div>
       <PageHeader
         title="Users"
-        subtitle="Manage roles and account status"
+        subtitle="Manage students and coordinators — instructor/super_admin accounts live under Employees"
         actions={
           <div className="flex items-center gap-3">
             <Checkbox label="Show deleted" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
@@ -132,7 +131,6 @@ export function Users() {
                 const isSelf = p.id === me?.id;
                 const enrolledCount = activeCourseIds(p.id).size;
                 const archived = !!p.archived_at;
-                const isLastSuperAdmin = p.role === 'super_admin' && !archived && activeSuperAdmins.length <= 1;
                 return (
                   <tr key={p.id} className={archived ? 'opacity-50' : ''}>
                     <td className="px-4 py-3 font-medium text-neutral-900">{p.full_name || '—'}</td>
@@ -204,8 +202,8 @@ export function Users() {
                         ) : (
                           <button
                             onClick={() => setDeleting(p)}
-                            disabled={isSelf || isLastSuperAdmin}
-                            title={isSelf ? "You can't delete your own account" : isLastSuperAdmin ? 'At least one super admin must remain' : 'Delete user'}
+                            disabled={isSelf}
+                            title={isSelf ? "You can't delete your own account" : 'Delete user'}
                             className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-neutral-400"
                           >
                             <Trash2 size={14} />

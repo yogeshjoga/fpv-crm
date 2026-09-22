@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   LayoutDashboard, UserPlus, Inbox, ClipboardCheck, GraduationCap, Layers3, FileQuestion,
   FormInput, CalendarDays, Megaphone, ScrollText, MessageCircle, BarChart3, Briefcase,
-  Users, Settings2, Workflow, ChevronRight, Lock, IdCard,
+  Users, Settings2, Workflow, ChevronRight, Lock, IdCard, Activity,
 } from 'lucide-react';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, PageHeader } from '../../components/ui/kit';
@@ -35,9 +35,10 @@ const SECTIONS: Section[] = [
       'The intake queue for brand-new leads — people who don\'t have an account yet. They arrive from a public registration form, a linked Google Form, or a CSV you import.',
     points: [
       'Each row shows a name/email and whatever custom answers they submitted (including uploaded files/photos).',
-      'Review a row to record payment (unpaid/paid/waived) and pick which course(s) to grant — you must set a payment status before you can accept.',
+      'Review a row to record payment (unpaid/paid/waived) and pick which course group(s) to grant — you must set a payment status before you can accept. Access is granted per group, not per individual course; checking a group also makes the student a real member of it, so a course added to that group later reaches them automatically too.',
       '"Accept & create account" creates their login and emails their credentials automatically. If email delivery fails, the temporary password is shown once so you can hand it over yourself.',
       'If the email already has an account, accepting just adds the extra course access instead of creating a duplicate account.',
+      'Every accept/reject is recorded — who reviewed it and when shows on the row and in the review modal, so there\'s always an audit trail of who approved a given application.',
       'Import CSV accepts a spreadsheet export (name/email/phone columns are auto-detected; everything else becomes custom answers) — handy for migrating an existing list of workshop signups.',
     ],
   },
@@ -85,8 +86,20 @@ const SECTIONS: Section[] = [
       'Create a group, add its courses under "Courses", then add attendees under "Students" — each checkbox instantly enrolls that student in that course via the same access students get from Users.',
       'Adding a new course to an existing group retroactively enrolls everyone already in the group.',
       'Removing a course or student from the group only stops future auto-enrolling — it never revokes access already granted. Revoke access explicitly from Users if a student needs to be pulled out.',
+      '"Coordinators" assigns a coordinator account to supervise the group — a pure responsibility marker with no effect on enrollments (coordinators get their own broad read access to registrations and student activity, separate from group membership).',
       'Deleting a group removes the bundle only; nobody loses access they already have.',
       'Best for: a workshop with a fixed course list and a batch of attendees you enroll all at once, instead of ticking boxes per student per course.',
+    ],
+  },
+  {
+    id: 'student-activity',
+    icon: Activity,
+    title: 'Student Activity',
+    summary: 'Every student\'s course progress, exam results and last-active date, in one combined view — instructors and coordinators both use this instead of piecing it together from other pages.',
+    points: [
+      'Each row summarizes active/completed course counts, exam attempt count and best score, and the most recent day they logged any activity.',
+      '"View" opens the full breakdown: every enrollment with its status, and every exam attempt with its score and pass/fail outcome.',
+      '"Last active" comes from the same day-bucketed study-time counter used for streaks — there\'s no separate login log, so it reflects real activity on the site, not just a login event.',
     ],
   },
   {
@@ -171,7 +184,7 @@ const SECTIONS: Section[] = [
     title: 'Employees',
     summary: 'Manage instructor and super-admin staff accounts — department, designation, join date, role, and active/suspended status.',
     points: [
-      'This is staff (instructor/super_admin) only — students are managed from Users instead.',
+      'This is staff (instructor/super_admin) only — students and coordinators are managed from Users instead.',
       'Changing someone\'s role here changes what they can access across the whole admin area.',
     ],
   },
@@ -180,11 +193,11 @@ const SECTIONS: Section[] = [
     icon: Users,
     who: 'Super Admin only',
     title: 'Users',
-    summary: 'Every account in the system — role, active/suspended status, and per-student course access, all in one table.',
+    summary: 'The two "user" access tiers — student and coordinator — role, active/suspended status, and per-student course access, all in one table. Instructor/super_admin accounts live under Employees instead.',
     points: [
+      'Promoting a student to "coordinator" here is the only way to create a coordinator — there\'s no separate coordinator signup. A coordinator gets broad read access to Registrations and Student Activity (configurable like any other module) and can be assigned to supervise a Course Group.',
       '"Manage access" on a student opens a checklist of every published course — check/uncheck to enroll or revoke, one course at a time.',
       'Deleting a user is a soft delete: it blocks sign-in immediately but keeps their enrollments, exam history and certificates, and requires your own password to confirm. Restore it any time from "Show deleted".',
-      'The last remaining super admin can\'t be deleted or demoted — the system always keeps at least one.',
     ],
   },
   {
@@ -198,7 +211,7 @@ const SECTIONS: Section[] = [
       'Certificate ID prefix, authorized signatory name, support email, and the verification base URL encoded into every certificate\'s QR code.',
       'Default exam parameters (pass %, time limit, questions per exam, max attempts, cooldown) — these only seed new courses; existing courses keep whatever they were set to.',
       'Google Forms integration: gives you a webhook URL and an Apps Script to paste into a Google Form so its responses flow straight into Registrations, including uploaded files. "Regenerate secret" invalidates the old webhook URL, so update any Form still using it afterward.',
-      'Instructor module access: per-section dropdown — Hidden / Read only / Read & write — for Registrations, Enrollment Requests, Account Approvals, Courses, Course Groups, Enrollment Forms, Calendar, Notifications, Certificates, Questions, and Help. "Read only" is the safe default: the instructor can open and view the section, but every button, form and toggle that would create/edit/delete something disappears — this is enforced on the page itself, not just in the sidebar, so it can\'t be bypassed by typing a URL. Analytics, Employees, Users and this Settings page always stay super-admin-only and aren\'t on this list.',
+      'Instructor module access: per-section dropdown — Hidden / Read only / Read & write — for Registrations, Enrollment Requests, Account Approvals, Courses, Course Groups, Student Activity, Enrollment Forms, Calendar, Notifications, Certificates, Questions, and Help. "Read only" is the safe default: staff can open and view the section, but every button, form and toggle that would create/edit/delete something disappears — this is enforced on the page itself, not just in the sidebar, so it can\'t be bypassed by typing a URL. Each dropdown applies to every instructor and coordinator alike — there\'s no separate setting per role or per person. Analytics, Employees, Users and this Settings page always stay super-admin-only and aren\'t on this list.',
     ],
   },
 ];
@@ -241,7 +254,8 @@ export function AdminHelp() {
         </p>
         <p className="mt-2 text-xs text-neutral-500">
           As a super admin, an <strong>Instructor view</strong> button sits in the top-right header of every admin page — click it
-          to preview both the sidebar and the read/write restrictions an instructor sees, based on Company Settings → Instructor module access.
+          to preview both the sidebar and the read/write restrictions an instructor sees, based on Company Settings → Instructor module
+          access. A coordinator account sees the exact same restrictions — there's no separate coordinator preview.
         </p>
       </GlassCard>
 
