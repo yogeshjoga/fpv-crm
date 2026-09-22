@@ -314,7 +314,11 @@ Deno.serve(async (req) => {
       const sealAspect = sealImg.width / sealImg.height;
       const sealH = 48; // 50% larger than the original 32
       const sealW = sealH * sealAspect;
-      back.drawImage(sealImg, { x: sigBoxLeft - sealW * 0.35, y: 12, width: sealW, height: sealH, opacity: 0.9 });
+      // Shifted 50% of its own width right and 20% of its own height up from its
+      // original spot, per request.
+      const sealX = sigBoxLeft - sealW * 0.35 + sealW * 0.5;
+      const sealY = 12 + sealH * 0.2;
+      back.drawImage(sealImg, { x: sealX, y: sealY, width: sealW, height: sealH, opacity: 0.9 });
     }
 
     if (signatureImg) {
