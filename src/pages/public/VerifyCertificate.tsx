@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { BadgeCheck, Search, ShieldX } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Button, Field, TextInput, Spinner } from '../../components/ui/kit';
+import { CertificatePreview } from '../../components/CertificatePreview';
 
 type Result =
   | { state: 'idle' }
@@ -14,8 +15,13 @@ type Result =
       revoked: boolean;
       student_name: string;
       course_title: string;
+      cert_type: string;
       issued_at: string;
       score_pct: number;
+      cert_id_string: string;
+      org_name: string;
+      verify_base_url: string;
+      cert_background_url: string | null;
     };
 
 export function VerifyCertificate() {
@@ -47,10 +53,11 @@ export function VerifyCertificate() {
   };
 
   return (
-    <div className="w-full max-w-xl rounded-[2rem] border border-white/70 bg-white/60 p-8 shadow-[0_8px_40px_rgb(0,0,0,0.06)] backdrop-blur-2xl">
+    <div className="w-full max-w-3xl rounded-[2rem] border border-white/70 bg-white/60 p-8 shadow-[0_8px_40px_rgb(0,0,0,0.06)] backdrop-blur-2xl">
       <h1 className="font-display text-2xl font-semibold text-neutral-900">Certificate verification</h1>
       <p className="mt-1.5 text-sm text-neutral-500">
-        Enter a certificate ID (for example <span className="font-mono">EGR-FPV-2026-000123</span>) to check its authenticity.
+        Enter a certificate ID (for example <span className="font-mono">EGR-FPV-2026-000123</span>) to confirm it was
+        genuinely issued by us and see the certificate itself — no account needed.
       </p>
 
       <form onSubmit={submit} className="mt-6 flex items-end gap-2">
@@ -74,25 +81,33 @@ export function VerifyCertificate() {
         )}
 
         {result.state === 'found' && (
-          <div
-            className={`rounded-2xl border px-5 py-5 ${
-              result.valid ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
-            }`}
-          >
-            <div className={`flex items-center gap-2 text-sm font-semibold ${result.valid ? 'text-green-800' : 'text-red-800'}`}>
+          <div className="space-y-4">
+            <div
+              className={`flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold ${
+                result.valid ? 'border-green-200 bg-green-50 text-green-800' : 'border-red-200 bg-red-50 text-red-800'
+              }`}
+            >
               {result.valid ? <BadgeCheck size={20} /> : <ShieldX size={20} />}
-              {result.valid ? 'Valid certificate' : result.revoked ? 'Certificate revoked' : 'Certificate invalid'}
+              {result.valid
+                ? 'Valid certificate — genuinely issued by us'
+                : result.revoked
+                  ? 'This certificate has been revoked'
+                  : 'Certificate invalid'}
             </div>
-            <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-              <dt className="text-neutral-500">Recipient</dt>
-              <dd className="font-medium text-neutral-900">{result.student_name}</dd>
-              <dt className="text-neutral-500">Course</dt>
-              <dd className="font-medium text-neutral-900">{result.course_title}</dd>
-              <dt className="text-neutral-500">Score</dt>
-              <dd className="font-medium text-neutral-900">{Number(result.score_pct)}%</dd>
-              <dt className="text-neutral-500">Issued</dt>
-              <dd className="font-medium text-neutral-900">{new Date(result.issued_at).toLocaleDateString()}</dd>
-            </dl>
+
+            <CertificatePreview
+              data={{
+                certId: result.cert_id_string,
+                studentName: result.student_name,
+                courseTitle: result.course_title,
+                certType: result.cert_type || 'Participation',
+                scorePct: result.score_pct,
+                issuedAt: result.issued_at,
+                orgName: result.org_name || 'EgireRobotics',
+                verifyBaseUrl: result.verify_base_url || 'egirerobotics.com',
+                backgroundUrl: result.cert_background_url,
+              }}
+            />
           </div>
         )}
       </div>

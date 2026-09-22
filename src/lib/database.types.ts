@@ -1816,12 +1816,17 @@ export type Database = {
       verify_certificate: {
         Args: { p_cert_id: string }
         Returns: {
+          cert_background_url: string
+          cert_id_string: string
+          cert_type: string
           course_title: string
           issued_at: string
+          org_name: string
           revoked: boolean
           score_pct: number
           student_name: string
           valid: boolean
+          verify_base_url: string
         }[]
       }
     }
