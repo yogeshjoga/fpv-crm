@@ -182,9 +182,10 @@ const SECTIONS: Section[] = [
     icon: Briefcase,
     who: 'Super Admin only',
     title: 'Employees',
-    summary: 'Manage instructor and super-admin staff accounts — department, designation, join date, role, and active/suspended status.',
+    summary: 'Manage super-admin, admin and instructor staff accounts — department, designation, join date, role, and active/suspended status.',
     points: [
-      'This is staff (instructor/super_admin) only — students and coordinators are managed from Users instead.',
+      'This is staff (super_admin/admin/instructor) only — students and coordinators are managed from Users instead.',
+      '"Admin" is a co-founder-level tier below super_admin: staff-level access, gated by the same Instructor module access settings as instructor/coordinator — Users, Settings, Employees and Analytics still stay super-admin-only regardless.',
       'Changing someone\'s role here changes what they can access across the whole admin area.',
     ],
   },
@@ -193,7 +194,7 @@ const SECTIONS: Section[] = [
     icon: Users,
     who: 'Super Admin only',
     title: 'Users',
-    summary: 'The two "user" access tiers — student and coordinator — role, active/suspended status, and per-student course access, all in one table. Instructor/super_admin accounts live under Employees instead.',
+    summary: 'The two "user" access tiers — student and coordinator — role, active/suspended status, and per-student course access, all in one table. Super_admin/admin/instructor accounts live under Employees instead.',
     points: [
       'Promoting a student to "coordinator" here is the only way to create a coordinator — there\'s no separate coordinator signup. A coordinator gets broad read access to Registrations and Student Activity (configurable like any other module) and can be assigned to supervise a Course Group.',
       '"Manage access" on a student opens a checklist of every published course — check/uncheck to enroll or revoke, one course at a time.',
@@ -211,7 +212,7 @@ const SECTIONS: Section[] = [
       'Certificate ID prefix, authorized signatory name, support email, and the verification base URL encoded into every certificate\'s QR code.',
       'Default exam parameters (pass %, time limit, questions per exam, max attempts, cooldown) — these only seed new courses; existing courses keep whatever they were set to.',
       'Google Forms integration: gives you a webhook URL and an Apps Script to paste into a Google Form so its responses flow straight into Registrations, including uploaded files. "Regenerate secret" invalidates the old webhook URL, so update any Form still using it afterward.',
-      'Instructor module access: per-section dropdown — Hidden / Read only / Read & write — for Registrations, Enrollment Requests, Account Approvals, Courses, Course Groups, Student Activity, Enrollment Forms, Calendar, Notifications, Certificates, Questions, and Help. "Read only" is the safe default: staff can open and view the section, but every button, form and toggle that would create/edit/delete something disappears — this is enforced on the page itself, not just in the sidebar, so it can\'t be bypassed by typing a URL. Each dropdown applies to every instructor and coordinator alike — there\'s no separate setting per role or per person. Analytics, Employees, Users and this Settings page always stay super-admin-only and aren\'t on this list.',
+      'Instructor module access: per-section dropdown — Hidden / Read only / Read & write — for Registrations, Enrollment Requests, Account Approvals, Courses, Course Groups, Student Activity, Enrollment Forms, Calendar, Notifications, Certificates, Questions, and Help. "Read only" is the safe default: staff can open and view the section, but every button, form and toggle that would create/edit/delete something disappears — this is enforced on the page itself, not just in the sidebar, so it can\'t be bypassed by typing a URL. Each dropdown applies to every instructor, coordinator and admin alike — there\'s no separate setting per role or per person. Analytics, Employees, Users and this Settings page always stay super-admin-only and aren\'t on this list.',
     ],
   },
 ];
@@ -255,7 +256,7 @@ export function AdminHelp() {
         <p className="mt-2 text-xs text-neutral-500">
           As a super admin, an <strong>Instructor view</strong> button sits in the top-right header of every admin page — click it
           to preview both the sidebar and the read/write restrictions an instructor sees, based on Company Settings → Instructor module
-          access. A coordinator account sees the exact same restrictions — there's no separate coordinator preview.
+          access. A coordinator or admin account sees the exact same restrictions — there's no separate preview per role.
         </p>
       </GlassCard>
 

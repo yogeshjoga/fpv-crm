@@ -22,6 +22,7 @@ export interface NavItem {
 
 const roleLabel: Record<string, string> = {
   super_admin: 'Super Admin',
+  admin: 'Admin',
   instructor: 'Instructor',
   coordinator: 'Coordinator',
   student: 'Student',
@@ -35,10 +36,15 @@ export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin'
   useStaffActivityTracker(area === 'Admin');
 
   const canPreviewInstructor = area === 'Admin' && profile?.role === 'super_admin';
-  // Named for the instructor role historically, but coordinators are restricted by
-  // the exact same module-access rules — both are non-super-admin staff.
+  // Named for the instructor role historically, but coordinator/admin are
+  // restricted by the exact same module-access rules — all three are
+  // non-super-admin staff.
   const asInstructor =
-    area === 'Admin' && (profile?.role === 'instructor' || profile?.role === 'coordinator' || (canPreviewInstructor && previewInstructor));
+    area === 'Admin' &&
+    (profile?.role === 'instructor' ||
+      profile?.role === 'coordinator' ||
+      profile?.role === 'admin' ||
+      (canPreviewInstructor && previewInstructor));
   const moduleAccess = useInstructorModuleAccess(area === 'Admin');
 
   const visibleNav = useMemo(() => {

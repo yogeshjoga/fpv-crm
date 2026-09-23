@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
 
     const { email, full_name, role, department, designation, joined_on } = await req.json();
     if (!email?.trim()) throw new HttpError(400, 'Email is required.');
-    const wantRole = ['student', 'instructor', 'super_admin'].includes(role) ? role : 'instructor';
+    const wantRole = ['student', 'instructor', 'admin', 'super_admin'].includes(role) ? role : 'instructor';
 
     const { data: created, error: cErr } = await admin.auth.admin.createUser({
       email: email.trim(),
