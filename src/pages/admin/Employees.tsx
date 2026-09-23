@@ -11,7 +11,7 @@ interface Employee {
   full_name: string;
   email: string;
   phone: string | null;
-  role: 'instructor' | 'super_admin' | 'student';
+  role: 'super_admin' | 'admin' | 'instructor' | 'student';
   status: 'pending' | 'active' | 'suspended';
   staff_details: { department: string; designation: string; joined_on: string | null; employee_code: string | null } | null;
 }
@@ -27,7 +27,7 @@ export function Employees() {
         supabase
           .from('profiles')
           .select('id, full_name, email, phone, role, status, staff_details(department, designation, joined_on, employee_code)')
-          .in('role', ['instructor', 'super_admin'])
+          .in('role', ['super_admin', 'admin', 'instructor'])
           .order('created_at'),
       ) as Promise<Employee[]>,
     [],
@@ -90,9 +90,9 @@ export function Employees() {
                   </td>
                   <td className="px-4 py-3">
                     <Select value={e.role} onChange={(ev) => setRole(e, ev.target.value as Employee['role'])} className="w-36 py-1.5">
-                      <option value="instructor">instructor</option>
                       <option value="super_admin">super_admin</option>
-                      <option value="student">student</option>
+                      <option value="admin">admin</option>
+                      <option value="instructor">instructor</option>
                     </Select>
                   </td>
                   <td className="px-4 py-3">
@@ -163,8 +163,9 @@ function AddEmployee({ open, onClose, onDone }: { open: boolean; onClose: () => 
           </Field>
           <Field label="Role">
             <Select value={form.role} onChange={(e) => set('role', e.target.value)}>
-              <option value="instructor">instructor</option>
               <option value="super_admin">super_admin</option>
+              <option value="admin">admin</option>
+              <option value="instructor">instructor</option>
             </Select>
           </Field>
           <Field label="Department">

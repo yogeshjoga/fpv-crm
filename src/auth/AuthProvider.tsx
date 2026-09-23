@@ -102,7 +102,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     profile,
     isAuthed: !!session,
     isActive: profile?.status === 'active',
-    isStaff: profile?.role === 'instructor' || profile?.role === 'coordinator' || profile?.role === 'super_admin',
+    isStaff:
+      profile?.role === 'instructor' ||
+      profile?.role === 'coordinator' ||
+      profile?.role === 'admin' ||
+      profile?.role === 'super_admin',
     isSuperAdmin: profile?.role === 'super_admin',
     signUp,
     signIn,

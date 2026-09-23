@@ -1900,7 +1900,12 @@ export type Database = {
       question_type: "single" | "multi"
       registration_source: "registration_form" | "google_form" | "csv"
       registration_status: "pending" | "accepted" | "rejected"
-      user_role: "super_admin" | "instructor" | "student" | "coordinator"
+      user_role:
+        | "super_admin"
+        | "instructor"
+        | "student"
+        | "coordinator"
+        | "admin"
       user_status: "pending" | "active" | "suspended"
     }
     CompositeTypes: {
@@ -2057,7 +2062,13 @@ export const Constants = {
       question_type: ["single", "multi"],
       registration_source: ["registration_form", "google_form", "csv"],
       registration_status: ["pending", "accepted", "rejected"],
-      user_role: ["super_admin", "instructor", "student", "coordinator"],
+      user_role: [
+        "super_admin",
+        "instructor",
+        "student",
+        "coordinator",
+        "admin",
+      ],
       user_status: ["pending", "active", "suspended"],
     },
   },

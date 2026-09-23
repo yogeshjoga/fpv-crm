@@ -100,7 +100,7 @@ export function AppRoutes() {
       <Route
         path="/admin"
         element={
-          <RequireRole roles={['instructor', 'coordinator', 'super_admin']}>
+          <RequireRole roles={['instructor', 'coordinator', 'admin', 'super_admin']}>
             <Shell nav={adminNav} area="Admin" />
           </RequireRole>
         }
