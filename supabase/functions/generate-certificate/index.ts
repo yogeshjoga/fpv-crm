@@ -137,7 +137,7 @@ Deno.serve(async (req) => {
         console.error('certificate QR render failed', e);
       }
 
-      const footerX = PAGE_W * 0.06 + 20;
+      const footerX = PAGE_W * 0.06 + 28;
       page.drawText(`Certificate ID`, { x: footerX, y: PAGE_H * 0.135, size: 9, font: bold, color: navy });
       page.drawText(certId, { x: footerX + bold.widthOfTextAtSize('Certificate ID  ', 9), y: PAGE_H * 0.135, size: 9, font: reg, color: rgb(0.3, 0.3, 0.3) });
       page.drawText(`Date of issue`, { x: footerX, y: PAGE_H * 0.11, size: 9, font: bold, color: navy });
