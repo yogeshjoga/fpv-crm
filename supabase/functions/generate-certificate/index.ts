@@ -123,6 +123,7 @@ Deno.serve(async (req) => {
       // QR code straight to the public verification page — sits in the open sky area
       // top-right that the template's own corner-bracket flourish already marks out,
       // clear of the mountain art and the "Small Drones Big Dreams" script below it.
+      // No caption text on purpose — the QR code alone is enough.
       try {
         const qrDataUrl: string = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 300 });
         const qrPng = await pdf.embedPng(qrDataUrl);
@@ -132,14 +133,6 @@ Deno.serve(async (req) => {
         const qrX = qrRight - qrSize;
         const qrY = qrTop - qrSize;
         page.drawImage(qrPng, { x: qrX, y: qrY, width: qrSize, height: qrSize });
-
-        const captionRight = qrX - 6;
-        const capRight = (text: string, y: number, font: Awaited<ReturnType<PDFDocument['embedFont']>>, size: number, color = navy) => {
-          const w = font.widthOfTextAtSize(text, size);
-          page.drawText(text, { x: captionRight - w, y, size, font, color });
-        };
-        capRight('Scan to verify', qrTop - 10, bold, 8, gold);
-        capRight(String(org.org_name || 'EgireRobotics'), qrTop - 22, reg, 7, navy);
       } catch (e) {
         console.error('certificate QR render failed', e);
       }

@@ -97,6 +97,7 @@ export function CertificatePreview({ data }: { data: CertificatePreviewData }) {
               {blurb}
             </div>
 
+            {/* No caption text on purpose — the QR code alone is enough. */}
             {qrDataUrl && (
               <img
                 src={qrDataUrl}
@@ -105,18 +106,6 @@ export function CertificatePreview({ data }: { data: CertificatePreviewData }) {
                 style={{ right: PAGE_W - 0.95 * PAGE_W, bottom: 0.975 * PAGE_H - 58, width: 58, height: 58 }}
               />
             )}
-            <div
-              className="absolute text-right font-bold"
-              style={{ right: PAGE_W - (0.95 * PAGE_W - 58) + 6, bottom: 0.975 * PAGE_H - 10, fontSize: 8, color: gold }}
-            >
-              Scan to verify
-            </div>
-            <div
-              className="absolute text-right"
-              style={{ right: PAGE_W - (0.95 * PAGE_W - 58) + 6, bottom: 0.975 * PAGE_H - 22, fontSize: 7, color: navy }}
-            >
-              {orgName}
-            </div>
 
             <div className="absolute" style={{ left: 0.06 * PAGE_W, bottom: 0.135 * PAGE_H, fontSize: 9 }}>
               <span className="font-bold" style={{ color: navy }}>
