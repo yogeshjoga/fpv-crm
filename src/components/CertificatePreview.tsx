@@ -107,13 +107,13 @@ export function CertificatePreview({ data }: { data: CertificatePreviewData }) {
               />
             )}
 
-            <div className="absolute" style={{ left: 0.06 * PAGE_W, bottom: 0.135 * PAGE_H, fontSize: 9 }}>
+            <div className="absolute" style={{ left: 0.06 * PAGE_W + 20, bottom: 0.135 * PAGE_H, fontSize: 9 }}>
               <span className="font-bold" style={{ color: navy }}>
                 Certificate ID{'  '}
               </span>
               <span style={{ color: '#4d4d4d' }}>{certId}</span>
             </div>
-            <div className="absolute" style={{ left: 0.06 * PAGE_W, bottom: 0.11 * PAGE_H, fontSize: 9 }}>
+            <div className="absolute" style={{ left: 0.06 * PAGE_W + 20, bottom: 0.11 * PAGE_H, fontSize: 9 }}>
               <span className="font-bold" style={{ color: navy }}>
                 Date of issue{'  '}
               </span>
