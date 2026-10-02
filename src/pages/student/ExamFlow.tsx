@@ -32,11 +32,21 @@ interface StartResponse {
   allow_backtrack: boolean;
   questions: { id: string; prompt: string; type: 'single' | 'multi'; options: { id: string; label: string }[] }[];
 }
+interface ReviewItem {
+  question_id: string;
+  prompt: string;
+  type: 'single' | 'multi';
+  your_answers: string[];
+  correct_answers: string[];
+  explanation: string;
+}
 interface SubmitResponse {
   score_pct: number;
   passed: boolean;
   grade_label?: string | null;
   correct_count: number;
+  wrong_count?: number;
+  review?: ReviewItem[];
   total: number;
   cert_id_string?: string;
   cooldown_until?: string;
@@ -172,12 +182,20 @@ export function ExamFlow() {
   }
 
   if (phase === 'result' && result) {
+    const wrongCount = result.wrong_count ?? result.total - result.correct_count;
     return (
+      <div className="mx-auto max-w-3xl space-y-6">
       <GlassCard className="mx-auto max-w-lg p-8 text-center">
         {result.passed ? <CheckCircle2 className="mx-auto text-green-500" size={44} /> : <XCircle className="mx-auto text-red-500" size={44} />}
         <h2 className="mt-3 text-2xl font-semibold text-neutral-900">{result.passed ? 'You passed!' : 'Not this time'}</h2>
         <p className="mt-1 text-neutral-600">
           Score <span className="font-semibold text-neutral-900">{Number(result.score_pct)}%</span> — {result.correct_count}/{result.total} correct
+          {wrongCount > 0 && (
+            <>
+              {' '}
+              · <span className="font-semibold text-red-600">{wrongCount} wrong</span>
+            </>
+          )}
         </p>
         {result.grade_label && (
           <p className="mt-2">
@@ -214,6 +232,44 @@ export function ExamFlow() {
           Back to course
         </Link>
       </GlassCard>
+
+      {result.review && result.review.length > 0 && (
+        <section>
+          <h3 className="text-lg font-semibold text-neutral-900">Review your {result.review.length} wrong {result.review.length === 1 ? 'answer' : 'answers'}</h3>
+          <p className="mt-1 text-sm text-neutral-500">
+            Read the correct answer and the explanation for each question below — this is how you learn the topic before your next attempt.
+          </p>
+          <div className="mt-4 space-y-4">
+            {result.review.map((r, i) => (
+              <GlassCard key={r.question_id} className="p-5">
+                <div className="text-xs font-semibold uppercase tracking-wide text-neutral-400">Question {i + 1}</div>
+                <p className="mt-1 font-medium text-neutral-900">{r.prompt}</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide">
+                      <XCircle size={14} /> Your answer
+                    </div>
+                    <div className="mt-1">{r.your_answers.length ? r.your_answers.join(', ') : 'Not answered'}</div>
+                  </div>
+                  <div className="rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide">
+                      <CheckCircle2 size={14} /> Correct answer
+                    </div>
+                    <div className="mt-1 font-medium">{r.correct_answers.join(', ')}</div>
+                  </div>
+                </div>
+                {r.explanation && (
+                  <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3 text-sm leading-relaxed text-neutral-700">
+                    <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-blue-700">Why — explanation &amp; example</div>
+                    {r.explanation}
+                  </div>
+                )}
+              </GlassCard>
+            ))}
+          </div>
+        </section>
+      )}
+      </div>
     );
   }
 
