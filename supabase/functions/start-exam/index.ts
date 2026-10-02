@@ -56,6 +56,7 @@ Deno.serve(async (req) => {
         attempt_id: latest.id,
         expires_at: latest.expires_at,
         time_limit_min: course.exam_time_limit_min,
+        allow_backtrack: course.allow_backtrack,
         questions,
       });
     }
@@ -125,12 +126,19 @@ Deno.serve(async (req) => {
         attempt_id: race.id,
         expires_at: race.expires_at,
         time_limit_min: course.exam_time_limit_min,
+        allow_backtrack: course.allow_backtrack,
         questions: await buildQuestionSet(admin, race.question_ids_json as string[]),
       });
     }
 
     const questions = await buildQuestionSet(admin, attempt.question_ids_json as string[]);
-    return json({ attempt_id: attempt.id, expires_at: attempt.expires_at, time_limit_min: course.exam_time_limit_min, questions });
+    return json({
+      attempt_id: attempt.id,
+      expires_at: attempt.expires_at,
+      time_limit_min: course.exam_time_limit_min,
+      allow_backtrack: course.allow_backtrack,
+      questions,
+    });
   } catch (e) {
     const status = e instanceof HttpError ? e.status : 500;
     return json({ error: (e as Error).message }, status);

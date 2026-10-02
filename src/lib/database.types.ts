@@ -356,6 +356,7 @@ export type Database = {
       }
       courses: {
         Row: {
+          allow_backtrack: boolean
           cert_type: string
           cooldown_hours: number
           course_code: string
@@ -379,6 +380,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          allow_backtrack?: boolean
           cert_type?: string
           cooldown_hours?: number
           course_code: string
@@ -402,6 +404,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          allow_backtrack?: boolean
           cert_type?: string
           cooldown_hours?: number
           course_code?: string

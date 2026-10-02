@@ -29,6 +29,7 @@ interface StartResponse {
   attempt_id: string;
   expires_at: string;
   time_limit_min: number;
+  allow_backtrack: boolean;
   questions: { id: string; prompt: string; type: 'single' | 'multi'; options: { id: string; label: string }[] }[];
 }
 interface SubmitResponse {
@@ -158,6 +159,7 @@ export function ExamFlow() {
         <p className="mt-2 text-sm text-neutral-600">
           {exam.questions.length} questions · {exam.time_limit_min} minutes. This exam must be taken in fullscreen — if
           you exit fullscreen at any point, the exam will pause until you return.
+          {!exam.allow_backtrack && ' Once you move past a question you cannot return to it, so answer carefully before advancing.'}
         </p>
         <Button className="mt-5" onClick={beginExam}>
           <Maximize size={16} /> Enter fullscreen &amp; start
@@ -279,9 +281,13 @@ export function ExamFlow() {
       </GlassCard>
 
       <div className="mt-4 flex items-center justify-between">
-        <Button variant="secondary" onClick={() => setCurrent((c) => Math.max(0, c - 1))} disabled={current === 0}>
-          <ChevronLeft size={16} /> Prev
-        </Button>
+        {exam.allow_backtrack ? (
+          <Button variant="secondary" onClick={() => setCurrent((c) => Math.max(0, c - 1))} disabled={current === 0}>
+            <ChevronLeft size={16} /> Prev
+          </Button>
+        ) : (
+          <span />
+        )}
         {current < exam.questions.length - 1 ? (
           <Button onClick={() => setCurrent((c) => c + 1)}>
             Next <ChevronRight size={16} />
@@ -294,17 +300,28 @@ export function ExamFlow() {
       </div>
 
       <div className="mt-4 flex flex-wrap gap-1.5">
-        {exam.questions.map((qq, i) => (
-          <button
-            key={qq.id}
-            onClick={() => setCurrent(i)}
-            className={`h-8 w-8 rounded-lg text-xs font-medium ${
-              i === current ? 'bg-[#1a1a1a] text-white' : (answers[qq.id] ?? []).length ? 'bg-blue-100 text-blue-700' : 'bg-white/60 text-neutral-500'
-            }`}
-          >
-            {i + 1}
-          </button>
-        ))}
+        {exam.questions.map((qq, i) => {
+          const locked = !exam.allow_backtrack && i < current;
+          return (
+            <button
+              key={qq.id}
+              onClick={() => !locked && setCurrent(i)}
+              disabled={locked}
+              title={locked ? 'This exam does not allow returning to earlier questions' : undefined}
+              className={`h-8 w-8 rounded-lg text-xs font-medium ${
+                locked
+                  ? 'cursor-not-allowed bg-white/30 text-neutral-300'
+                  : i === current
+                    ? 'bg-[#1a1a1a] text-white'
+                    : (answers[qq.id] ?? []).length
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-white/60 text-neutral-500'
+              }`}
+            >
+              {i + 1}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
