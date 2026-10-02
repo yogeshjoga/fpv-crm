@@ -364,6 +364,9 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string
+          exam_access: string
+          exam_closes_at: string | null
+          exam_opens_at: string | null
           exam_question_count: number
           exam_time_limit_min: number
           grading_mode: string
@@ -389,6 +392,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string
+          exam_access?: string
+          exam_closes_at?: string | null
+          exam_opens_at?: string | null
           exam_question_count?: number
           exam_time_limit_min?: number
           grading_mode?: string
@@ -414,6 +420,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string
+          exam_access?: string
+          exam_closes_at?: string | null
+          exam_opens_at?: string | null
           exam_question_count?: number
           exam_time_limit_min?: number
           grading_mode?: string

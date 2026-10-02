@@ -125,6 +125,7 @@ export function AdminCourses() {
               ) : (
                 <div className="mt-2 text-xs text-neutral-400">Certificate: OF {c.cert_type.toUpperCase()}</div>
               )}
+              <ExamAccessEditor course={c} writable={writable} onSaved={() => q.refetch()} />
               <div className="mt-4 flex flex-wrap gap-2">
                 <Link to={`/admin/courses/${c.id}/build`}>
                   <Button variant="secondary">
@@ -159,6 +160,89 @@ export function AdminCourses() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+const toLocalInput = (iso: string | null) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+function examAccessSummary(c: Course) {
+  if (c.exam_access === 'closed') return 'Exam closed — students cannot start it';
+  if (c.exam_access === 'scheduled') {
+    const from = c.exam_opens_at ? new Date(c.exam_opens_at).toLocaleString() : 'now';
+    const to = c.exam_closes_at ? new Date(c.exam_closes_at).toLocaleString() : 'no end';
+    return `Scheduled: ${from} to ${to}`;
+  }
+  return 'Exam open — students can start it any time';
+}
+
+/** Admin control for when students may take a course's exam, and how long it runs. */
+function ExamAccessEditor({ course, writable, onSaved }: { course: Course; writable: boolean; onSaved: () => void }) {
+  const toast = useToast();
+  const [access, setAccess] = useState<Course['exam_access']>(course.exam_access);
+  const [opens, setOpens] = useState(toLocalInput(course.exam_opens_at));
+  const [closes, setCloses] = useState(toLocalInput(course.exam_closes_at));
+  const [minutes, setMinutes] = useState(course.exam_time_limit_min);
+  const [saving, setSaving] = useState(false);
+
+  if (!writable) return <div className="mt-3 text-xs text-neutral-500">{examAccessSummary(course)}</div>;
+
+  const save = async () => {
+    if (access === 'scheduled' && !opens && !closes) return toast('Pick an opening and/or closing time', 'error');
+    if (opens && closes && new Date(closes) <= new Date(opens)) return toast('The closing time must be after the opening time', 'error');
+    if (!minutes || minutes < 1) return toast('Time limit must be at least 1 minute', 'error');
+    setSaving(true);
+    const { error } = await supabase
+      .from('courses')
+      .update({
+        exam_access: access,
+        exam_opens_at: access === 'scheduled' && opens ? new Date(opens).toISOString() : null,
+        exam_closes_at: access === 'scheduled' && closes ? new Date(closes).toISOString() : null,
+        exam_time_limit_min: minutes,
+      })
+      .eq('id', course.id);
+    setSaving(false);
+    if (error) return toast(error.message, 'error');
+    toast('Exam availability saved');
+    onSaved();
+  };
+
+  return (
+    <div className="mt-3 rounded-2xl border border-white/60 bg-white/40 p-3">
+      <div className="text-xs font-semibold uppercase tracking-wide text-neutral-400">Exam availability</div>
+      <div className="mt-1 text-xs text-neutral-500">{examAccessSummary(course)}</div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <Field label="Who can start the exam">
+          <Select value={access} onChange={(e) => setAccess(e.target.value as Course['exam_access'])}>
+            <option value="open">Open — any time</option>
+            <option value="closed">Closed — nobody can start</option>
+            <option value="scheduled">Scheduled — only between set times</option>
+          </Select>
+        </Field>
+        <Field label="Exam duration (minutes)" hint="Applies to attempts started from now on">
+          <TextInput type="number" min={1} value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} />
+        </Field>
+        {access === 'scheduled' && (
+          <>
+            <Field label="Opens at" hint="Leave empty to open immediately">
+              <TextInput type="datetime-local" value={opens} onChange={(e) => setOpens(e.target.value)} />
+            </Field>
+            <Field label="Closes at" hint="Leave empty for no end time">
+              <TextInput type="datetime-local" value={closes} onChange={(e) => setCloses(e.target.value)} />
+            </Field>
+          </>
+        )}
+      </div>
+      <div className="mt-3 flex justify-end">
+        <Button variant="secondary" onClick={save} loading={saving}>
+          Save availability
+        </Button>
+      </div>
     </div>
   );
 }

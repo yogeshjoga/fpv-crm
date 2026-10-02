@@ -207,7 +207,7 @@ export function CourseViewer() {
       supabase
         .from('courses')
         .select(
-          'id, title, slug, description, pass_pct, exam_time_limit_min, exam_question_count, max_attempts, cooldown_hours, ' +
+          'id, title, slug, description, pass_pct, exam_time_limit_min, exam_question_count, max_attempts, cooldown_hours, exam_access, exam_opens_at, exam_closes_at, ' +
             'modules(id, title, position, lessons(id, title, position, kind, content, video_url, embed_url, lesson_resources(id, file_name, file_path, mime)))',
         )
         .eq('slug', slug as string)
@@ -260,6 +260,18 @@ export function CourseViewer() {
   const canStart =
     enrollment?.status === 'active' && !cert && !locked && !cooldownActive && attemptsUsed < course.max_attempts;
   const hasAccess = enrollment?.status === 'active' || enrollment?.status === 'completed';
+
+  // Admin-controlled exam availability (mirrors the check start-exam enforces on the server).
+  const nowMs = Date.now();
+  const opensMs = course.exam_opens_at ? new Date(course.exam_opens_at).getTime() : null;
+  const closesMs = course.exam_closes_at ? new Date(course.exam_closes_at).getTime() : null;
+  const resumable = latest?.status === 'in_progress' && new Date(latest.expires_at).getTime() > nowMs;
+  let examGate: string | null = null;
+  if (course.exam_access === 'closed') examGate = 'The exam is not open yet. Your instructor will announce when it opens.';
+  else if (course.exam_access === 'scheduled') {
+    if (opensMs !== null && nowMs < opensMs) examGate = `The exam opens on ${new Date(opensMs).toLocaleString()}.`;
+    else if (closesMs !== null && nowMs > closesMs && !resumable) examGate = `The exam window closed on ${new Date(closesMs).toLocaleString()}.`;
+  }
 
   return (
     <div>
@@ -375,6 +387,8 @@ export function CourseViewer() {
               <GraduationCap size={18} /> Final exam
             </div>
             <dl className="mt-4 space-y-1.5 text-sm">
+              {course.exam_access === 'scheduled' && opensMs !== null && <Row k="Opens" v={new Date(opensMs).toLocaleString()} />}
+              {course.exam_access === 'scheduled' && closesMs !== null && <Row k="Closes" v={new Date(closesMs).toLocaleString()} />}
               <Row k="Questions" v={course.exam_question_count} />
               <Row k="Time limit" v={`${course.exam_time_limit_min} min`} />
               <Row k="Pass mark" v={`${course.pass_pct}%`} />
@@ -393,6 +407,10 @@ export function CourseViewer() {
               ) : locked ? (
                 <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
                   <Lock size={15} /> Attempts exhausted. Ask an instructor to reset.
+                </div>
+              ) : examGate ? (
+                <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  <Lock size={15} className="mt-0.5 shrink-0" /> {examGate}
                 </div>
               ) : cooldownActive ? (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
