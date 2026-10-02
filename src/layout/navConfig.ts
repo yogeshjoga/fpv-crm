@@ -2,13 +2,14 @@ import {
   LayoutDashboard, BookOpen, Award, UserCircle, CalendarDays,
   ClipboardCheck, Users, GraduationCap, Briefcase, Megaphone,
   FormInput, Inbox, ScrollText, Settings2, UserPlus, BarChart3,
-  MessageCircle, ImagePlus, Layers3, HelpCircle, IdCard, Activity,
+  MessageCircle, ImagePlus, Layers3, HelpCircle, IdCard, Activity, FolderOpen,
 } from 'lucide-react';
 import type { NavItem } from './Shell';
 
 export const studentNav: NavItem[] = [
   { to: '/app', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/app/courses', label: 'Courses', icon: BookOpen },
+  { to: '/app/resources', label: 'Resources', icon: FolderOpen },
   { to: '/app/showcase', label: 'Showcase', icon: ImagePlus },
   { to: '/app/ask', label: 'Ask us', icon: MessageCircle },
   { to: '/app/calendar', label: 'Calendar', icon: CalendarDays },
@@ -27,6 +28,7 @@ export const adminNav: NavItem[] = [
   { to: '/admin/approvals', label: 'Account Approvals', icon: ClipboardCheck, key: 'approvals' },
   { to: '/admin/courses', label: 'Courses', icon: GraduationCap, key: 'courses' },
   { to: '/admin/course-groups', label: 'Course Groups', icon: Layers3, key: 'course-groups' },
+  { to: '/admin/resources', label: 'Resources', icon: FolderOpen, key: 'resources' },
   { to: '/admin/student-activity', label: 'Student Activity', icon: Activity, key: 'student-activity' },
   { to: '/admin/forms', label: 'Enrollment Forms', icon: FormInput, key: 'forms' },
   { to: '/admin/calendar', label: 'Calendar', icon: CalendarDays, key: 'calendar' },

@@ -1538,6 +1538,53 @@ export type Database = {
           },
         ]
       }
+      resources: {
+        Row: {
+          created_at: string
+          description: string
+          external_url: string | null
+          file_name: string
+          file_path: string | null
+          id: string
+          mime: string
+          size_bytes: number | null
+          title: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          external_url?: string | null
+          file_name: string
+          file_path?: string | null
+          id?: string
+          mime?: string
+          size_bytes?: number | null
+          title: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          external_url?: string | null
+          file_name?: string
+          file_path?: string | null
+          id?: string
+          mime?: string
+          size_bytes?: number | null
+          title?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resources_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       showcase_comments: {
         Row: {
           author_id: string
