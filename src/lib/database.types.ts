@@ -373,6 +373,7 @@ export type Database = {
           mix_hard: number | null
           mix_medium: number | null
           pass_pct: number
+          show_review: boolean
           slug: string
           status: Database["public"]["Enums"]["course_status"]
           summary: string
@@ -397,6 +398,7 @@ export type Database = {
           mix_hard?: number | null
           mix_medium?: number | null
           pass_pct?: number
+          show_review?: boolean
           slug: string
           status?: Database["public"]["Enums"]["course_status"]
           summary?: string
@@ -421,6 +423,7 @@ export type Database = {
           mix_hard?: number | null
           mix_medium?: number | null
           pass_pct?: number
+          show_review?: boolean
           slug?: string
           status?: Database["public"]["Enums"]["course_status"]
           summary?: string

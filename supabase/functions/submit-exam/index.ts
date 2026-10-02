@@ -59,6 +59,45 @@ Deno.serve(async (req) => {
     const total = questionIds.length;
     const scorePct = totalPoints ? Math.round((earnedPoints / totalPoints) * 10000) / 100 : 0;
 
+    // Courses with show_review get every wrong question back with the correct answer and
+    // its explanation, so the student can learn from the attempt. Right answers are never
+    // echoed back, which keeps the exam pool from leaking beyond what the student missed.
+    let review:
+      | { question_id: string; prompt: string; type: string; your_answers: string[]; correct_answers: string[]; explanation: string }[]
+      | undefined;
+    const wrong = answerRows.filter((r) => !r.is_correct);
+    if (course.show_review && wrong.length) {
+      const wrongIds = wrong.map((r) => r.question_id);
+      const { data: qRows } = await admin.from('questions').select('id, prompt, type, explanation').in('id', wrongIds);
+      const { data: optRows } = await admin
+        .from('question_options')
+        .select('id, question_id, label, is_correct, position')
+        .in('question_id', wrongIds)
+        .order('position');
+      const qById = new Map((qRows ?? []).map((q) => [q.id, q]));
+      const optsByQ = new Map<string, { id: string; label: string; is_correct: boolean }[]>();
+      for (const o of optRows ?? []) {
+        const arr = optsByQ.get(o.question_id) ?? [];
+        arr.push(o);
+        optsByQ.set(o.question_id, arr);
+      }
+      review = wrong
+        .filter((r) => qById.has(r.question_id))
+        .map((r) => {
+          const q = qById.get(r.question_id)!;
+          const opts = optsByQ.get(r.question_id) ?? [];
+          const picked = new Set(r.selected_option_ids_json);
+          return {
+            question_id: r.question_id,
+            prompt: q.prompt,
+            type: q.type,
+            your_answers: opts.filter((o) => picked.has(o.id)).map((o) => o.label),
+            correct_answers: opts.filter((o) => o.is_correct).map((o) => o.label),
+            explanation: q.explanation ?? '',
+          };
+        });
+    }
+
     let gradeLabel: string | null = null;
     let passed: boolean;
     if (course.grading_mode === 'tiered') {
@@ -125,7 +164,9 @@ Deno.serve(async (req) => {
       passed,
       grade_label: gradeLabel,
       correct_count: correctCount,
+      wrong_count: total - correctCount,
       total,
+      review,
       cert_id_string: certId,
       cooldown_until: cooldownUntil,
       locked,
