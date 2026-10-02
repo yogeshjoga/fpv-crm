@@ -49,6 +49,12 @@ Deno.serve(async (req) => {
     const latest = attempts?.[0];
     const now = Date.now();
 
+    // Exam availability set by an admin. A scheduled window that ends mid-attempt must not
+    // lock out a student who already started, so resuming stays allowed after the close time.
+    const access = examAccessState(course, now);
+    const canResume = !!latest && latest.status === 'in_progress' && new Date(latest.expires_at).getTime() > now;
+    if (!access.open && !(access.afterClose && canResume)) throw new HttpError(403, access.reason);
+
     // resume an in-progress, unexpired attempt
     if (latest && latest.status === 'in_progress' && new Date(latest.expires_at).getTime() > now) {
       const questions = await buildQuestionSet(admin, latest.question_ids_json as string[]);
@@ -144,6 +150,23 @@ Deno.serve(async (req) => {
     return json({ error: (e as Error).message }, status);
   }
 });
+
+function examAccessState(course: Record<string, any>, now: number) {
+  const access = course.exam_access ?? 'open';
+  if (access === 'open') return { open: true, afterClose: false, reason: '' };
+  if (access === 'closed') {
+    return { open: false, afterClose: false, reason: 'The exam is not open yet. Your instructor will announce when it opens.' };
+  }
+  const opens = course.exam_opens_at ? new Date(course.exam_opens_at).getTime() : null;
+  const closes = course.exam_closes_at ? new Date(course.exam_closes_at).getTime() : null;
+  if (opens !== null && now < opens) {
+    return { open: false, afterClose: false, reason: 'The exam is not open yet. Check the course page for the opening time.' };
+  }
+  if (closes !== null && now > closes) {
+    return { open: false, afterClose: true, reason: 'The exam window has closed. Ask your instructor if you still need access.' };
+  }
+  return { open: true, afterClose: false, reason: '' };
+}
 
 async function pickPlainQuestions(admin: ReturnType<typeof adminClient>, course: Record<string, any>) {
   const { data: pool } = await admin
