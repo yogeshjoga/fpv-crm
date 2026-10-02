@@ -328,6 +328,18 @@ export function CourseViewer() {
                         </div>
                       )}
 
+                      {(l.kind === 'embed' || l.kind === 'download') && l.embed_url && /\.(pdf|docx?|xlsx?|pptx?)$/i.test(l.embed_url) && (
+                        <a
+                          href={l.embed_url}
+                          download
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-white"
+                        >
+                          <FileText size={13} /> Download {l.embed_url.split('/').pop()} <Download size={12} />
+                        </a>
+                      )}
+
                       {!!l.lesson_resources?.length && (
                         <div className="mt-3 flex flex-wrap gap-2">
                           {l.lesson_resources.map((r: any) =>
