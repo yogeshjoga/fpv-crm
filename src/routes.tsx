@@ -43,6 +43,8 @@ import { FormResponses } from './pages/admin/FormResponses';
 import { FormAnalytics } from './pages/admin/FormAnalytics';
 import { EnrollmentRequests } from './pages/admin/EnrollmentRequests';
 import { AdminCertificates } from './pages/admin/AdminCertificates';
+import { AdminResources } from './pages/admin/AdminResources';
+import { Resources } from './pages/student/Resources';
 import { IdCards } from './pages/admin/IdCards';
 import { AdminAnalytics } from './pages/admin/AdminAnalytics';
 import { AdminAsk } from './pages/admin/AdminAsk';
@@ -91,6 +93,7 @@ export function AppRoutes() {
         <Route path="courses/:slug" element={<CourseViewer />} />
         <Route path="courses/:slug/exam" element={<ExamFlow />} />
         <Route path="calendar" element={<StudentCalendar />} />
+        <Route path="resources" element={<Resources />} />
         <Route path="certificates" element={<StudentCertificates />} />
         <Route path="profile" element={<StudentProfile />} />
         <Route path="ask" element={<Ask />} />
@@ -207,6 +210,14 @@ export function AppRoutes() {
           element={
             <RequireModule moduleKey="enrollments">
               <EnrollmentRequests />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="resources"
+          element={
+            <RequireModule moduleKey="resources">
+              <AdminResources />
             </RequireModule>
           }
         />
