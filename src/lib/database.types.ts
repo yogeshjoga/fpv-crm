@@ -1599,6 +1599,7 @@ export type Database = {
           comment: string
           course_id: string | null
           created_at: string
+          group_id: string | null
           id: string
           rating: number
           student_id: string
@@ -1608,6 +1609,7 @@ export type Database = {
           comment?: string
           course_id?: string | null
           created_at?: string
+          group_id?: string | null
           id?: string
           rating: number
           student_id: string
@@ -1617,6 +1619,7 @@ export type Database = {
           comment?: string
           course_id?: string | null
           created_at?: string
+          group_id?: string | null
           id?: string
           rating?: number
           student_id?: string
@@ -1628,6 +1631,13 @@ export type Database = {
             columns: ["course_id"]
             isOneToOne: false
             referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "course_groups"
             referencedColumns: ["id"]
           },
           {
