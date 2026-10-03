@@ -2,7 +2,7 @@ import {
   LayoutDashboard, BookOpen, Award, UserCircle, CalendarDays,
   ClipboardCheck, Users, GraduationCap, Briefcase, Megaphone,
   FormInput, Inbox, ScrollText, Settings2, UserPlus, BarChart3,
-  MessageCircle, ImagePlus, Layers3, HelpCircle, IdCard, Activity, FolderOpen,
+  MessageCircle, ImagePlus, Layers3, HelpCircle, IdCard, Activity, FolderOpen, MessageSquareHeart,
 } from 'lucide-react';
 import type { NavItem } from './Shell';
 
@@ -12,6 +12,7 @@ export const studentNav: NavItem[] = [
   { to: '/app/resources', label: 'Resources', icon: FolderOpen },
   { to: '/app/showcase', label: 'Showcase', icon: ImagePlus },
   { to: '/app/ask', label: 'Ask us', icon: MessageCircle },
+  { to: '/app/reviews', label: 'Reviews', icon: MessageSquareHeart },
   { to: '/app/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/app/certificates', label: 'Certificates', icon: Award },
   { to: '/app/profile', label: 'Profile', icon: UserCircle },
@@ -36,6 +37,7 @@ export const adminNav: NavItem[] = [
   { to: '/admin/certificates', label: 'Certificates', icon: ScrollText, key: 'certificates' },
   { to: '/admin/id-cards', label: 'ID Cards', icon: IdCard, key: 'id-cards' },
   { to: '/admin/ask', label: 'Questions', icon: MessageCircle, key: 'ask' },
+  { to: '/admin/reviews', label: 'Reviews', icon: MessageSquareHeart, key: 'reviews' },
   { to: '/admin/analytics', label: 'Analytics', icon: BarChart3, key: 'analytics', superAdminOnly: true },
   { to: '/admin/employees', label: 'Employees', icon: Briefcase, key: 'employees', superAdminOnly: true },
   { to: '/admin/users', label: 'Users', icon: Users, key: 'users', superAdminOnly: true },

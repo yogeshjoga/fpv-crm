@@ -1594,6 +1594,51 @@ export type Database = {
           },
         ]
       }
+      reviews: {
+        Row: {
+          comment: string
+          course_id: string | null
+          created_at: string
+          id: string
+          rating: number
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          comment?: string
+          course_id?: string | null
+          created_at?: string
+          id?: string
+          rating: number
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          comment?: string
+          course_id?: string | null
+          created_at?: string
+          id?: string
+          rating?: number
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       showcase_comments: {
         Row: {
           author_id: string
