@@ -45,6 +45,8 @@ import { EnrollmentRequests } from './pages/admin/EnrollmentRequests';
 import { AdminCertificates } from './pages/admin/AdminCertificates';
 import { AdminResources } from './pages/admin/AdminResources';
 import { Resources } from './pages/student/Resources';
+import { Reviews } from './pages/student/Reviews';
+import { AdminReviews } from './pages/admin/AdminReviews';
 import { IdCards } from './pages/admin/IdCards';
 import { AdminAnalytics } from './pages/admin/AdminAnalytics';
 import { AdminAsk } from './pages/admin/AdminAsk';
@@ -97,6 +99,7 @@ export function AppRoutes() {
         <Route path="certificates" element={<StudentCertificates />} />
         <Route path="profile" element={<StudentProfile />} />
         <Route path="ask" element={<Ask />} />
+        <Route path="reviews" element={<Reviews />} />
         <Route path="showcase" element={<Showcase />} />
       </Route>
 
@@ -218,6 +221,14 @@ export function AppRoutes() {
           element={
             <RequireModule moduleKey="resources">
               <AdminResources />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="reviews"
+          element={
+            <RequireModule moduleKey="reviews">
+              <AdminReviews />
             </RequireModule>
           }
         />
