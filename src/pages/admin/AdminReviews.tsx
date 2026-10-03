@@ -12,10 +12,12 @@ interface ReviewRow {
   rating: number;
   comment: string;
   course_id: string | null;
+  group_id: string | null;
   created_at: string;
   updated_at: string;
   student: { full_name: string; email: string } | null;
   course: { title: string } | null;
+  group: { name: string } | null;
 }
 
 export function AdminReviews() {
@@ -30,24 +32,36 @@ export function AdminReviews() {
       unwrap(
         supabase
           .from('reviews')
-          .select('id, rating, comment, course_id, created_at, updated_at, student:profiles!reviews_student_id_fkey(full_name, email), course:courses(title)')
+          .select(
+            'id, rating, comment, course_id, group_id, created_at, updated_at, student:profiles!reviews_student_id_fkey(full_name, email), course:courses(title), group:course_groups(name)',
+          )
           .order('updated_at', { ascending: false }),
       ) as unknown as Promise<ReviewRow[]>,
     [],
   );
 
   const all = useMemo(() => q.data ?? [], [q.data]);
-  const courseOptions = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const r of all) if (r.course_id && r.course) seen.set(r.course_id, r.course.title);
-    return [...seen.entries()];
+  // Filter keys: 'group:<id>', 'course:<id>' or 'general'.
+  const targetOptions = useMemo(() => {
+    const groups = new Map<string, string>();
+    const courses = new Map<string, string>();
+    for (const r of all) {
+      if (r.group_id && r.group) groups.set(r.group_id, r.group.name);
+      else if (r.course_id && r.course) courses.set(r.course_id, r.course.title);
+    }
+    return { groups: [...groups.entries()], courses: [...courses.entries()] };
   }, [all]);
 
   const rows = useMemo(
     () =>
       all.filter(
         (r) =>
-          (course === 'all' || (course === 'general' ? r.course_id === null : r.course_id === course)) &&
+          (course === 'all' ||
+            (course === 'general'
+              ? !r.course_id && !r.group_id
+              : course.startsWith('group:')
+                ? r.group_id === course.slice(6)
+                : r.course_id === course.slice(7))) &&
           (stars === 'all' || r.rating === Number(stars)),
       ),
     [all, course, stars],
@@ -73,14 +87,19 @@ export function AdminReviews() {
         subtitle="What students say about the courses and the program"
         actions={
           <div className="flex gap-2">
-            <Select value={course} onChange={(e) => setCourse(e.target.value)} className="w-52">
-              <option value="all">All courses</option>
-              <option value="general">Overall (general)</option>
-              {courseOptions.map(([id, title]) => (
-                <option key={id} value={id}>
+            <Select value={course} onChange={(e) => setCourse(e.target.value)} className="w-60">
+              <option value="all">All reviews</option>
+              {targetOptions.groups.map(([id, name]) => (
+                <option key={id} value={`group:${id}`}>
+                  Group: {name}
+                </option>
+              ))}
+              {targetOptions.courses.map(([id, title]) => (
+                <option key={id} value={`course:${id}`}>
                   {title}
                 </option>
               ))}
+              <option value="general">Overall (general)</option>
             </Select>
             <Select value={stars} onChange={(e) => setStars(e.target.value)} className="w-32">
               <option value="all">All stars</option>
@@ -131,7 +150,7 @@ export function AdminReviews() {
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium text-neutral-900">{r.student?.full_name || r.student?.email || 'Student'}</span>
-                        <Badge tone={r.course ? 'blue' : 'neutral'}>{r.course?.title ?? 'Overall'}</Badge>
+                        <Badge tone={r.group ? 'amber' : r.course ? 'blue' : 'neutral'}>{r.group?.name ?? r.course?.title ?? 'Overall'}</Badge>
                       </div>
                       <div className="mt-1 flex items-center gap-2">
                         <StarRating value={r.rating} size={15} />

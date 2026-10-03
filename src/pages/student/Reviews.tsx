@@ -10,6 +10,7 @@ import { Button, EmptyState, Field, PageHeader, Select, Spinner, TextArea, useTo
 interface MyReview {
   id: string;
   course_id: string | null;
+  group_id: string | null;
   rating: number;
   comment: string;
   updated_at: string;
@@ -17,36 +18,59 @@ interface MyReview {
 interface Enrolled {
   course: { id: string; title: string } | null;
 }
+interface Membership {
+  group: { id: string; name: string } | null;
+}
 
 const GENERAL = 'general';
 const LABELS = ['', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'];
 
+/** The dropdown value for a review target: 'general', 'group:<id>' or 'course:<id>'. */
+const keyOf = (r: { course_id: string | null; group_id: string | null }) =>
+  r.group_id ? `group:${r.group_id}` : r.course_id ? `course:${r.course_id}` : GENERAL;
+
 export function Reviews() {
   const { profile } = useAuth();
   const toast = useToast();
-  const [target, setTarget] = useState(GENERAL);
+  const [target, setTarget] = useState<string | null>(null);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
 
   const q = useQuery(async () => {
-    const [reviews, enrolled] = await Promise.all([
-      unwrap(supabase.from('reviews').select('id, course_id, rating, comment, updated_at').eq('student_id', profile!.id).order('updated_at', { ascending: false })) as Promise<MyReview[]>,
+    const [reviews, enrolled, memberships] = await Promise.all([
+      unwrap(
+        supabase.from('reviews').select('id, course_id, group_id, rating, comment, updated_at').eq('student_id', profile!.id).order('updated_at', { ascending: false }),
+      ) as Promise<MyReview[]>,
       unwrap(supabase.from('enrollments').select('course:courses(id, title)').eq('student_id', profile!.id).eq('status', 'active')) as unknown as Promise<Enrolled[]>,
+      unwrap(supabase.from('course_group_members').select('group:course_groups(id, name)').eq('student_id', profile!.id)) as unknown as Promise<Membership[]>,
     ]);
-    return { reviews, courses: enrolled.map((e) => e.course).filter((c): c is { id: string; title: string } => !!c) };
+    return {
+      reviews,
+      courses: enrolled.map((e) => e.course).filter((c): c is { id: string; title: string } => !!c),
+      groups: memberships.map((m) => m.group).filter((g): g is { id: string; name: string } => !!g),
+    };
   }, [profile?.id]);
 
   const reviews = useMemo(() => q.data?.reviews ?? [], [q.data]);
   const courses = useMemo(() => q.data?.courses ?? [], [q.data]);
-  const titleFor = (courseId: string | null) => (courseId ? courses.find((c) => c.id === courseId)?.title ?? 'Course' : 'EgireRobotics overall');
-  const existing = reviews.find((r) => (r.course_id ?? GENERAL) === target);
+  const groups = useMemo(() => q.data?.groups ?? [], [q.data]);
+  // Default to the student's own group (e.g. their college batch) when they have one.
+  const current = target ?? (groups[0] ? `group:${groups[0].id}` : GENERAL);
 
-  // Picking a course you've already reviewed loads that review so you can edit it.
+  const titleFor = (r: MyReview) =>
+    r.group_id
+      ? groups.find((g) => g.id === r.group_id)?.name ?? 'Group'
+      : r.course_id
+        ? courses.find((c) => c.id === r.course_id)?.title ?? 'Course'
+        : 'EgireRobotics overall';
+  const existing = reviews.find((r) => keyOf(r) === current);
+
+  // Picking something you've already reviewed loads that review so you can edit it.
   useEffect(() => {
     setRating(existing?.rating ?? 0);
     setComment(existing?.comment ?? '');
-  }, [existing?.id, existing?.rating, existing?.comment, target]);
+  }, [existing?.id, existing?.rating, existing?.comment, current]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +79,12 @@ export function Reviews() {
     const payload = { rating, comment: comment.trim() };
     const { error } = existing
       ? await supabase.from('reviews').update(payload).eq('id', existing.id)
-      : await supabase.from('reviews').insert({ ...payload, student_id: profile!.id, course_id: target === GENERAL ? null : target });
+      : await supabase.from('reviews').insert({
+          ...payload,
+          student_id: profile!.id,
+          group_id: current.startsWith('group:') ? current.slice(6) : null,
+          course_id: current.startsWith('course:') ? current.slice(7) : null,
+        });
     setBusy(false);
     if (error) return toast(error.message, 'error');
     toast(existing ? 'Review updated — thank you!' : 'Thanks for your review!');
@@ -66,7 +95,7 @@ export function Reviews() {
     if (!confirm('Delete this review?')) return;
     const { error } = await supabase.from('reviews').delete().eq('id', r.id);
     if (error) return toast(error.message, 'error');
-    if ((r.course_id ?? GENERAL) === target) {
+    if (keyOf(r) === current) {
       setRating(0);
       setComment('');
     }
@@ -83,10 +112,15 @@ export function Reviews() {
         <GlassCard className="p-5 lg:col-span-3">
           <form onSubmit={submit} className="space-y-4">
             <Field label="What are you reviewing?">
-              <Select value={target} onChange={(e) => setTarget(e.target.value)}>
+              <Select value={current} onChange={(e) => setTarget(e.target.value)}>
+                {groups.map((g) => (
+                  <option key={g.id} value={`group:${g.id}`}>
+                    {g.name} (my group)
+                  </option>
+                ))}
                 <option value={GENERAL}>EgireRobotics overall</option>
                 {courses.map((c) => (
-                  <option key={c.id} value={c.id}>
+                  <option key={c.id} value={`course:${c.id}`}>
                     {c.title}
                   </option>
                 ))}
@@ -119,8 +153,8 @@ export function Reviews() {
               {reviews.map((r) => (
                 <GlassCard key={r.id} className="p-4">
                   <div className="flex items-start justify-between gap-2">
-                    <button type="button" onClick={() => setTarget(r.course_id ?? GENERAL)} className="min-w-0 text-left">
-                      <div className="truncate text-sm font-medium text-neutral-900">{titleFor(r.course_id)}</div>
+                    <button type="button" onClick={() => setTarget(keyOf(r))} className="min-w-0 text-left">
+                      <div className="truncate text-sm font-medium text-neutral-900">{titleFor(r)}</div>
                       <div className="mt-1">
                         <StarRating value={r.rating} size={14} />
                       </div>
