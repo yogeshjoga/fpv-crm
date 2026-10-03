@@ -30,7 +30,7 @@ const keyOf = (r: { course_id: string | null; group_id: string | null }) =>
   r.group_id ? `group:${r.group_id}` : r.course_id ? `course:${r.course_id}` : GENERAL;
 
 export function Reviews() {
-  const { profile } = useAuth();
+  const { profile, isStaff } = useAuth();
   const toast = useToast();
   const [target, setTarget] = useState<string | null>(null);
   const [rating, setRating] = useState(0);
@@ -111,6 +111,11 @@ export function Reviews() {
       <div className="grid gap-6 lg:grid-cols-5">
         <GlassCard className="p-5 lg:col-span-3">
           <form onSubmit={submit} className="space-y-4">
+            {isStaff && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-800">
+                You're signed in as staff, so this is a preview. Only student accounts can submit reviews — you can read them in Admin → Reviews.
+              </div>
+            )}
             <Field label="What are you reviewing?">
               <Select value={current} onChange={(e) => setTarget(e.target.value)}>
                 {groups.map((g) => (
@@ -137,7 +142,7 @@ export function Reviews() {
             </Field>
             <div className="flex items-center justify-between">
               <span className="text-xs text-neutral-400">{existing ? 'You already reviewed this — saving will update it.' : 'Your instructors read every review.'}</span>
-              <Button type="submit" loading={busy}>
+              <Button type="submit" loading={busy} disabled={isStaff}>
                 <Send size={14} /> {existing ? 'Update review' : 'Submit review'}
               </Button>
             </div>
