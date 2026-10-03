@@ -33,10 +33,16 @@ export function Reviews() {
       unwrap(
         supabase.from('reviews').select('id, group_id, rating, comment, updated_at').eq('student_id', profile!.id).not('group_id', 'is', null).order('updated_at', { ascending: false }),
       ) as Promise<MyReview[]>,
-      unwrap(supabase.from('course_group_members').select('group:course_groups(id, name)').eq('student_id', profile!.id)) as unknown as Promise<Membership[]>,
+      // Students see the groups they belong to; staff previewing this page see every group.
+      isStaff
+        ? (unwrap(supabase.from('course_groups').select('id, name').order('name')) as Promise<{ id: string; name: string }[]>)
+        : (unwrap(supabase.from('course_group_members').select('group:course_groups(id, name)').eq('student_id', profile!.id)) as unknown as Promise<Membership[]>),
     ]);
-    return { reviews, groups: memberships.map((m) => m.group).filter((g): g is { id: string; name: string } => !!g) };
-  }, [profile?.id]);
+    const groups = (memberships as (Membership | { id: string; name: string })[])
+      .map((m) => ('group' in m ? m.group : m))
+      .filter((g): g is { id: string; name: string } => !!g);
+    return { reviews, groups };
+  }, [profile?.id, isStaff]);
 
   const reviews = useMemo(() => q.data?.reviews ?? [], [q.data]);
   const groups = useMemo(() => q.data?.groups ?? [], [q.data]);
@@ -85,17 +91,22 @@ export function Reviews() {
       {!groups.length ? (
         <EmptyState
           icon={<MessageSquareHeart size={22} />}
-          title={isStaff ? 'Staff preview' : 'No course group yet'}
+          title={isStaff ? 'No course groups yet' : 'No course group yet'}
           description={
             isStaff
-              ? 'Only students in a course group can submit reviews. You can read them in Admin → Reviews.'
-              : "Reviews are collected for your course group. Once your instructor adds you to one, it will appear here."
+              ? 'Create a course group under Admin → Course Groups and students in it can review it here.'
+              : 'Reviews are collected for your course group. Once your instructor adds you to one, it will appear here.'
           }
         />
       ) : (
         <div className="grid gap-6 lg:grid-cols-5">
           <GlassCard className="p-5 lg:col-span-3">
             <form onSubmit={submit} className="space-y-4">
+              {isStaff && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-800">
+                  Staff preview — students see only their own group here. Only students can submit; read reviews in Admin → Reviews.
+                </div>
+              )}
               <Field label="Course group">
                 <Select value={current} onChange={(e) => setTarget(e.target.value)}>
                   {groups.map((g) => (
@@ -116,7 +127,7 @@ export function Reviews() {
               </Field>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-xs text-neutral-400">{existing ? 'You already reviewed this — saving will update it.' : 'Your instructors read every review.'}</span>
-                <Button type="submit" loading={busy}>
+                <Button type="submit" loading={busy} disabled={isStaff}>
                   <Send size={14} /> {existing ? 'Update review' : 'Submit review'}
                 </Button>
               </div>
