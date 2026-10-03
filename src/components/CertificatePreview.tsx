@@ -8,6 +8,9 @@ import QRCode from 'qrcode';
  * org's certificate background image, not a stored image render. */
 const PAGE_W = 842;
 const PAGE_H = 595;
+/** Page points per pixel of the 2000x1414 template artwork. */
+const ART_X = PAGE_W / 2000;
+const ART_Y = PAGE_H / 1414;
 
 export interface CertificatePreviewData {
   certId: string;
@@ -61,6 +64,10 @@ export function CertificatePreview({ data }: { data: CertificatePreviewData }) {
     `has successfully completed the ${courseTitle} program conducted by ${orgName}` +
     (scorePct != null ? ` and achieved a score of ${Number(scorePct)}% in the certification exam.` : '.');
 
+  // Shrink long certificate types so they never run into the gold rules either side.
+  const ofText = `OF ${certType.toUpperCase()}`;
+  const ofSize = Math.min(20, 20 * ((1325 - 641 - 60) * ART_X) / (ofText.length * 14.2));
+
   const navy = '#0f2a4a';
   const gold = '#c9a227';
 
@@ -80,10 +87,27 @@ export function CertificatePreview({ data }: { data: CertificatePreviewData }) {
       >
         {backgroundUrl ? (
           <>
-            {/* mask the template's own plain "OF ..." line so our value can replace it */}
-            <div className="absolute" style={{ left: 0.2 * PAGE_W, bottom: 0.675 * PAGE_H, width: 0.6 * PAGE_W, height: 0.052 * PAGE_H, background: '#fdfcf9' }} />
-            <div className="absolute inset-x-0 text-center font-bold" style={{ bottom: 0.685 * PAGE_H, fontSize: 20, color: gold }}>
-              OF {certType.toUpperCase()}
+            {/* Cover only the template's own gold "OF" (x 681-754, y 394-428 of the 2000x1414 art)
+                and centre our value between the template's two gold rules (x 641-1325, y 413).
+                Same numbers as generate-certificate. */}
+            <div
+              className="absolute"
+              style={{ left: 672 * ART_X, top: 388 * ART_Y, width: 92 * ART_X, height: 46 * ART_Y, background: '#fefefe' }}
+            />
+            <div
+              className="absolute whitespace-nowrap text-center font-bold"
+              style={{
+                left: 641 * ART_X,
+                width: (1325 - 641) * ART_X,
+                top: 413 * ART_Y - 14,
+                height: 28,
+                lineHeight: '28px',
+                fontSize: ofSize,
+                color: gold,
+                fontFamily: '"Times New Roman", Times, serif',
+              }}
+            >
+              {ofText}
             </div>
 
             <div className="absolute inset-x-0 text-center font-bold" style={{ bottom: 0.585 * PAGE_H, fontSize: 22, color: navy }}>

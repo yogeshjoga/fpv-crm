@@ -105,9 +105,25 @@ Deno.serve(async (req) => {
       // fields printed on top, positions tuned to this exact template layout.
       page.drawImage(backgroundImg, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
 
-      // Mask the template's plain "OF" line so the certificate type can replace it.
-      page.drawRectangle({ x: PAGE_W * 0.2, y: PAGE_H * 0.675, width: PAGE_W * 0.6, height: PAGE_H * 0.052, color: rgb(0.992, 0.988, 0.976) });
-      centre(`OF ${String(course.cert_type || 'Participation').toUpperCase()}`, PAGE_H * 0.685, serifBold, 20, gold);
+      // Cover only the template's own gold "OF" (x 681-754, y 394-428 of the 2000x1414 art,
+      // on a pure-white background) so the certificate type can replace it. Anything wider
+      // shows up as a white patch over the sky and mountains.
+      const artX = PAGE_W / 2000;
+      const artY = PAGE_H / 1414;
+      page.drawRectangle({ x: 672 * artX, y: PAGE_H - 434 * artY, width: 92 * artX, height: 46 * artY, color: rgb(0.996, 0.996, 0.996) });
+      // Centre the type between the template's two gold rules (x 641-1325, y 413), shrinking
+      // long names so they never run into the rules.
+      const ofText = `OF ${String(course.cert_type || 'Participation').toUpperCase()}`;
+      const ofMaxW = (1325 - 641 - 60) * artX;
+      const ofSize = Math.min(20, (20 * ofMaxW) / serifBold.widthOfTextAtSize(ofText, 20));
+      const ofCapH = serifBold.heightAtSize(ofSize, { descender: false });
+      page.drawText(ofText, {
+        x: ((641 + 1325) / 2) * artX - serifBold.widthOfTextAtSize(ofText, ofSize) / 2,
+        y: PAGE_H - 413 * artY - ofCapH / 2,
+        size: ofSize,
+        font: serifBold,
+        color: gold,
+      });
 
       centre(student.full_name || student.email, PAGE_H * 0.585, serifBold, 22, navy);
 
