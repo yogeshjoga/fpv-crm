@@ -11,12 +11,10 @@ interface ReviewRow {
   id: string;
   rating: number;
   comment: string;
-  course_id: string | null;
   group_id: string | null;
   created_at: string;
   updated_at: string;
   student: { full_name: string; email: string } | null;
-  course: { title: string } | null;
   group: { name: string } | null;
 }
 
@@ -24,7 +22,7 @@ export function AdminReviews() {
   const toast = useToast();
   const { canWrite } = useAdminAccess();
   const writable = canWrite('reviews');
-  const [course, setCourse] = useState('all');
+  const [group, setGroup] = useState('all');
   const [stars, setStars] = useState('all');
 
   const q = useQuery(
@@ -33,7 +31,7 @@ export function AdminReviews() {
         supabase
           .from('reviews')
           .select(
-            'id, rating, comment, course_id, group_id, created_at, updated_at, student:profiles!reviews_student_id_fkey(full_name, email), course:courses(title), group:course_groups(name)',
+            'id, rating, comment, group_id, created_at, updated_at, student:profiles!reviews_student_id_fkey(full_name, email), group:course_groups(name)',
           )
           .order('updated_at', { ascending: false }),
       ) as unknown as Promise<ReviewRow[]>,
@@ -41,30 +39,15 @@ export function AdminReviews() {
   );
 
   const all = useMemo(() => q.data ?? [], [q.data]);
-  // Filter keys: 'group:<id>', 'course:<id>' or 'general'.
-  const targetOptions = useMemo(() => {
+  const groupOptions = useMemo(() => {
     const groups = new Map<string, string>();
-    const courses = new Map<string, string>();
-    for (const r of all) {
-      if (r.group_id && r.group) groups.set(r.group_id, r.group.name);
-      else if (r.course_id && r.course) courses.set(r.course_id, r.course.title);
-    }
-    return { groups: [...groups.entries()], courses: [...courses.entries()] };
+    for (const r of all) if (r.group_id && r.group) groups.set(r.group_id, r.group.name);
+    return [...groups.entries()];
   }, [all]);
 
   const rows = useMemo(
-    () =>
-      all.filter(
-        (r) =>
-          (course === 'all' ||
-            (course === 'general'
-              ? !r.course_id && !r.group_id
-              : course.startsWith('group:')
-                ? r.group_id === course.slice(6)
-                : r.course_id === course.slice(7))) &&
-          (stars === 'all' || r.rating === Number(stars)),
-      ),
-    [all, course, stars],
+    () => all.filter((r) => (group === 'all' || r.group_id === group) && (stars === 'all' || r.rating === Number(stars))),
+    [all, group, stars],
   );
 
   const avg = rows.length ? rows.reduce((s, r) => s + r.rating, 0) / rows.length : 0;
@@ -84,22 +67,16 @@ export function AdminReviews() {
     <div>
       <PageHeader
         title="Reviews"
-        subtitle="What students say about the courses and the program"
+        subtitle="What each course group says about the program"
         actions={
           <div className="flex gap-2">
-            <Select value={course} onChange={(e) => setCourse(e.target.value)} className="w-60">
-              <option value="all">All reviews</option>
-              {targetOptions.groups.map(([id, name]) => (
-                <option key={id} value={`group:${id}`}>
-                  Group: {name}
+            <Select value={group} onChange={(e) => setGroup(e.target.value)} className="w-60">
+              <option value="all">All course groups</option>
+              {groupOptions.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
                 </option>
               ))}
-              {targetOptions.courses.map(([id, title]) => (
-                <option key={id} value={`course:${id}`}>
-                  {title}
-                </option>
-              ))}
-              <option value="general">Overall (general)</option>
             </Select>
             <Select value={stars} onChange={(e) => setStars(e.target.value)} className="w-32">
               <option value="all">All stars</option>
@@ -141,7 +118,7 @@ export function AdminReviews() {
           </GlassCard>
 
           {!rows.length ? (
-            <EmptyState icon={<MessageSquareHeart size={22} />} title="No matching reviews" description="Try a different course or star filter." />
+            <EmptyState icon={<MessageSquareHeart size={22} />} title="No matching reviews" description="Try a different group or star filter." />
           ) : (
             <div className="space-y-3">
               {rows.map((r) => (
@@ -150,7 +127,7 @@ export function AdminReviews() {
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium text-neutral-900">{r.student?.full_name || r.student?.email || 'Student'}</span>
-                        <Badge tone={r.group ? 'amber' : r.course ? 'blue' : 'neutral'}>{r.group?.name ?? r.course?.title ?? 'Overall'}</Badge>
+                        <Badge tone="amber">{r.group?.name ?? 'Group'}</Badge>
                       </div>
                       <div className="mt-1 flex items-center gap-2">
                         <StarRating value={r.rating} size={15} />
