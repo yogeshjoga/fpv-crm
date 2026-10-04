@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Check, MessageSquareHeart, Pencil, Trash2, X } from 'lucide-react';
+import { Check, Download, MessageSquareHeart, Pencil, Trash2, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
+import { downloadCsv } from '../../lib/csv';
+import { slugify } from '../../lib/slug';
 import { GlassCard } from '../../components/ui/shared';
 import { StarRating } from '../../components/StarRating';
-import { Badge, Button, EmptyState, PageHeader, Select, Spinner, useToast } from '../../components/ui/kit';
+import { Badge, Button, EmptyState, Modal, PageHeader, Select, Spinner, useToast } from '../../components/ui/kit';
 
 interface ReviewRow {
   id: string;
@@ -32,6 +34,8 @@ export function AdminReviews() {
   const writable = canWrite('reviews');
   const [group, setGroup] = useState('all');
   const [stars, setStars] = useState('all');
+  const [exporting, setExporting] = useState(false);
+  const [withNames, setWithNames] = useState(true);
 
   const q = useQuery(
     () =>
@@ -85,6 +89,27 @@ export function AdminReviews() {
   const avg = rows.length ? rows.reduce((s, r) => s + r.rating, 0) / rows.length : 0;
   const dist = [5, 4, 3, 2, 1].map((n) => ({ n, count: rows.filter((r) => r.rating === n).length }));
 
+  // Exports exactly what is on screen: the current group and star filters are applied.
+  // Without names the file has no name or email column and only dates (no times), so feedback
+  // can be shared or analysed anonymously.
+  const exportCsv = () => {
+    const day = (iso: string) => new Date(iso).toLocaleDateString('en-GB');
+    const stamp = (iso: string) => new Date(iso).toLocaleString('en-GB');
+    const edited = (r: ReviewRow) => (new Date(r.updated_at).getTime() - new Date(r.created_at).getTime() > 60_000 ? 'Yes' : 'No');
+    const headers = withNames
+      ? ['Student', 'Email', 'Course group', 'Rating (1-5)', 'Comment', 'Submitted', 'Last updated', 'Edited']
+      : ['#', 'Course group', 'Rating (1-5)', 'Comment', 'Submitted', 'Last updated', 'Edited'];
+    const body = rows.map((r, i) =>
+      withNames
+        ? [r.student?.full_name ?? '', r.student?.email ?? '', r.group?.name ?? '', r.rating, r.comment, stamp(r.created_at), stamp(r.updated_at), edited(r)]
+        : [i + 1, r.group?.name ?? '', r.rating, r.comment, day(r.created_at), day(r.updated_at), edited(r)],
+    );
+    const scope = group === 'all' ? 'all-groups' : slugify(groupOptions.find(([id]) => id === group)?.[1] ?? 'group');
+    downloadCsv(`reviews-${scope}${withNames ? '' : '-anonymous'}-${new Date().toISOString().slice(0, 10)}.csv`, headers, body);
+    toast(`Exported ${rows.length} review${rows.length === 1 ? '' : 's'}${withNames ? '' : ' anonymously'}`);
+    setExporting(false);
+  };
+
   const remove = async (r: ReviewRow) => {
     if (!confirm('Remove this review? The student will no longer see it.')) return;
     const { error } = await supabase.from('reviews').delete().eq('id', r.id);
@@ -101,7 +126,7 @@ export function AdminReviews() {
         title="Reviews"
         subtitle="What each course group says about the program"
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Select value={group} onChange={(e) => setGroup(e.target.value)} className="w-60">
               <option value="all">All course groups</option>
               {groupOptions.map(([id, name]) => (
@@ -118,6 +143,9 @@ export function AdminReviews() {
                 </option>
               ))}
             </Select>
+            <Button variant="secondary" onClick={() => setExporting(true)} disabled={!rows.length}>
+              <Download size={15} /> Export CSV
+            </Button>
           </div>
         }
       />
@@ -229,6 +257,34 @@ export function AdminReviews() {
             </div>
           )}
         </>
+      )}
+
+      {exporting && (
+        <Modal open onClose={() => setExporting(false)} title="Export reviews to CSV">
+          <div className="space-y-4">
+            <p className="text-sm text-neutral-600">
+              {rows.length} review{rows.length === 1 ? '' : 's'} will be exported, matching the group and star filters currently selected.
+            </p>
+            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/60 bg-white/50 p-3">
+              <input type="checkbox" className="mt-1 h-4 w-4" checked={withNames} onChange={(e) => setWithNames(e.target.checked)} />
+              <span>
+                <span className="block text-sm font-medium text-neutral-900">Include student names and email addresses</span>
+                <span className="block text-xs text-neutral-500">
+                  Untick to export anonymously: no name or email column, and only dates instead of exact times. Comments are exported as written, so a
+                  student may still name themselves in their text.
+                </span>
+              </span>
+            </label>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setExporting(false)}>
+                Cancel
+              </Button>
+              <Button onClick={exportCsv}>
+                <Download size={15} /> Download {withNames ? 'CSV' : 'anonymous CSV'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );
