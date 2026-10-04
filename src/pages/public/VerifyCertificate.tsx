@@ -22,6 +22,10 @@ type Result =
       org_name: string;
       verify_base_url: string;
       cert_background_url: string | null;
+      signatory_image_url: string | null;
+      company_seal_url: string | null;
+      report_total: number | null;
+      report_max: number | null;
     };
 
 export function VerifyCertificate() {
@@ -106,6 +110,9 @@ export function VerifyCertificate() {
                 orgName: result.org_name || 'EgireRobotics',
                 verifyBaseUrl: result.verify_base_url || 'egirerobotics.com',
                 backgroundUrl: result.cert_background_url,
+                signatureUrl: result.signatory_image_url,
+                sealUrl: result.company_seal_url,
+                totalMarks: result.report_total != null && result.report_max != null ? { total: Number(result.report_total), max: Number(result.report_max) } : null,
               }}
             />
           </div>

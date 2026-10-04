@@ -11,6 +11,7 @@ interface Cert {
   id: string;
   cert_id_string: string;
   cert_type: string | null;
+  report: { total: number; max: number } | null;
   score_pct: number;
   issued_at: string;
   revoked: boolean;
@@ -23,6 +24,8 @@ interface OrgBranding {
   org_name: string | null;
   verify_base_url: string | null;
   cert_background_url: string | null;
+  signatory_image_url: string | null;
+  company_seal_url: string | null;
 }
 
 export function AdminCertificates() {
@@ -37,12 +40,12 @@ export function AdminCertificates() {
         supabase
           .from('certificates')
           .select(
-            'id, cert_id_string, cert_type, score_pct, issued_at, revoked, revoked_reason, ' +
+            'id, cert_id_string, cert_type, report, score_pct, issued_at, revoked, revoked_reason, ' +
               'student:profiles!certificates_student_id_fkey(full_name, email), course:courses(title, cert_type)',
           )
           .order('issued_at', { ascending: false }),
       ) as Promise<Cert[]>,
-      unwrap(supabase.from('org_settings').select('org_name, verify_base_url, cert_background_url').single()) as Promise<OrgBranding>,
+      unwrap(supabase.from('org_settings').select('org_name, verify_base_url, cert_background_url, signatory_image_url, company_seal_url').single()) as Promise<OrgBranding>,
     ]);
     return { certs, org };
   }, []);
@@ -147,6 +150,9 @@ export function AdminCertificates() {
               orgName: q.data?.org?.org_name || 'EgireRobotics',
               verifyBaseUrl: q.data?.org?.verify_base_url || 'egirerobotics.com',
               backgroundUrl: q.data?.org?.cert_background_url ?? null,
+              signatureUrl: q.data?.org?.signatory_image_url ?? null,
+              sealUrl: q.data?.org?.company_seal_url ?? null,
+              totalMarks: viewing.report ? { total: viewing.report.total, max: viewing.report.max } : null,
             }}
           />
           {viewing.revoked && (
