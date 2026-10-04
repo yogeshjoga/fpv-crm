@@ -14,6 +14,8 @@ type Org = Tables<'org_settings'>;
 export function Settings() {
   const toast = useToast();
   const q = useQuery<Org>(() => unwrap(supabase.from('org_settings').select('*').single()) as Promise<Org>, []);
+  // The webhook secret lives in its own super-admin-only table, never in org_settings.
+  const secretQ = useQuery<{ google_form_secret: string }>(() => unwrap(supabase.from('org_secrets').select('google_form_secret').single()) as Promise<{ google_form_secret: string }>, []);
   const [form, setForm] = useState<Partial<Org>>({});
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
@@ -66,7 +68,7 @@ export function Settings() {
 
       <InstructorAccessCard />
 
-      <GoogleFormIntegration secret={org.google_form_secret} onRegenerated={() => q.refetch()} />
+      <GoogleFormIntegration secret={secretQ.data?.google_form_secret ?? ''} onRegenerated={() => secretQ.refetch()} />
 
       <GlassCard className="mb-6 p-6">
         <h2 className="mb-4 font-semibold text-neutral-900">Branding</h2>
@@ -283,7 +285,7 @@ function onEgireSubmit(e) {
     const newSecret = Array.from(crypto.getRandomValues(new Uint8Array(18)))
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('');
-    const { error } = await supabase.from('org_settings').update({ google_form_secret: newSecret }).eq('id', true);
+    const { error } = await supabase.from('org_secrets').update({ google_form_secret: newSecret }).eq('id', true);
     setBusy(false);
     if (error) return toast(error.message, 'error');
     toast('Secret regenerated');

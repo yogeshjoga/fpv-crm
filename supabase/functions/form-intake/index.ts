@@ -3,7 +3,7 @@ import { decodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
 
 /**
  * Webhook for Google Forms (via an Apps Script onSubmit trigger).
- * Auth: ?secret=<org_settings.google_form_secret> or header x-webhook-secret.
+ * Auth: ?secret=<org_secrets.google_form_secret> or header x-webhook-secret.
  * Body: { full_name, email, phone?, answers?, files?: [{ q, name, mime, data(base64) }] }
  * File-upload answers are stored in our own `enrollment-uploads` bucket so the
  * review screen can preview them without depending on Google Drive sharing.
@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const provided = url.searchParams.get('secret') ?? req.headers.get('x-webhook-secret') ?? '';
 
-    const { data: org } = await admin.from('org_settings').select('google_form_secret').single();
+    const { data: org } = await admin.from('org_secrets').select('google_form_secret').single();
     if (!org || !provided || provided !== org.google_form_secret) throw new HttpError(401, 'Invalid webhook secret.');
 
     const body = await req.json();

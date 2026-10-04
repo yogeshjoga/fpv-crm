@@ -51,7 +51,7 @@ export function EnrollmentForm() {
       supabase
         .from('enrollment_forms')
         .select(
-          'id, course_id, title, description, is_open, opens_at, closes_at, course:courses(title, slug), ' +
+          'id, course_id, title, description, is_open, opens_at, closes_at, ' +
             'enrollment_form_fields(id, label, field_type, options_json, required, help_text, position)',
         )
         .eq('slug', slug as string)
@@ -68,6 +68,11 @@ export function EnrollmentForm() {
         .eq('student_id', profile?.id ?? '')
         .maybeSingle(),
     )) as { id: string; status: string } | null;
+
+    // Students can no longer read courses they aren't enrolled in, so the course name for this
+    // form comes from a narrow function instead of a table join.
+    const { data: courseRows } = await supabase.rpc('enrollment_form_course', { p_form_id: form.id });
+    form.course = courseRows?.[0] ?? null;
 
     return { form, existing };
   }, [slug, profile?.id]);

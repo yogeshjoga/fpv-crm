@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, BookOpen, Eye, Lock } from 'lucide-react';
+import { ArrowRight, BookOpen, Eye } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
-import { Badge, EmptyState, PageHeader, Spinner, useToast } from '../../components/ui/kit';
+import { EmptyState, PageHeader, Spinner, useToast } from '../../components/ui/kit';
 
 interface Course {
   id: string;
@@ -15,27 +15,32 @@ interface Course {
   cover_image_url: string | null;
 }
 
+/**
+ * Students see only the courses they are enrolled in — the database enforces this too
+ * (courses RLS), so a student cannot list the rest of the catalog even by calling the API.
+ * Staff see every published course and can preview one as a student.
+ */
 export function CourseCatalog() {
   const { profile, isStaff } = useAuth();
   const toast = useToast();
   const uid = profile?.id ?? '';
   const [busy, setBusy] = useState<string | null>(null);
   const q = useQuery(async () => {
-    // enrollments / requests are scoped to the current user explicitly — staff
-    // RLS would otherwise return every student's rows and mislabel course cards.
-    const [courses, enrollments, requests, forms] = await Promise.all([
+    // Scoped to the current user explicitly — staff RLS would otherwise return every
+    // student's enrollments and mislabel course cards.
+    const [courses, enrollments] = await Promise.all([
       unwrap(supabase.from('courses').select('id, slug, title, summary, cover_image_url').eq('status', 'published').order('title')) as Promise<Course[]>,
       unwrap(supabase.from('enrollments').select('course_id, status').eq('student_id', uid)) as Promise<{ course_id: string; status: string }[]>,
-      unwrap(supabase.from('enrollment_requests').select('course_id, status').eq('student_id', uid)) as Promise<{ course_id: string; status: string }[]>,
-      unwrap(supabase.from('enrollment_forms').select('course_id, slug').eq('is_open', true)) as Promise<{ course_id: string; slug: string }[]>,
     ]);
-    return { courses, enrollments, requests, forms };
+    return { courses, enrollments };
   }, [uid]);
 
   if (q.loading) return <Spinner />;
   if (q.error) return <p className="text-sm text-red-600">{q.error}</p>;
 
-  const { courses, enrollments, requests, forms } = q.data!;
+  const { courses, enrollments } = q.data!;
+  const isEnrolled = (courseId: string) => enrollments.some((e) => e.course_id === courseId && e.status !== 'revoked');
+  const visible = isStaff ? courses : courses.filter((c) => isEnrolled(c.id));
 
   const startPreview = async (courseId: string) => {
     setBusy(courseId);
@@ -58,15 +63,20 @@ export function CourseCatalog() {
 
   return (
     <div>
-      <PageHeader title="Course catalog" subtitle="Published FPV & drone training courses" />
-      {!courses.length ? (
-        <EmptyState icon={<BookOpen size={22} />} title="No published courses yet" description="Check back soon." />
+      <PageHeader
+        title={isStaff ? 'Course catalog' : 'My courses'}
+        subtitle={isStaff ? 'Published FPV & drone training courses' : 'The courses you are enrolled in'}
+      />
+      {!visible.length ? (
+        <EmptyState
+          icon={<BookOpen size={22} />}
+          title={isStaff ? 'No published courses yet' : "You aren't enrolled in a course yet"}
+          description={isStaff ? 'Check back soon.' : 'Once your instructor enrolls you, your courses will appear here.'}
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {courses.map((c) => {
-            const enrolled = enrollments.find((e) => e.course_id === c.id);
-            const requested = requests.find((r) => r.course_id === c.id && r.status === 'pending');
-            const form = forms.find((f) => f.course_id === c.id);
+          {visible.map((c) => {
+            const enrolled = isEnrolled(c.id);
 
             return (
               <GlassCard key={c.id} className="flex flex-col p-5">
@@ -86,7 +96,7 @@ export function CourseCatalog() {
                     <Link to={`/app/courses/${c.slug}`} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:underline">
                       Open course <ArrowRight size={14} />
                     </Link>
-                  ) : isStaff ? (
+                  ) : (
                     <button
                       onClick={() => startPreview(c.id)}
                       disabled={busy === c.id}
@@ -94,16 +104,6 @@ export function CourseCatalog() {
                     >
                       <Eye size={13} /> {busy === c.id ? 'Starting…' : 'Preview as student'}
                     </button>
-                  ) : requested ? (
-                    <Badge tone="amber">Enrollment pending review</Badge>
-                  ) : form ? (
-                    <Link to={`/enroll/${form.slug}`} className="inline-flex items-center gap-2 rounded-full bg-[#1a1a1a] px-4 py-2 text-sm font-medium text-white">
-                      Enroll <ArrowRight size={14} />
-                    </Link>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 text-sm text-neutral-400">
-                      <Lock size={14} /> Enrollment closed
-                    </span>
                   )}
                   {enrolled && isStaff && (
                     <button

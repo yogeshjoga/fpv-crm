@@ -24,6 +24,21 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+/**
+ * Mirrors the access token into a cookie so same-origin <iframe>, <img> and download requests
+ * for protected course material (/api/private) can be authenticated — those cannot send an
+ * Authorization header. It is the same token the Supabase client already keeps in localStorage.
+ */
+function syncAccessCookie(session: Session | null) {
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  if (!session) {
+    document.cookie = `egr_at=; Path=/; Max-Age=0; SameSite=Lax${secure}`;
+    return;
+  }
+  const maxAge = Math.max(60, (session.expires_at ?? 0) - Math.floor(Date.now() / 1000));
+  document.cookie = `egr_at=${encodeURIComponent(session.access_token)}; Path=/; Max-Age=${maxAge}; SameSite=Lax${secure}`;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
@@ -42,12 +57,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let active = true;
     supabase.auth.getSession().then(async ({ data }) => {
       if (!active) return;
+      syncAccessCookie(data.session);
       setSession(data.session);
       if (data.session?.user) await loadProfile(data.session.user.id);
       setLoading(false);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, next) => {
+      syncAccessCookie(next);
       setSession(next);
       if (next?.user) await loadProfile(next.user.id);
       else setProfile(null);
