@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Award, Download, ShieldCheck } from 'lucide-react';
+import { Award, ClipboardList, Download, ShieldCheck } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useQuery, unwrap } from '../../lib/useQuery';
@@ -12,6 +12,8 @@ interface Cert {
   score_pct: number;
   issued_at: string;
   pdf_path: string | null;
+  cert_type: string | null;
+  report: { total: number; max: number; clearedAll: boolean } | null;
   revoked: boolean;
   course: { title: string } | null;
 }
@@ -25,7 +27,7 @@ export function StudentCertificates() {
       unwrap(
         supabase
           .from('certificates')
-          .select('id, cert_id_string, score_pct, issued_at, pdf_path, revoked, course:courses(title)')
+          .select('id, cert_id_string, score_pct, issued_at, pdf_path, cert_type, report, revoked, course:courses(title)')
           .eq('student_id', uid)
           .order('issued_at', { ascending: false }),
       ) as Promise<Cert[]>,
@@ -59,7 +61,8 @@ export function StudentCertificates() {
                 <div>
                   ID <span className="font-mono text-neutral-800">{c.cert_id_string}</span>
                 </div>
-                <div>Score {Number(c.score_pct)}%</div>
+                {c.cert_type && <div>Certificate of <span className="font-medium text-neutral-800">{c.cert_type}</span></div>}
+                <div>{c.report ? `Total ${c.report.total} / ${c.report.max}` : `Score ${Number(c.score_pct)}%`}</div>
                 <div>Issued {new Date(c.issued_at).toLocaleDateString()}</div>
               </div>
               <div className="mt-4 flex gap-2">
@@ -70,6 +73,14 @@ export function StudentCertificates() {
                   >
                     <Download size={14} /> PDF
                   </button>
+                )}
+                {c.report && (
+                  <Link
+                    to="/app/report-card"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-white"
+                  >
+                    <ClipboardList size={14} /> Report card
+                  </Link>
                 )}
                 <Link
                   to={`/verify/${c.cert_id_string}`}
