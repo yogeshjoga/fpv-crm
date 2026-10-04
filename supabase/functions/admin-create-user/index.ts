@@ -1,5 +1,7 @@
 import { adminClient, cors, emailButton, emailShell, HttpError, json, requireUser, sendEmail } from '../_shared/common.ts';
 
+const esc = (s: unknown) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
 /** Super-admin only: create a staff (or student) account and send a set-password link. */
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -12,7 +14,7 @@ Deno.serve(async (req) => {
 
     const { email, full_name, role, department, designation, joined_on } = await req.json();
     if (!email?.trim()) throw new HttpError(400, 'Email is required.');
-    const wantRole = ['student', 'instructor', 'admin', 'super_admin'].includes(role) ? role : 'instructor';
+    const wantRole = ['student', 'instructor', 'coordinator', 'admin', 'super_admin'].includes(role) ? role : 'instructor';
 
     const { data: created, error: cErr } = await admin.auth.admin.createUser({
       email: email.trim(),
@@ -47,8 +49,8 @@ Deno.serve(async (req) => {
       .from('org_settings')
       .select('org_name, logo_url, signatory_name, signatory_title, signatory_image_url, support_email')
       .single();
-    const orgName = org?.org_name ?? 'EgireRobotics';
-    const firstName = String(full_name ?? 'there').replace(/</g, '&lt;').split(' ')[0] || 'there';
+    const orgName = esc(org?.org_name ?? 'EgireRobotics');
+    const firstName = esc(String(full_name ?? 'there').split(' ')[0] || 'there');
 
     const emailRes = await sendEmail({
       to: email.trim(),

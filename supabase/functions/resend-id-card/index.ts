@@ -1,5 +1,7 @@
 import { adminClient, cors, HttpError, json, requireUser } from '../_shared/common.ts';
 
+const STAFF_ROLES = ['instructor', 'coordinator', 'admin', 'super_admin'];
+
 /**
  * Staff: re-send a student's ID card. This regenerates it first (from the
  * card's own saved type/workshop/validity/fee) rather than re-mailing the
@@ -16,7 +18,7 @@ Deno.serve(async (req) => {
     const admin = adminClient();
     const caller = await requireUser(req, admin);
     const { data: me } = await admin.from('profiles').select('role').eq('id', caller.id).single();
-    if (!me || !['instructor', 'super_admin'].includes(me.role)) throw new HttpError(403, 'Forbidden.');
+    if (!me || !STAFF_ROLES.includes(me.role)) throw new HttpError(403, 'Forbidden.');
 
     const { id_card_id } = await req.json();
     if (!id_card_id) throw new HttpError(400, 'id_card_id is required.');

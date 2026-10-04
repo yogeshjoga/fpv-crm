@@ -1,5 +1,7 @@
 import { adminClient, cors, HttpError, json, requireUser } from '../_shared/common.ts';
 
+const STAFF_ROLES = ['instructor', 'coordinator', 'admin', 'super_admin'];
+
 /**
  * Public registration intake.
  *  - single submit from our public form: { form_slug, full_name, email, phone?, answers? }
@@ -19,7 +21,7 @@ Deno.serve(async (req) => {
     if (payload.source === 'csv' && Array.isArray(payload.rows)) {
       const user = await requireUser(req, admin);
       const { data: me } = await admin.from('profiles').select('role').eq('id', user.id).single();
-      if (!me || !['instructor', 'super_admin'].includes(me.role)) throw new HttpError(403, 'Forbidden.');
+      if (!me || !STAFF_ROLES.includes(me.role)) throw new HttpError(403, 'Forbidden.');
 
       if (payload.rows.length > 2000) throw new HttpError(413, 'Import at most 2000 rows at a time.');
       let inserted = 0;

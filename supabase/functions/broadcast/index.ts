@@ -1,5 +1,7 @@
 import { adminClient, cors, emailShell, HttpError, json, requireUser, sendEmail } from '../_shared/common.ts';
 
+const STAFF_ROLES = ['instructor', 'coordinator', 'admin', 'super_admin'];
+
 /** Staff-only: fan a message out to an audience as in-app notifications + email. */
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -8,7 +10,7 @@ Deno.serve(async (req) => {
     const admin = adminClient();
     const user = await requireUser(req, admin);
     const { data: me } = await admin.from('profiles').select('role').eq('id', user.id).single();
-    if (!me || !['instructor', 'super_admin'].includes(me.role)) throw new HttpError(403, 'Forbidden.');
+    if (!me || !STAFF_ROLES.includes(me.role)) throw new HttpError(403, 'Forbidden.');
 
     const { subject, body, audience_type, audience_ref } = await req.json();
     if (!subject?.trim()) throw new HttpError(400, 'Subject is required.');
@@ -21,7 +23,7 @@ Deno.serve(async (req) => {
       const { data } = await admin.from('profiles').select('id, email, full_name').eq('role', 'student').eq('status', 'active');
       recipients = data ?? [];
     } else if (audience_type === 'all_staff') {
-      const { data } = await admin.from('profiles').select('id, email, full_name').in('role', ['instructor', 'super_admin']);
+      const { data } = await admin.from('profiles').select('id, email, full_name').in('role', STAFF_ROLES);
       recipients = data ?? [];
     } else if (audience_type === 'course') {
       const courseId = audience_ref?.course_id;

@@ -132,7 +132,9 @@ Deno.serve(async (req) => {
 
     const { data: seq } = await admin.rpc('next_cert_number', { p_course_code: course.course_code });
     const year = new Date().getFullYear();
-    const certId = `${org.cert_id_prefix}-${course.course_code}-${year}-${String(seq ?? 1).padStart(6, '0')}`;
+    // A random tail makes certificate numbers impossible to enumerate from the public verify page.
+    const tail = Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 32]).join('');
+    const certId = `${org.cert_id_prefix}-${course.course_code}-${year}-${String(seq ?? 1).padStart(6, '0')}-${tail}`;
     const base = String(org.verify_base_url || '').replace(/\/+$/, '');
     const verifyUrl = `${base}/verify/${certId}`;
     const issuedAt = new Date();

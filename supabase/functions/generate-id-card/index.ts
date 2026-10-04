@@ -2,6 +2,8 @@ import { PDFDocument, StandardFonts, rgb } from 'https://esm.sh/pdf-lib@1.17.1';
 import { encodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
 import { adminClient, cors, emailShell, HttpError, json, sendEmail } from '../_shared/common.ts';
 
+const STAFF_ROLES = ['instructor', 'coordinator', 'admin', 'super_admin'];
+
 /** True for our own service-role calls (e.g. accept-registration) or a signed-in instructor/super_admin. */
 async function callerAuthorized(req: Request, admin: ReturnType<typeof adminClient>): Promise<boolean> {
   const provided = (req.headers.get('Authorization') ?? '').replace('Bearer ', '').trim();
@@ -16,7 +18,7 @@ async function callerAuthorized(req: Request, admin: ReturnType<typeof adminClie
     const { data } = await admin.auth.getUser(provided);
     if (!data.user) return false;
     const { data: me } = await admin.from('profiles').select('role').eq('id', data.user.id).single();
-    return !!me && ['instructor', 'super_admin'].includes(me.role);
+    return !!me && STAFF_ROLES.includes(me.role);
   } catch {
     return false;
   }
@@ -77,6 +79,8 @@ function fmtDate(d: Date): string {
 }
 
 async function embedRemoteImage(pdf: PDFDocument, url: string) {
+  // Only fetch images we host (or Google sign-in photos): never an address a user typed in.
+  if (!/^https:\/\/(txbrnewcztixcagdnnfx\.supabase\.co\/storage\/|lh3\.googleusercontent\.com\/)/.test(url)) throw new Error('image host not allowed');
   const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
   const lower = url.toLowerCase();
   return lower.endsWith('.jpg') || lower.endsWith('.jpeg') ? await pdf.embedJpg(bytes) : await pdf.embedPng(bytes);
