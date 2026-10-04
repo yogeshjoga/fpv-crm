@@ -1,4 +1,5 @@
 import { adminClient, cors, HttpError, json, requireUser } from '../_shared/common.ts';
+import { evaluate, type Scheme } from '../_shared/assessment.ts';
 
 const STAFF_ROLES = ['instructor', 'coordinator', 'admin', 'super_admin'];
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -7,9 +8,10 @@ type Admin = ReturnType<typeof adminClient>;
 type Course = Record<string, any>;
 
 /**
- * Turns a student's online exam score and the instructor-entered viva / simulation / piloting
- * marks into one total, then issues the certificate: "Merit" at or above the course's merit
- * threshold, "Participation" below it. Called by staff, a few students at a time so each
+ * Turns a student's online exam score and the instructor-entered viva / simulation / free flight
+ * marks into a result, then issues the certificate. Every module has its own pass mark and must be
+ * cleared on its own; a student who fails any one cannot get Merit however high the total is.
+ * "Merit" = every module cleared and the merit total reached, otherwise "Participation". Called by staff, a few students at a time so each
  * request stays inside the function time limit (every certificate renders a PDF and emails it).
  */
 Deno.serve(async (req) => {
@@ -76,13 +78,30 @@ async function finalizeOne(admin: Admin, course: Course, studentId: string) {
   for (const c of ['viva', 'simulation', 'piloting']) if (!marks.has(c)) missing.push(c);
   if (missing.length) return { status: 'incomplete', missing };
 
-  const online = round2((Number(best!.score_pct ?? 0) / 100) * Number(course.marks_online));
-  const viva = marks.get('viva')!;
-  const simulation = marks.get('simulation')!;
-  const piloting = marks.get('piloting')!;
-  const total = round2(online + viva + simulation + piloting);
-  const max = round2(Number(course.marks_online) + Number(course.marks_viva) + Number(course.marks_simulation) + Number(course.marks_piloting));
-  const certType = total >= Number(course.merit_min_marks) ? 'Merit' : 'Participation';
+  const scheme: Scheme = {
+    max: {
+      online: Number(course.marks_online),
+      viva: Number(course.marks_viva),
+      simulation: Number(course.marks_simulation),
+      piloting: Number(course.marks_piloting),
+    },
+    pass: {
+      online: Number(course.pass_marks_online),
+      viva: Number(course.pass_marks_viva),
+      simulation: Number(course.pass_marks_simulation),
+      piloting: Number(course.pass_marks_piloting),
+    },
+    meritMin: Number(course.merit_min_marks),
+  };
+  // The online mark is judged unrounded (74.99% must not round up into a pass), shown rounded.
+  const onlineRaw = (Number(best!.score_pct ?? 0) / 100) * scheme.max.online;
+  const ev = evaluate(scheme, { online: onlineRaw, viva: Number(marks.get('viva')), simulation: Number(marks.get('simulation')), piloting: Number(marks.get('piloting')) })!;
+  const byKey = Object.fromEntries(ev.modules.map((m) => [m.key, m.marks])) as Record<string, number>;
+  const certType = ev.result;
+  const total = ev.total;
+  const max = ev.max;
+  // Snapshot kept on the certificate: this is the report card the student sees.
+  const report = { ...ev, merit_min: scheme.meritMin, course: course.title, finalized_at: new Date().toISOString() };
 
   const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-certificate`, {
     method: 'POST',
@@ -93,12 +112,13 @@ async function finalizeOne(admin: Admin, course: Course, studentId: string) {
       course_id: course.id,
       score_pct: max ? round2((total / max) * 100) : 0,
       cert_type: certType,
-      breakdown: { online, viva, simulation, piloting, total, max },
+      breakdown: { online: byKey.online, viva: byKey.viva, simulation: byKey.simulation, piloting: byKey.piloting, total, max },
+      report,
     }),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error ?? `Certificate generation failed (${res.status})`);
 
   await admin.from('enrollments').update({ status: 'completed' }).eq('id', best!.enrollment_id);
-  return { status: 'issued', cert_id_string: body.cert_id_string, cert_type: certType, total, max };
+  return { status: 'issued', cert_id_string: body.cert_id_string, cert_type: certType, total, max, cleared_all: ev.clearedAll, failed: ev.failed };
 }

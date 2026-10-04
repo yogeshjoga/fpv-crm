@@ -1,4 +1,5 @@
 import { slugify } from './slug';
+import { evaluate, type Scheme } from './assessment';
 
 /**
  * Printable / editable mark sheets for instructors who examine offline (viva, simulation,
@@ -15,6 +16,8 @@ export interface SheetStudent {
   simulation?: number;
   piloting?: number;
   online?: number;
+  /** The online mark before rounding; pass/fail is judged on this so 74.99% cannot round up into a pass. */
+  onlineRaw?: number;
 }
 
 export interface SheetOptions {
@@ -24,14 +27,25 @@ export interface SheetOptions {
   /** Fill in marks already entered; otherwise the mark boxes are left blank for handwriting. */
   withMarks: boolean;
   withEmail: boolean;
-  /** With every part filled in, adds a Result column: Merit at/above this total, else Participation. */
-  meritMin?: number;
+  /** With every part filled in, adds a Result column using the course pass marks: every module must be cleared. */
+  scheme?: Scheme;
   students: SheetStudent[];
 }
 
 const PART_LABEL: Record<Exclude<SheetPart, 'all'>, string> = { viva: 'Viva', simulation: 'Simulation', piloting: 'Real FPV piloting' };
 
-function layout(o: SheetOptions) {
+/** "Merit", or "Participation (not cleared: Viva, Free flight)"; the PDF uses the short form. */
+function resultText(o: SheetOptions, s: SheetStudent, long: boolean): string {
+  if (!o.scheme || s.viva === undefined || s.simulation === undefined || s.piloting === undefined || (s.online === undefined && s.onlineRaw === undefined)) {
+    return 'Incomplete';
+  }
+  const ev = evaluate(o.scheme, { online: s.onlineRaw ?? s.online!, viva: s.viva, simulation: s.simulation, piloting: s.piloting });
+  if (!ev) return 'Incomplete';
+  if (!ev.failed.length) return ev.result;
+  return long ? `${ev.result} (not cleared: ${ev.failed.join(', ')})` : 'Not cleared';
+}
+
+function layout(o: SheetOptions, longResult = true) {
   const parts = (o.part === 'all' ? ['viva', 'simulation', 'piloting'] : [o.part]) as Exclude<SheetPart, 'all'>[];
   const total = o.part === 'all' ? o.max.viva + o.max.simulation + o.max.piloting + o.max.online : o.max[o.part];
   const title = o.part === 'all' ? `${o.course} — mark sheet` : `${o.course} — ${PART_LABEL[o.part]} mark sheet`;
@@ -39,7 +53,7 @@ function layout(o: SheetOptions) {
     o.part === 'all'
       ? `Viva ${o.max.viva} · Simulation ${o.max.simulation} · Real piloting ${o.max.piloting} · Online exam ${o.max.online} · Total ${total}`
       : `${PART_LABEL[o.part]} — out of ${total} marks`;
-  const showResult = o.part === 'all' && o.withMarks && o.meritMin !== undefined;
+  const showResult = o.part === 'all' && o.withMarks && o.scheme !== undefined;
   const headers = [
     'No.',
     'Student',
@@ -60,7 +74,7 @@ function layout(o: SheetOptions) {
       ...(o.withEmail ? [s.email] : []),
       ...partValues,
       ...(o.part === 'all' && o.withMarks ? [s.online ?? '', sum] : []),
-      ...(showResult ? [sum === '' ? 'Incomplete' : sum >= o.meritMin! ? 'Merit' : 'Participation'] : []),
+      ...(showResult ? [resultText(o, s, longResult)] : []),
       '',
     ];
   });
@@ -122,7 +136,7 @@ async function buildXlsx(o: SheetOptions): Promise<BuiltSheet> {
     ),
   ];
 
-  const widths = [6, 30, ...(o.withEmail ? [34] : []), ...parts.map(() => 16), ...(o.part === 'all' && o.withMarks ? [14, 14] : []), ...(showResult ? [16] : []), 36];
+  const widths = [6, 30, ...(o.withEmail ? [34] : []), ...parts.map(() => 16), ...(o.part === 'all' && o.withMarks ? [14, 14] : []), ...(showResult ? [44] : []), 36];
   const blob = await writeXlsxFile(sheetData as never, {
     sheet: o.part === 'all' ? 'Mark sheet' : PART_LABEL[o.part],
     columns: widths.map((width) => ({ width })),
@@ -134,7 +148,7 @@ async function buildXlsx(o: SheetOptions): Promise<BuiltSheet> {
 
 async function buildPdf(o: SheetOptions): Promise<BuiltSheet> {
   const [{ jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
-  const { title, subtitle, headers, body, parts, showResult } = layout(o);
+  const { title, subtitle, headers, body, parts, showResult } = layout(o, false);
   const landscape = headers.length > 6;
   const doc = new jsPDF({ orientation: landscape ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
   const w = doc.internal.pageSize.getWidth();
@@ -153,18 +167,19 @@ async function buildPdf(o: SheetOptions): Promise<BuiltSheet> {
   doc.setTextColor(30).text('Examiner: ______________________', 14, 30).text('Date: ______________', w - 14 - 50, 30);
 
   const markStart = o.withEmail ? 3 : 2;
+  const tight = o.part === 'all' && o.withMarks; // every part plus online, total and result on one page
   // Fixed widths for everything but Remarks, which takes whatever is left: that is the column
   // people actually write in.
   const columnStyles: Record<number, Record<string, unknown>> = {
     0: { cellWidth: 12, halign: 'center' },
-    1: { cellWidth: landscape ? 56 : 54 },
+    1: { cellWidth: tight ? 50 : landscape ? 56 : 54 },
   };
-  if (o.withEmail) columnStyles[2] = { cellWidth: landscape ? 50 : 44, fontSize: 8.5 };
-  parts.forEach((_, i) => (columnStyles[markStart + i] = { cellWidth: landscape ? 25 : 28, halign: 'center' }));
+  if (o.withEmail) columnStyles[2] = { cellWidth: tight ? 44 : landscape ? 50 : 44, fontSize: 8.5 };
+  parts.forEach((_, i) => (columnStyles[markStart + i] = { cellWidth: tight ? 22 : landscape ? 25 : 28, halign: 'center' }));
   if (o.part === 'all' && o.withMarks) {
     columnStyles[markStart + parts.length] = { cellWidth: 22, halign: 'center' };
     columnStyles[markStart + parts.length + 1] = { cellWidth: 22, halign: 'center' };
-    if (showResult) columnStyles[markStart + parts.length + 2] = { cellWidth: 28, halign: 'center' };
+    if (showResult) columnStyles[markStart + parts.length + 2] = { cellWidth: 26, halign: 'center' };
   }
 
   autoTable(doc, {

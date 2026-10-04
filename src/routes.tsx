@@ -46,6 +46,7 @@ import { AdminCertificates } from './pages/admin/AdminCertificates';
 import { AdminResources } from './pages/admin/AdminResources';
 import { Resources } from './pages/student/Resources';
 import { Reviews } from './pages/student/Reviews';
+import { ReportCard } from './pages/student/ReportCard';
 import { AdminReviews } from './pages/admin/AdminReviews';
 import { AdminExams } from './pages/admin/AdminExams';
 import { IdCards } from './pages/admin/IdCards';
@@ -98,6 +99,7 @@ export function AppRoutes() {
         <Route path="calendar" element={<StudentCalendar />} />
         <Route path="resources" element={<Resources />} />
         <Route path="certificates" element={<StudentCertificates />} />
+        <Route path="report-card" element={<ReportCard />} />
         <Route path="profile" element={<StudentProfile />} />
         <Route path="ask" element={<Ask />} />
         <Route path="reviews" element={<Reviews />} />

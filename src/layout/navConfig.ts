@@ -2,7 +2,7 @@ import {
   LayoutDashboard, BookOpen, Award, UserCircle, CalendarDays,
   ClipboardCheck, Users, GraduationCap, Briefcase, Megaphone,
   FormInput, Inbox, ScrollText, Settings2, UserPlus, BarChart3,
-  MessageCircle, ImagePlus, Layers3, HelpCircle, IdCard, Activity, FolderOpen, MessageSquareHeart, ListChecks,
+  MessageCircle, ImagePlus, Layers3, HelpCircle, IdCard, Activity, FolderOpen, MessageSquareHeart, ListChecks, ClipboardList,
 } from 'lucide-react';
 import type { NavItem } from './Shell';
 
@@ -14,6 +14,7 @@ export const studentNav: NavItem[] = [
   { to: '/app/ask', label: 'Ask us', icon: MessageCircle },
   { to: '/app/reviews', label: 'Reviews', icon: MessageSquareHeart },
   { to: '/app/calendar', label: 'Calendar', icon: CalendarDays },
+  { to: '/app/report-card', label: 'Report card', icon: ClipboardList },
   { to: '/app/certificates', label: 'Certificates', icon: Award },
   { to: '/app/profile', label: 'Profile', icon: UserCircle },
 ];
