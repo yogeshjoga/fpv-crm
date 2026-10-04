@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useQuery, unwrap } from '../../lib/useQuery';
-import { CONFIGURABLE_MODULES } from '../../layout/navConfig';
+import { CONFIGURABLE_MODULES, STUDENT_MODULES } from '../../layout/navConfig';
 import { invalidateModuleAccessCache, type AccessLevel } from '../../lib/moduleAccess';
 import { GlassCard } from '../../components/ui/shared';
 import { Button, Field, PageHeader, Select, Spinner, TextArea, TextInput, useToast } from '../../components/ui/kit';
@@ -66,7 +66,7 @@ export function Settings() {
     <div className="max-w-2xl">
       <PageHeader title="Company settings" subtitle="Branding and default exam parameters" />
 
-      <InstructorAccessCard />
+      <RoleAccessCard />
 
       <GoogleFormIntegration secret={secretQ.data?.google_form_secret ?? ''} onRegenerated={() => secretQ.refetch()} />
 
@@ -150,59 +150,158 @@ export function Settings() {
 }
 
 const LEVEL_LABEL: Record<AccessLevel, string> = { none: 'Hidden', read: 'Read only', write: 'Read & write' };
+const STAFF_ROLES = [
+  { key: 'instructor', label: 'Instructor' },
+  { key: 'coordinator', label: 'Coordinator' },
+  { key: 'admin', label: 'Admin' },
+] as const;
 
-function InstructorAccessCard() {
+interface AccessRow {
+  role: string;
+  module_key: string;
+  access_level: AccessLevel;
+}
+
+/**
+ * Who can see and change what. Each of instructor, coordinator and admin has its own level for
+ * every admin section (hidden / read only / read & write), and students get their own on/off list of
+ * student sections. A super admin always has everything and is not listed.
+ */
+function RoleAccessCard() {
   const toast = useToast();
-  const q = useQuery<{ module_key: string; access_level: AccessLevel }[]>(
-    () => unwrap(supabase.from('instructor_module_access').select('module_key, access_level')) as Promise<{ module_key: string; access_level: AccessLevel }[]>,
-    [],
-  );
+  const q = useQuery<AccessRow[]>(() => unwrap(supabase.from('role_module_access').select('role, module_key, access_level')) as Promise<AccessRow[]>, []);
   const [busy, setBusy] = useState<string | null>(null);
 
-  const levelFor = (key: string): AccessLevel => q.data?.find((r) => r.module_key === key)?.access_level ?? 'read';
+  // A section with no row yet is read-only for staff and visible for students — the old behaviour.
+  const levelFor = (role: string, key: string): AccessLevel => q.data?.find((r) => r.role === role && r.module_key === key)?.access_level ?? 'read';
 
-  const setLevel = async (key: string, access_level: AccessLevel) => {
-    setBusy(key);
+  const save = async (rows: AccessRow[], busyKey: string) => {
+    setBusy(busyKey);
+    const stamp = new Date().toISOString();
     const { error } = await supabase
-      .from('instructor_module_access')
-      .upsert({ module_key: key, access_level, updated_at: new Date().toISOString() }, { onConflict: 'module_key' });
+      .from('role_module_access')
+      .upsert(rows.map((r) => ({ ...r, updated_at: stamp })), { onConflict: 'role,module_key' });
     setBusy(null);
     if (error) return toast(error.message, 'error');
     invalidateModuleAccessCache();
     q.refetch();
   };
 
+  const setOne = (role: string, key: string, access_level: AccessLevel) => save([{ role, module_key: key, access_level }], `${role}:${key}`);
+  const setAll = (role: string, access_level: AccessLevel, modules: { key: string }[]) =>
+    save(
+      modules.map((m) => ({ role, module_key: m.key, access_level })),
+      `all:${role}`,
+    );
+
   return (
     <GlassCard className="mb-6 p-6">
-      <h2 className="mb-1 font-semibold text-neutral-900">Instructor module access</h2>
+      <h2 className="mb-1 font-semibold text-neutral-900">Role permissions</h2>
       <p className="mb-4 text-sm text-neutral-500">
-        For each admin section, choose whether instructor accounts have it hidden, can only view it, or can also
-        create/edit/delete there. This is enforced both in the sidebar and on the page itself — an instructor set to
-        "Read only" sees every write button, form and toggle disappear, and can't reach a write action by URL either.
-        Analytics, Employees, Users and this Settings page always stay super-admin-only, regardless of these settings.
+        Choose, for every role separately, which sections are <strong>hidden</strong>, <strong>read only</strong> (can open it, but every create, edit and delete
+        control disappears) or <strong>read &amp; write</strong>. Changes apply the next time that person opens or reloads the app. Super admins always have full
+        access, and Analytics, Employees, Users and this Settings page stay super-admin-only. To check a setup, use <strong>View as</strong> at the top of the
+        admin area.
       </p>
-      {q.loading ? (
+
+      {q.loading && !q.data ? (
         <Spinner />
       ) : (
-        <div className="grid gap-2 sm:grid-cols-2">
-          {CONFIGURABLE_MODULES.map((m) => (
-            <div key={m.key} className={`flex items-center justify-between gap-3 rounded-xl border border-white/60 bg-white/40 px-3 py-2 ${busy === m.key ? 'opacity-50' : ''}`}>
-              <span className="text-sm text-neutral-800">{m.label}</span>
-              <Select
-                value={levelFor(m.key)}
-                disabled={busy === m.key}
-                onChange={(e) => setLevel(m.key, e.target.value as AccessLevel)}
-                className="w-36 py-1.5 text-xs"
-              >
-                {(Object.keys(LEVEL_LABEL) as AccessLevel[]).map((lvl) => (
-                  <option key={lvl} value={lvl}>
-                    {LEVEL_LABEL[lvl]}
-                  </option>
+        <>
+          <h3 className="mb-2 text-sm font-semibold text-neutral-800">Staff roles — admin sections</h3>
+          <div className="overflow-x-auto rounded-2xl border border-white/60 bg-white/40">
+            <table className="w-full min-w-[620px] text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-neutral-400">
+                  <th className="px-4 py-3">Section</th>
+                  {STAFF_ROLES.map((r) => (
+                    <th key={r.key} className="px-3 py-3">
+                      <div>{r.label}</div>
+                      <Select
+                        value=""
+                        disabled={busy === `all:${r.key}`}
+                        onChange={(e) => e.target.value && setAll(r.key, e.target.value as AccessLevel, CONFIGURABLE_MODULES)}
+                        className="mt-1 w-36 py-1 text-[11px] font-normal normal-case tracking-normal"
+                        aria-label={`Set every section for ${r.label}`}
+                      >
+                        <option value="">Set all to…</option>
+                        {(Object.keys(LEVEL_LABEL) as AccessLevel[]).map((lvl) => (
+                          <option key={lvl} value={lvl}>
+                            {LEVEL_LABEL[lvl]}
+                          </option>
+                        ))}
+                      </Select>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/50">
+                {CONFIGURABLE_MODULES.map((m) => (
+                  <tr key={m.key}>
+                    <td className="px-4 py-2 font-medium text-neutral-800">{m.label}</td>
+                    {STAFF_ROLES.map((r) => {
+                      const level = levelFor(r.key, m.key);
+                      return (
+                        <td key={r.key} className="px-3 py-2">
+                          <Select
+                            value={level}
+                            disabled={busy === `${r.key}:${m.key}` || busy === `all:${r.key}`}
+                            onChange={(e) => setOne(r.key, m.key, e.target.value as AccessLevel)}
+                            className={`w-36 py-1.5 text-xs ${level === 'none' ? 'text-red-600' : level === 'write' ? 'text-green-700' : ''}`}
+                          >
+                            {(Object.keys(LEVEL_LABEL) as AccessLevel[]).map((lvl) => (
+                              <option key={lvl} value={lvl}>
+                                {LEVEL_LABEL[lvl]}
+                              </option>
+                            ))}
+                          </Select>
+                        </td>
+                      );
+                    })}
+                  </tr>
                 ))}
-              </Select>
-            </div>
-          ))}
-        </div>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mb-2 mt-6 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-neutral-800">Students — which pages they see</h3>
+            <Select
+              value=""
+              disabled={busy === 'all:student'}
+              onChange={(e) => e.target.value && setAll('student', e.target.value as AccessLevel, STUDENT_MODULES)}
+              className="w-40 py-1 text-xs"
+              aria-label="Set every student section"
+            >
+              <option value="">Set all to…</option>
+              <option value="read">Visible</option>
+              <option value="none">Hidden</option>
+            </Select>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {STUDENT_MODULES.map((m) => {
+              const visible = levelFor('student', m.key) !== 'none';
+              return (
+                <div
+                  key={m.key}
+                  className={`flex items-center justify-between gap-3 rounded-xl border border-white/60 bg-white/40 px-3 py-2 ${busy === `student:${m.key}` ? 'opacity-50' : ''}`}
+                >
+                  <span className="text-sm text-neutral-800">{m.label}</span>
+                  <Select
+                    value={visible ? 'read' : 'none'}
+                    disabled={busy === `student:${m.key}` || busy === 'all:student'}
+                    onChange={(e) => setOne('student', m.key, e.target.value as AccessLevel)}
+                    className={`w-32 py-1.5 text-xs ${visible ? '' : 'text-red-600'}`}
+                  >
+                    <option value="read">Visible</option>
+                    <option value="none">Hidden</option>
+                  </Select>
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-xs text-neutral-400">Dashboard and Profile are always shown to students. A hidden page also can't be opened by its link.</p>
+        </>
       )}
     </GlassCard>
   );

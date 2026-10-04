@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
-import { isModuleVisible, useInstructorModuleAccess } from '../lib/moduleAccess';
+import { isModuleVisible, useModuleAccess } from '../lib/moduleAccess';
 import { Spinner } from '../components/ui/kit';
 
 /** Requires a signed-in user. Sends unauthenticated visitors to /login. */
@@ -41,15 +41,15 @@ export function RequireRole({
 }
 
 /**
- * Requires the admin module `moduleKey` to be visible per instructor_module_access.
- * Super admins always pass; instructor/coordinator/admin are all checked against
- * the same configured list (module access is global per module, not per role).
+ * Requires the admin section `moduleKey` to be visible for the signed-in user's own role, per
+ * role_module_access. Super admins always pass; instructor, coordinator and admin are each checked
+ * against their own configured access.
  * Never wrap the admin dashboard's index route with this — its own fallback
  * redirect target is itself, which would loop.
  */
 export function RequireModule({ moduleKey, children }: { moduleKey: string; children: ReactElement }) {
   const { loading, isAuthed, profile } = useAuth();
-  const access = useInstructorModuleAccess();
+  const access = useModuleAccess(profile?.role);
   if (loading) return <Spinner />;
   if (!isAuthed) return <Navigate to="/login" replace />;
   if (!profile) return <Spinner label="Loading your profile…" />;
@@ -58,5 +58,18 @@ export function RequireModule({ moduleKey, children }: { moduleKey: string; chil
     if (access.loading) return <Spinner />;
     if (!isModuleVisible(access.data, moduleKey)) return <Navigate to="/admin" replace />;
   }
+  return children;
+}
+
+/**
+ * Hides a student section a super admin has turned off for students (Company Settings → role
+ * access). Staff opening the student view always pass.
+ */
+export function RequireStudentModule({ moduleKey, children }: { moduleKey: string; children: ReactElement }) {
+  const { profile } = useAuth();
+  const access = useModuleAccess(profile?.role === 'student' ? 'student' : null);
+  if (profile?.role !== 'student') return children;
+  if (access.loading) return <Spinner />;
+  if (!isModuleVisible(access.data, moduleKey)) return <Navigate to="/app" replace />;
   return children;
 }

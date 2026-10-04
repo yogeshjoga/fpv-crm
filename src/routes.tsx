@@ -3,7 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { PublicShell } from './layout/PublicShell';
 import { Shell } from './layout/Shell';
 import { studentNav, adminNav } from './layout/navConfig';
-import { RequireActive, RequireModule, RequireRole } from './auth/guards';
+import { RequireActive, RequireModule, RequireRole, RequireStudentModule } from './auth/guards';
 
 import { Landing } from './pages/public/Landing';
 import { Login } from './pages/public/Login';
@@ -93,17 +93,17 @@ export function AppRoutes() {
         }
       >
         <Route index element={<StudentDashboard />} />
-        <Route path="courses" element={<CourseCatalog />} />
-        <Route path="courses/:slug" element={<CourseViewer />} />
-        <Route path="courses/:slug/exam" element={<ExamFlow />} />
-        <Route path="calendar" element={<StudentCalendar />} />
-        <Route path="resources" element={<Resources />} />
-        <Route path="certificates" element={<StudentCertificates />} />
-        <Route path="report-card" element={<ReportCard />} />
+        <Route path="courses" element={<RequireStudentModule moduleKey="courses"><CourseCatalog /></RequireStudentModule>} />
+        <Route path="courses/:slug" element={<RequireStudentModule moduleKey="courses"><CourseViewer /></RequireStudentModule>} />
+        <Route path="courses/:slug/exam" element={<RequireStudentModule moduleKey="courses"><ExamFlow /></RequireStudentModule>} />
+        <Route path="calendar" element={<RequireStudentModule moduleKey="calendar"><StudentCalendar /></RequireStudentModule>} />
+        <Route path="resources" element={<RequireStudentModule moduleKey="resources"><Resources /></RequireStudentModule>} />
+        <Route path="certificates" element={<RequireStudentModule moduleKey="certificates"><StudentCertificates /></RequireStudentModule>} />
+        <Route path="report-card" element={<RequireStudentModule moduleKey="report-card"><ReportCard /></RequireStudentModule>} />
         <Route path="profile" element={<StudentProfile />} />
-        <Route path="ask" element={<Ask />} />
-        <Route path="reviews" element={<Reviews />} />
-        <Route path="showcase" element={<Showcase />} />
+        <Route path="ask" element={<RequireStudentModule moduleKey="ask"><Ask /></RequireStudentModule>} />
+        <Route path="reviews" element={<RequireStudentModule moduleKey="reviews"><Reviews /></RequireStudentModule>} />
+        <Route path="showcase" element={<RequireStudentModule moduleKey="showcase"><Showcase /></RequireStudentModule>} />
       </Route>
 
       <Route

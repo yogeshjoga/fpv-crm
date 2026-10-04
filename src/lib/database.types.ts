@@ -1820,6 +1820,27 @@ export type Database = {
           },
         ]
       }
+      role_module_access: {
+        Row: {
+          access_level: string
+          module_key: string
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          access_level: string
+          module_key: string
+          role: string
+          updated_at?: string
+        }
+        Update: {
+          access_level?: string
+          module_key?: string
+          role?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       showcase_comments: {
         Row: {
           author_id: string
