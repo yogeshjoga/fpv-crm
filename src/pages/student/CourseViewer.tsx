@@ -1,3 +1,4 @@
+import { ExamOpensTimer } from '../../components/ExamCountdown';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { AlertTriangle, Download, FileText, GraduationCap, Lock, PlayCircle } from 'lucide-react';
@@ -449,7 +450,11 @@ export function CourseViewer() {
                 </div>
               ) : examGate ? (
                 <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                  <Lock size={15} className="mt-0.5 shrink-0" /> {examGate}
+                  <Lock size={15} className="mt-0.5 shrink-0" />
+                  <div>
+                    {examGate}
+                    {course.exam_access === 'scheduled' && opensMs !== null && nowMs < opensMs && <ExamOpensTimer opensAt={course.exam_opens_at!} />}
+                  </div>
                 </div>
               ) : cooldownActive ? (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
