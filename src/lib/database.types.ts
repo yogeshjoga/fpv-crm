@@ -1820,6 +1820,27 @@ export type Database = {
           },
         ]
       }
+      role_module_access: {
+        Row: {
+          access_level: string
+          module_key: string
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          access_level: string
+          module_key: string
+          role: string
+          updated_at?: string
+        }
+        Update: {
+          access_level?: string
+          module_key?: string
+          role?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       showcase_comments: {
         Row: {
           author_id: string
@@ -2158,11 +2179,15 @@ export type Database = {
           cert_background_url: string
           cert_id_string: string
           cert_type: string
+          company_seal_url: string
           course_title: string
           issued_at: string
           org_name: string
+          report_max: number
+          report_total: number
           revoked: boolean
           score_pct: number
+          signatory_image_url: string
           student_name: string
           valid: boolean
           verify_base_url: string

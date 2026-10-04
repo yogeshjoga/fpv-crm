@@ -6,7 +6,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { NotificationBell } from '../components/NotificationBell';
 import { Logo } from '../components/Brand';
 import { useStaffActivityTracker } from '../lib/useTimeTracker';
-import { isModuleVisible, isModuleWritable, useInstructorModuleAccess } from '../lib/moduleAccess';
+import { isModuleVisible, isModuleWritable, useModuleAccess } from '../lib/moduleAccess';
 import { AdminAccessProvider } from './AdminAccessContext';
 
 export interface NavItem {
@@ -14,7 +14,7 @@ export interface NavItem {
   label: string;
   icon: LucideIcon;
   end?: boolean;
-  /** Matches instructor_module_access.module_key — omit for items every admin role always sees. */
+  /** Matches role_module_access.module_key — omit for items that are always shown. */
   key?: string;
   /** Never shown to instructors (real or previewed), and not configurable. */
   superAdminOnly?: boolean;
@@ -32,36 +32,39 @@ export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin'
   const { profile, signOut, isStaff } = useAuth();
   const navigate = useNavigate();
   const [openMobile, setOpenMobile] = useState(false);
-  const [previewInstructor, setPreviewInstructor] = useState(false);
+  // A super admin can preview the app as any other role (what that role sees and can edit).
+  const [previewRole, setPreviewRole] = useState<'instructor' | 'coordinator' | 'admin' | null>(null);
   useStaffActivityTracker(area === 'Admin');
 
-  const canPreviewInstructor = area === 'Admin' && profile?.role === 'super_admin';
-  // Named for the instructor role historically, but coordinator/admin are
-  // restricted by the exact same module-access rules — all three are
-  // non-super-admin staff.
-  const asInstructor =
-    area === 'Admin' &&
-    (profile?.role === 'instructor' ||
-      profile?.role === 'coordinator' ||
-      profile?.role === 'admin' ||
-      (canPreviewInstructor && previewInstructor));
-  const moduleAccess = useInstructorModuleAccess(area === 'Admin');
+  const canPreview = area === 'Admin' && profile?.role === 'super_admin';
+  // The staff role whose section access applies right now: the person's own role, or the one a
+  // super admin is previewing. Each of instructor / coordinator / admin has its own settings.
+  // (null for a real super admin who isn't previewing — they are never restricted.)
+  const staffRole = area === 'Admin' ? (profile?.role === 'super_admin' ? previewRole : profile?.role ?? null) : null;
+  const restricted = !!staffRole;
+  // Students may have sections switched off; staff opening the student view see everything.
+  const accessRole = area === 'Admin' ? staffRole : profile?.role === 'student' ? 'student' : null;
+  const moduleAccess = useModuleAccess(accessRole);
 
   const visibleNav = useMemo(() => {
-    if (!asInstructor) return nav;
+    if (area === 'Student') {
+      if (profile?.role !== 'student') return nav;
+      return nav.filter((item) => !item.key || isModuleVisible(moduleAccess.data, item.key));
+    }
+    if (!restricted) return nav;
     return nav.filter((item) => {
       if (item.superAdminOnly) return false;
       if (!item.key) return true; // e.g. Dashboard — always reachable, never gated
       return isModuleVisible(moduleAccess.data, item.key);
     });
-  }, [nav, asInstructor, moduleAccess.data]);
+  }, [nav, area, restricted, profile?.role, moduleAccess.data]);
 
   const accessValue = useMemo(
     () => ({
-      restricted: asInstructor,
-      canWrite: (moduleKey: string) => !asInstructor || isModuleWritable(moduleAccess.data, moduleKey),
+      restricted,
+      canWrite: (moduleKey: string) => !restricted || isModuleWritable(moduleAccess.data, moduleKey),
     }),
-    [asInstructor, moduleAccess.data],
+    [restricted, moduleAccess.data],
   );
 
   const handleSignOut = async () => {
@@ -110,15 +113,24 @@ export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin'
             {openMobile ? <X size={20} /> : <Menu size={20} />}
           </button>
           <div className="flex flex-1 items-center justify-end gap-3">
-            {canPreviewInstructor && (
-              <button
-                onClick={() => setPreviewInstructor((v) => !v)}
+            {canPreview && (
+              <label
                 className={`hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-sm sm:flex ${
-                  previewInstructor ? 'bg-amber-100 font-medium text-amber-800' : 'bg-white/60 text-neutral-600 hover:bg-white'
+                  previewRole ? 'bg-amber-100 font-medium text-amber-800' : 'bg-white/60 text-neutral-600 hover:bg-white'
                 }`}
               >
-                <GraduationCap size={14} /> {previewInstructor ? 'Exit instructor view' : 'Instructor view'}
-              </button>
+                <GraduationCap size={14} /> View as
+                <select
+                  value={previewRole ?? ''}
+                  onChange={(e) => setPreviewRole((e.target.value || null) as typeof previewRole)}
+                  className="cursor-pointer bg-transparent text-sm outline-none"
+                >
+                  <option value="">Super admin</option>
+                  <option value="admin">Admin</option>
+                  <option value="coordinator">Coordinator</option>
+                  <option value="instructor">Instructor</option>
+                </select>
+              </label>
             )}
             {isStaff && (
               <Link
@@ -146,9 +158,9 @@ export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin'
             </button>
           </div>
         </header>
-        {canPreviewInstructor && previewInstructor && (
+        {canPreview && previewRole && (
           <div className="flex shrink-0 items-center justify-center gap-2 bg-amber-100 px-4 py-2 text-center text-xs font-medium text-amber-800">
-            <Eye size={13} /> Previewing as an Instructor — sidebar and write access match your Company Settings configuration.
+            <Eye size={13} /> Previewing as {roleLabel[previewRole]} — the sidebar and write access match your Company Settings for that role.
           </div>
         )}
         <main className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-4 py-8 md:px-8">

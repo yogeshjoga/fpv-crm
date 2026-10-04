@@ -1,6 +1,7 @@
 import { PDFDocument, StandardFonts, rgb } from 'https://esm.sh/pdf-lib@1.17.1';
 import QRCode from 'https://esm.sh/qrcode@1.5.4';
 import { encodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
+import { decode as decodePng, encode as encodePng } from 'https://esm.sh/fast-png@6.2.0';
 import { adminClient, cors, emailShell, HttpError, json, sendEmail } from '../_shared/common.ts';
 
 function callerIsServiceRole(req: Request): boolean {
@@ -41,6 +42,50 @@ async function embedRemoteImage(pdf: PDFDocument, url: string) {
   const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
   const lower = url.toLowerCase();
   return lower.endsWith('.jpg') || lower.endsWith('.jpeg') ? await pdf.embedJpg(bytes) : await pdf.embedPng(bytes);
+}
+
+/**
+ * Embeds a signature / seal image cropped to its visible ink. These are normally transparent PNGs
+ * on a big empty canvas (e.g. 1920x1080 with a small stamp in the middle); drawing the whole canvas
+ * would shrink the real signature to a speck and put it in the wrong place.
+ */
+async function embedTrimmedImage(pdf: PDFDocument, url: string) {
+  const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
+  const isJpg = url.toLowerCase().split('?')[0].match(/\.jpe?g$/);
+  if (isJpg) return await pdf.embedJpg(bytes);
+  try {
+    const png = decodePng(bytes);
+    if (png.channels === 4 && png.depth === 8) {
+      const { width, height, data } = png;
+      let minX = width;
+      let minY = height;
+      let maxX = -1;
+      let maxY = -1;
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          if (data[(y * width + x) * 4 + 3] > 8) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (maxX >= 0) {
+        const w = maxX - minX + 1;
+        const h = maxY - minY + 1;
+        const out = new Uint8Array(w * h * 4);
+        for (let row = 0; row < h; row++) {
+          const from = ((minY + row) * width + minX) * 4;
+          out.set(data.subarray(from, from + w * 4), row * w * 4);
+        }
+        return await pdf.embedPng(encodePng({ width: w, height: h, data: out, channels: 4, depth: 8 }));
+      }
+    }
+  } catch (e) {
+    console.error('image trim failed, using it as uploaded', e);
+  }
+  return await pdf.embedPng(bytes);
 }
 
 Deno.serve(async (req) => {
@@ -118,16 +163,46 @@ Deno.serve(async (req) => {
       }
     }
 
+    // The signatory's signature and the company seal, set in Company Settings. A missing or broken
+    // image must never stop a certificate being issued.
+    let signatureImg: Awaited<ReturnType<typeof embedTrimmedImage>> | null = null;
+    let sealImg: Awaited<ReturnType<typeof embedTrimmedImage>> | null = null;
+    if (org.signatory_image_url) {
+      try {
+        signatureImg = await embedTrimmedImage(pdf, org.signatory_image_url);
+      } catch (e) {
+        console.error('signature embed failed', e);
+      }
+    }
+    if (org.company_seal_url) {
+      try {
+        sealImg = await embedTrimmedImage(pdf, org.company_seal_url);
+      } catch (e) {
+        console.error('seal embed failed', e);
+      }
+    }
+
     if (backgroundImg) {
-      // Branded background (logo, borders, signature already baked in) with dynamic
-      // fields printed on top, positions tuned to this exact template layout.
+      // Branded background (logo, borders and the printed signatory name are baked in) with the
+      // dynamic fields, signature and seal placed on top, positions tuned to this exact template.
       page.drawImage(backgroundImg, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
 
+      const artX = PAGE_W / 2000;
+      const artY = PAGE_H / 1414;
+
+      // Signature on the template's signing line (x 1400-1648, y 1135 of the 2000x1414 art, above the
+      // printed name) and the company seal just to its left, like a stamp beside the signature.
+      const drawArt = (img: NonNullable<typeof sealImg>, cx: number, widthArt: number, opts: { bottom?: number; centerY?: number; opacity?: number }) => {
+        const w = widthArt * artX;
+        const h = (w * img.height) / img.width;
+        const y = opts.centerY !== undefined ? PAGE_H - opts.centerY * artY - h / 2 : PAGE_H - opts.bottom! * artY;
+        page.drawImage(img, { x: cx * artX - w / 2, y, width: w, height: h, opacity: opts.opacity ?? 1 });
+      };
+      if (sealImg) drawArt(sealImg, 1265, 235, { centerY: 1040, opacity: 0.9 });
+      if (signatureImg) drawArt(signatureImg, 1524, 290, { bottom: 1130 });
       // Cover only the template's own gold "OF" (x 681-754, y 394-428 of the 2000x1414 art,
       // on a pure-white background) so the certificate type can replace it. Anything wider
       // shows up as a white patch over the sky and mountains.
-      const artX = PAGE_W / 2000;
-      const artY = PAGE_H / 1414;
       page.drawRectangle({ x: 672 * artX, y: PAGE_H - 434 * artY, width: 92 * artX, height: 46 * artY, color: rgb(0.996, 0.996, 0.996) });
       // Centre the type between the template's two gold rules (x 641-1325, y 413), shrinking
       // long names so they never run into the rules.
@@ -208,6 +283,16 @@ Deno.serve(async (req) => {
       page.drawText(`Certificate ID: ${certId}`, { x: 60, y: 70, size: 10, font: reg, color: muted });
       page.drawText(`Verify at ${verifyUrl}`, { x: 60, y: 54, size: 9, font: reg, color: muted });
 
+      if (sealImg) {
+        const w = 80;
+        const h = (w * sealImg.height) / sealImg.width;
+        page.drawImage(sealImg, { x: 470 - w / 2, y: 135 - h / 2, width: w, height: h, opacity: 0.9 });
+      }
+      if (signatureImg) {
+        const w = 130;
+        const h = (w * signatureImg.height) / signatureImg.width;
+        page.drawImage(signatureImg, { x: 620 - w / 2, y: 124, width: w, height: h });
+      }
       page.drawLine({ start: { x: 520, y: 120 }, end: { x: 720, y: 120 }, thickness: 1, color: muted });
       page.drawText(String(org.signatory_name || 'Authorized Signatory'), { x: 520, y: 104, size: 10, font: bold, color: ink });
       page.drawText(String(org.signatory_title || org.org_name || 'EgireRobotics'), { x: 520, y: 90, size: 9, font: reg, color: muted });

@@ -8,18 +8,21 @@ import type { NavItem } from './Shell';
 
 export const studentNav: NavItem[] = [
   { to: '/app', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/app/courses', label: 'Courses', icon: BookOpen },
-  { to: '/app/resources', label: 'Resources', icon: FolderOpen },
-  { to: '/app/showcase', label: 'Showcase', icon: ImagePlus },
-  { to: '/app/ask', label: 'Ask us', icon: MessageCircle },
-  { to: '/app/reviews', label: 'Reviews', icon: MessageSquareHeart },
-  { to: '/app/calendar', label: 'Calendar', icon: CalendarDays },
-  { to: '/app/report-card', label: 'Report card', icon: ClipboardList },
-  { to: '/app/certificates', label: 'Certificates', icon: Award },
+  { to: '/app/courses', label: 'Courses', icon: BookOpen, key: 'courses' },
+  { to: '/app/resources', label: 'Resources', icon: FolderOpen, key: 'resources' },
+  { to: '/app/showcase', label: 'Showcase', icon: ImagePlus, key: 'showcase' },
+  { to: '/app/ask', label: 'Ask us', icon: MessageCircle, key: 'ask' },
+  { to: '/app/reviews', label: 'Reviews', icon: MessageSquareHeart, key: 'reviews' },
+  { to: '/app/calendar', label: 'Calendar', icon: CalendarDays, key: 'calendar' },
+  { to: '/app/report-card', label: 'Report card', icon: ClipboardList, key: 'report-card' },
+  { to: '/app/certificates', label: 'Certificates', icon: Award, key: 'certificates' },
   { to: '/app/profile', label: 'Profile', icon: UserCircle },
 ];
 
-// `key` matches instructor_module_access.module_key — used to control which
+/** Student sections a super admin can show or hide for students (Dashboard and Profile always stay). */
+export const STUDENT_MODULES = studentNav.filter((i) => i.key).map((i) => ({ key: i.key as string, label: i.label }));
+
+// `key` matches role_module_access.module_key — used to control which
 // of these an instructor account (or a super admin's "Instructor view"
 // preview) sees. Items with `superAdminOnly` are never configurable and
 // never shown to instructors, full stop.

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
+import { trimmedImageUrl } from '../lib/trimImage';
 
 /** CR80-style page size used by the generate-certificate edge function — kept in sync
  * with `PAGE_W`/`PAGE_H` there. Every position below is the exact px/pt value that
@@ -22,6 +23,11 @@ export interface CertificatePreviewData {
   orgName: string;
   verifyBaseUrl: string;
   backgroundUrl: string | null;
+  /** The signatory's signature and the company seal (Company Settings), shown as on the PDF. */
+  signatureUrl?: string | null;
+  sealUrl?: string | null;
+  /** For certificates issued from module marks: "a total score of X out of Y". */
+  totalMarks?: { total: number; max: number } | null;
 }
 
 /** Renders a certificate purely from data — the org's background image (one small,
@@ -29,10 +35,24 @@ export interface CertificatePreviewData {
  * Scales to fit its container via a CSS transform so the same fixed-position numbers
  * work at any display size. */
 export function CertificatePreview({ data }: { data: CertificatePreviewData }) {
-  const { certId, studentName, courseTitle, certType, scorePct, issuedAt, orgName, verifyBaseUrl, backgroundUrl } = data;
+  const { certId, studentName, courseTitle, certType, scorePct, issuedAt, orgName, verifyBaseUrl, backgroundUrl, signatureUrl, sealUrl, totalMarks } = data;
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [signatureSrc, setSignatureSrc] = useState<string | null>(null);
+  const [sealSrc, setSealSrc] = useState<string | null>(null);
+
+  // Crop each image to its visible ink first, exactly as the PDF does.
+  useEffect(() => {
+    let live = true;
+    setSignatureSrc(null);
+    setSealSrc(null);
+    if (signatureUrl) trimmedImageUrl(signatureUrl).then((u) => live && setSignatureSrc(u));
+    if (sealUrl) trimmedImageUrl(sealUrl).then((u) => live && setSealSrc(u));
+    return () => {
+      live = false;
+    };
+  }, [signatureUrl, sealUrl]);
 
   useEffect(() => {
     const el = wrapperRef.current;
@@ -62,7 +82,11 @@ export function CertificatePreview({ data }: { data: CertificatePreviewData }) {
   const issuedLabel = new Date(issuedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   const blurb =
     `has successfully completed the ${courseTitle} program conducted by ${orgName}` +
-    (scorePct != null ? ` and achieved a score of ${Number(scorePct)}% in the certification exam.` : '.');
+    (totalMarks
+      ? ` and achieved a total score of ${totalMarks.total} out of ${totalMarks.max} in the final assessment.`
+      : scorePct != null
+        ? ` and achieved a score of ${Number(scorePct)}% in the certification exam.`
+        : '.');
 
   // Shrink long certificate types so they never run into the gold rules either side.
   const ofText = `OF ${certType.toUpperCase()}`;
@@ -87,6 +111,25 @@ export function CertificatePreview({ data }: { data: CertificatePreviewData }) {
       >
         {backgroundUrl ? (
           <>
+            {/* Company seal beside the signature, and the signature on the signing line above the
+                printed name. Same art-pixel positions the PDF uses. */}
+            {sealSrc && (
+              <img
+                src={sealSrc}
+                alt=""
+                className="absolute"
+                style={{ left: (1265 - 235 / 2) * ART_X, top: 1040 * ART_Y, width: 235 * ART_X, transform: 'translateY(-50%)', opacity: 0.9 }}
+              />
+            )}
+            {signatureSrc && (
+              <img
+                src={signatureSrc}
+                alt=""
+                className="absolute"
+                style={{ left: (1524 - 290 / 2) * ART_X, top: 1130 * ART_Y, width: 290 * ART_X, transform: 'translateY(-100%)' }}
+              />
+            )}
+
             {/* Cover only the template's own gold "OF" (x 681-754, y 394-428 of the 2000x1414 art)
                 and centre our value between the template's two gold rules (x 641-1325, y 413).
                 Same numbers as generate-certificate. */}
