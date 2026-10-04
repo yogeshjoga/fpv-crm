@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { MessageSquareHeart, Trash2 } from 'lucide-react';
+import { Check, MessageSquareHeart, Pencil, Trash2, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
@@ -16,6 +16,14 @@ interface ReviewRow {
   updated_at: string;
   student: { full_name: string; email: string } | null;
   group: { name: string } | null;
+}
+interface EditRequestRow {
+  id: string;
+  reason: string;
+  status: 'pending' | 'approved';
+  created_at: string;
+  student: { full_name: string; email: string } | null;
+  review: { rating: number; comment: string; group: { name: string } | null } | null;
 }
 
 export function AdminReviews() {
@@ -37,6 +45,30 @@ export function AdminReviews() {
       ) as unknown as Promise<ReviewRow[]>,
     [],
   );
+
+  // Students can't edit a review on their own: they ask, and an admin decides here.
+  const rq = useQuery(
+    () =>
+      unwrap(
+        supabase
+          .from('review_edit_requests')
+          .select('id, reason, status, created_at, student:profiles!review_edit_requests_student_id_fkey(full_name, email), review:reviews(rating, comment, group:course_groups(name))')
+          .in('status', ['pending', 'approved'])
+          .order('created_at', { ascending: true }),
+      ) as unknown as Promise<EditRequestRow[]>,
+    [],
+  );
+  const requests = rq.data ?? [];
+  const pending = requests.filter((r) => r.status === 'pending');
+  const approved = requests.filter((r) => r.status === 'approved');
+
+  const decide = async (r: EditRequestRow, status: 'approved' | 'denied') => {
+    if (status === 'denied' && r.status === 'pending' && !confirm('Decline this edit request? The review stays as it is.')) return;
+    const { error } = await supabase.from('review_edit_requests').update({ status }).eq('id', r.id);
+    if (error) return toast(error.message, 'error');
+    toast(status === 'approved' ? 'Approved — the student can now edit once' : r.status === 'approved' ? 'Approval withdrawn' : 'Request declined');
+    rq.refetch();
+  };
 
   const all = useMemo(() => q.data ?? [], [q.data]);
   const groupOptions = useMemo(() => {
@@ -61,7 +93,7 @@ export function AdminReviews() {
     q.refetch();
   };
 
-  if (q.loading) return <Spinner />;
+  if (q.loading && !q.data) return <Spinner />;
 
   return (
     <div>
@@ -89,6 +121,56 @@ export function AdminReviews() {
           </div>
         }
       />
+
+      {(pending.length > 0 || approved.length > 0) && (
+        <GlassCard className="mb-6 p-5">
+          <h2 className="flex items-center gap-2 font-semibold text-neutral-900">
+            <Pencil size={16} /> Edit requests
+            {pending.length > 0 && <Badge tone="amber">{pending.length} waiting</Badge>}
+          </h2>
+          <p className="mt-0.5 text-xs text-neutral-500">Reviews are locked. Approving lets that student change their review once; it then locks again.</p>
+          <div className="mt-4 space-y-3">
+            {[...pending, ...approved].map((r) => (
+              <div key={r.id} className="rounded-2xl border border-white/60 bg-white/50 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-neutral-900">{r.student?.full_name || r.student?.email || 'Student'}</span>
+                      <Badge tone="amber">{r.review?.group?.name ?? 'Group'}</Badge>
+                      {r.status === 'approved' && <Badge tone="green">Approved — waiting for the student</Badge>}
+                    </div>
+                    <p className="mt-2 text-sm text-neutral-700">
+                      <span className="text-neutral-400">Reason: </span>
+                      {r.reason}
+                    </p>
+                    {r.review && (
+                      <div className="mt-2 text-xs text-neutral-500">
+                        <span className="mr-2 inline-block align-middle">
+                          <StarRating value={r.review.rating} size={12} />
+                        </span>
+                        <span className="line-clamp-2">{r.review.comment || 'No comment'}</span>
+                      </div>
+                    )}
+                    <div className="mt-1 text-[11px] text-neutral-400">Asked {new Date(r.created_at).toLocaleString()}</div>
+                  </div>
+                  {writable && (
+                    <div className="flex gap-2">
+                      {r.status === 'pending' && (
+                        <Button onClick={() => decide(r, 'approved')}>
+                          <Check size={14} /> Approve
+                        </Button>
+                      )}
+                      <Button variant="secondary" onClick={() => decide(r, 'denied')}>
+                        <X size={14} /> {r.status === 'approved' ? 'Withdraw' : 'Decline'}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+      )}
 
       {!all.length ? (
         <EmptyState icon={<MessageSquareHeart size={22} />} title="No reviews yet" description="Students can leave a rating and feedback from Reviews in their sidebar." />
@@ -128,6 +210,7 @@ export function AdminReviews() {
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium text-neutral-900">{r.student?.full_name || r.student?.email || 'Student'}</span>
                         <Badge tone="amber">{r.group?.name ?? 'Group'}</Badge>
+                        {new Date(r.updated_at).getTime() - new Date(r.created_at).getTime() > 60_000 && <Badge tone="blue">Edited</Badge>}
                       </div>
                       <div className="mt-1 flex items-center gap-2">
                         <StarRating value={r.rating} size={15} />
