@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Award, ClipboardCheck, Search, Settings2 } from 'lucide-react';
+import { Award, ClipboardCheck, Download, FileSpreadsheet, FileText, Search, Settings2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { invokeFn } from '../../lib/functions';
 import { useAuth } from '../../auth/AuthProvider';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
-import { Badge, Button, EmptyState, Field, PageHeader, Select, Spinner, TextInput, useToast } from '../../components/ui/kit';
+import { Badge, Button, EmptyState, Field, Modal, PageHeader, Select, Spinner, TextInput, useToast } from '../../components/ui/kit';
+import { exportMarkSheet, type SheetFormat, type SheetPart } from '../../lib/markSheet';
 import type { Tables } from '../../lib/database.types';
 
 type Course = Tables<'courses'>;
@@ -304,6 +305,15 @@ function MarksPanel({ course, canMark }: { course: Course; canMark: boolean }) {
   const toast = useToast();
   const [search, setSearch] = useState('');
   const [issuing, setIssuing] = useState<string | null>(null);
+  // Printable / Excel mark sheets for rounds examined offline (pen and paper first).
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetBusy, setSheetBusy] = useState(false);
+  const [sheet, setSheet] = useState<{ part: SheetPart; format: SheetFormat; withMarks: boolean; withEmail: boolean }>({
+    part: 'viva',
+    format: 'pdf',
+    withMarks: false,
+    withEmail: true,
+  });
 
   const q = useQuery(async () => {
     const [enrolled, marks, attempts, certs] = await Promise.all([
@@ -420,6 +430,26 @@ function MarksPanel({ course, canMark }: { course: Course; canMark: boolean }) {
     if (confirm(msg)) issue(ready.map((r) => r.id));
   };
 
+  const downloadSheet = async () => {
+    setSheetBusy(true);
+    try {
+      await exportMarkSheet(sheet.format, {
+        course: course.title,
+        part: sheet.part,
+        max: { viva: num(course.marks_viva), simulation: num(course.marks_simulation), piloting: num(course.marks_piloting), online: onlineMax },
+        withMarks: sheet.withMarks,
+        withEmail: sheet.withEmail,
+        students: rows.map((r) => ({ name: r.name, email: r.email, viva: r.marks.viva, simulation: r.marks.simulation, piloting: r.marks.piloting, online: r.online })),
+      });
+      toast(`${sheet.format === 'pdf' ? 'PDF' : 'Excel'} sheet for ${rows.length} students downloaded`);
+      setSheetOpen(false);
+    } catch (e) {
+      toast((e as Error).message || 'Could not create the sheet', 'error');
+    } finally {
+      setSheetBusy(false);
+    }
+  };
+
   if (q.loading && !q.data) return <Spinner />;
 
   return (
@@ -439,11 +469,16 @@ function MarksPanel({ course, canMark }: { course: Course; canMark: boolean }) {
             Out of {maxTotal} · Merit from {merit}
           </span>
         </div>
-        {canMark && (
-          <Button onClick={issueAll} disabled={!ready.length} loading={issuing === 'all'}>
-            <Award size={15} /> Issue {ready.length || ''} certificate{ready.length === 1 ? '' : 's'}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" onClick={() => setSheetOpen(true)} disabled={!rows.length}>
+            <Download size={15} /> Export sheet
           </Button>
-        )}
+          {canMark && (
+            <Button onClick={issueAll} disabled={!ready.length} loading={issuing === 'all'}>
+              <Award size={15} /> Issue {ready.length || ''} certificate{ready.length === 1 ? '' : 's'}
+            </Button>
+          )}
+        </div>
       </GlassCard>
 
       <div className="mb-3 text-xs text-neutral-500">
@@ -527,6 +562,92 @@ function MarksPanel({ course, canMark }: { course: Course; canMark: boolean }) {
         Marks save when you leave a box or press Enter. Clear a box to remove its mark. Marks lock once a certificate is issued — revoke it in Certificates to
         correct them.
       </p>
+
+      {sheetOpen && (
+        <Modal open onClose={() => setSheetOpen(false)} title="Export a mark sheet">
+          <div className="space-y-5">
+            <p className="text-sm text-neutral-600">
+              A list of all {rows.length} students for instructors who examine offline — write the marks on paper, then enter them here afterwards.
+            </p>
+
+            <Field label="Sheet for">
+              <Select value={sheet.part} onChange={(e) => setSheet((p) => ({ ...p, part: e.target.value as SheetPart }))}>
+                <option value="viva">Viva (out of {num(course.marks_viva)})</option>
+                <option value="simulation">Simulation (out of {num(course.marks_simulation)})</option>
+                <option value="piloting">Real FPV piloting (out of {num(course.marks_piloting)})</option>
+                <option value="all">All three parts together</option>
+              </Select>
+            </Field>
+
+            <div>
+              <div className="mb-1.5 text-sm font-medium text-neutral-700">File type</div>
+              <div className="grid grid-cols-2 gap-3">
+                {(
+                  [
+                    ['pdf', 'PDF', 'Print it and fill in by hand', FileText],
+                    ['xlsx', 'Excel (.xlsx)', 'Edit or type in a spreadsheet', FileSpreadsheet],
+                  ] as const
+                ).map(([key, label, hint, Icon]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={sheet.format === key}
+                    onClick={() => setSheet((p) => ({ ...p, format: key }))}
+                    className={`rounded-2xl border p-3 text-left transition-colors ${
+                      sheet.format === key ? 'border-neutral-900 bg-white' : 'border-white/60 bg-white/40 hover:bg-white/70'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 text-sm font-medium text-neutral-900">
+                      <Icon size={16} /> {label}
+                    </div>
+                    <div className="mt-0.5 text-xs text-neutral-500">{hint}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/60 bg-white/50 p-3">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4"
+                  checked={sheet.withMarks}
+                  onChange={(e) => setSheet((p) => ({ ...p, withMarks: e.target.checked }))}
+                />
+                <span>
+                  <span className="block text-sm font-medium text-neutral-900">Include marks entered so far</span>
+                  <span className="block text-xs text-neutral-500">Leave unticked for a blank sheet with empty boxes to write in.</span>
+                </span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/60 bg-white/50 p-3">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4"
+                  checked={sheet.withEmail}
+                  onChange={(e) => setSheet((p) => ({ ...p, withEmail: e.target.checked }))}
+                />
+                <span>
+                  <span className="block text-sm font-medium text-neutral-900">Show email addresses</span>
+                  <span className="block text-xs text-neutral-500">Helps tell apart students with the same name.</span>
+                </span>
+              </label>
+            </div>
+
+            {sheet.format === 'pdf' && (
+              <p className="text-xs text-neutral-400">PDF supports English letters only; names in other scripts will show as “?”. Use Excel for those.</p>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setSheetOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={downloadSheet} loading={sheetBusy}>
+                <Download size={15} /> Download {sheet.format === 'pdf' ? 'PDF' : 'Excel'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
