@@ -427,6 +427,7 @@ export type Database = {
           description: string
           exam_access: string
           exam_closes_at: string | null
+          exam_name: string | null
           exam_opens_at: string | null
           exam_question_count: number
           exam_time_limit_min: number
@@ -465,6 +466,7 @@ export type Database = {
           description?: string
           exam_access?: string
           exam_closes_at?: string | null
+          exam_name?: string | null
           exam_opens_at?: string | null
           exam_question_count?: number
           exam_time_limit_min?: number
@@ -503,6 +505,7 @@ export type Database = {
           description?: string
           exam_access?: string
           exam_closes_at?: string | null
+          exam_name?: string | null
           exam_opens_at?: string | null
           exam_question_count?: number
           exam_time_limit_min?: number
