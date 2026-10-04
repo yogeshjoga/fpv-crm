@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, BookOpen, Award, Clock, Flame } from 'lucide-react';
+import { ArrowRight, BookOpen, Award, ClipboardList, Clock, Flame } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useQuery, unwrap } from '../../lib/useQuery';
@@ -49,6 +49,19 @@ export function StudentDashboard() {
     [uid],
   );
 
+  // Report card: ready (a finalised result exists) or pending (enrolled in a module-graded course).
+  const reportCards = useQuery<{ id: string; report: { clearedAll: boolean; total: number; max: number } | null }[]>(
+    () =>
+      unwrap(
+        supabase.from('certificates').select('id, report').eq('student_id', uid).eq('revoked', false).not('report', 'is', null).order('issued_at', { ascending: false }),
+      ) as Promise<{ id: string; report: { clearedAll: boolean; total: number; max: number } | null }[]>,
+    [uid],
+  );
+  const gradedCourses = useQuery<{ id: string }[]>(
+    () => unwrap(supabase.from('courses').select('id').eq('scoring_mode', 'composite')) as Promise<{ id: string }[]>,
+    [uid],
+  );
+
   const activity = useQuery<{ day: string }[]>(
     () => unwrap(supabase.from('study_time').select('day').eq('student_id', uid)) as Promise<{ day: string }[]>,
     [uid],
@@ -70,6 +83,36 @@ export function StudentDashboard() {
         <Stat icon={<Award size={18} />} label="Certificates" value={certs.data?.length ?? 0} />
         <Stat icon={<Flame size={18} />} label="Day streak" value={streak.current} tone={streak.current > 0 ? 'text-orange-500' : undefined} />
       </div>
+
+      {(reportCards.data?.length || gradedCourses.data?.length) ? (
+        <Link to="/app/report-card" className="mb-6 block">
+          <GlassCard className="flex flex-wrap items-center justify-between gap-3 p-5 transition-transform hover:-translate-y-0.5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/70 text-neutral-700">
+                <ClipboardList size={20} />
+              </div>
+              <div>
+                <div className="font-semibold text-neutral-900">Your report card</div>
+                <div className="text-sm text-neutral-500">
+                  {reportCards.data?.length
+                    ? `Your result is ready — ${reportCards.data[0].report?.total} of ${reportCards.data[0].report?.max} marks.`
+                    : 'Results pending — see what you need to clear each module.'}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {reportCards.data?.length ? (
+                <Badge tone={reportCards.data[0].report?.clearedAll ? 'green' : 'red'}>{reportCards.data[0].report?.clearedAll ? 'Cleared' : 'Not cleared'}</Badge>
+              ) : (
+                <Badge tone="amber">Pending</Badge>
+              )}
+              <span className="inline-flex items-center gap-1 text-sm font-medium text-blue-600">
+                View <ArrowRight size={14} />
+              </span>
+            </div>
+          </GlassCard>
+        </Link>
+      ) : null}
 
       <GlassCard className="mb-6 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">

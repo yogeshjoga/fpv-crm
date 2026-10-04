@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Award, CheckCircle2, ClipboardList, Eye, XCircle } from 'lucide-react';
+import { Award, CheckCircle2, ClipboardList, Clock, Eye, XCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useQuery, unwrap } from '../../lib/useQuery';
@@ -7,8 +7,22 @@ import { GlassCard } from '../../components/ui/shared';
 import { Badge, EmptyState, PageHeader, Spinner } from '../../components/ui/kit';
 import { evaluate, type Evaluation, type Scheme } from '../../lib/assessment';
 
+interface CompositeCourse {
+  id: string;
+  title: string;
+  marks_online: number;
+  marks_viva: number;
+  marks_simulation: number;
+  marks_piloting: number;
+  pass_marks_online: number;
+  pass_marks_viva: number;
+  pass_marks_simulation: number;
+  pass_marks_piloting: number;
+}
+
 interface CertRow {
   id: string;
+  course_id: string;
   cert_id_string: string;
   cert_type: string | null;
   issued_at: string;
@@ -41,7 +55,7 @@ export function ReportCard() {
       unwrap(
         supabase
           .from('certificates')
-          .select('id, cert_id_string, cert_type, issued_at, report, course:courses(title)')
+          .select('id, course_id, cert_id_string, cert_type, issued_at, report, course:courses(title)')
           .eq('student_id', profile!.id)
           .eq('revoked', false)
           .not('report', 'is', null)
@@ -50,15 +64,36 @@ export function ReportCard() {
     [profile?.id],
   );
 
-  if (q.loading && !q.data) return <Spinner />;
+  // Courses graded by modules that this student is enrolled in (RLS only returns their own).
+  // Until results are finalised they get an "awaiting results" card showing what is required.
+  const courses = useQuery<CompositeCourse[]>(
+    () =>
+      isStaff
+        ? Promise.resolve([])
+        : (unwrap(
+            supabase
+              .from('courses')
+              .select(
+                'id, title, marks_online, marks_viva, marks_simulation, marks_piloting, pass_marks_online, pass_marks_viva, pass_marks_simulation, pass_marks_piloting',
+              )
+              .eq('scoring_mode', 'composite'),
+          ) as Promise<CompositeCourse[]>),
+    [isStaff],
+  );
+
+  if ((q.loading && !q.data) || (courses.loading && !courses.data)) return <Spinner />;
   const cards = (q.data ?? []).filter((c) => c.report);
+  const awaiting = (courses.data ?? []).filter((c) => !cards.some((card) => card.course_id === c.id));
 
   return (
     <div>
       <PageHeader title="Report card" subtitle="Your result in every module of the assessment" />
 
-      {cards.length ? (
+      {cards.length || awaiting.length ? (
         <div className="space-y-6">
+          {awaiting.map((c) => (
+            <AwaitingCard key={c.id} course={c} />
+          ))}
           {cards.map((c) => (
             <ReportCardView
               key={c.id}
@@ -103,6 +138,60 @@ export function ReportCard() {
         />
       )}
     </div>
+  );
+}
+
+/** Before results are finalised: the modules, what each one needs, and that results are pending. */
+function AwaitingCard({ course: c }: { course: CompositeCourse }) {
+  const rows = [
+    { label: 'Online exam', max: Number(c.marks_online), pass: Number(c.pass_marks_online) },
+    { label: 'Viva', max: Number(c.marks_viva), pass: Number(c.pass_marks_viva) },
+    { label: 'Simulation', max: Number(c.marks_simulation), pass: Number(c.pass_marks_simulation) },
+    { label: 'Free flight', max: Number(c.marks_piloting), pass: Number(c.pass_marks_piloting) },
+  ];
+  return (
+    <GlassCard className="overflow-hidden p-0">
+      <div className="border-b border-white/60 p-5">
+        <div className="text-xs font-semibold uppercase tracking-wide text-neutral-400">Report card</div>
+        <h2 className="mt-0.5 text-lg font-semibold text-neutral-900">{c.title}</h2>
+      </div>
+      <div className="flex items-center gap-3 bg-amber-50/80 px-5 py-4">
+        <Clock size={30} className="shrink-0 text-amber-600" />
+        <div>
+          <div className="text-lg font-semibold text-amber-900">Results pending</div>
+          <p className="text-sm text-amber-900/80">
+            Your marks and result appear here once your instructors have finalised them. To clear the assessment you need the pass mark in every module below.
+          </p>
+        </div>
+      </div>
+      <div className="overflow-x-auto p-5">
+        <table className="w-full min-w-[420px] text-sm">
+          <thead>
+            <tr className="text-left text-xs uppercase tracking-wide text-neutral-400">
+              <th className="pb-2 pr-4">Module</th>
+              <th className="pb-2 pr-4">Total marks</th>
+              <th className="pb-2 pr-4">You need</th>
+              <th className="pb-2">Result</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/60">
+            {rows.map((m) => (
+              <tr key={m.label}>
+                <td className="py-3 pr-4 font-medium text-neutral-900">{m.label}</td>
+                <td className="py-3 pr-4 text-neutral-600">{m.max}</td>
+                <td className="py-3 pr-4 text-neutral-900">
+                  {m.pass} <span className="text-xs text-neutral-400">({m.max ? Math.round((m.pass / m.max) * 100) : 0}%)</span>
+                </td>
+                <td className="py-3">
+                  <Badge tone="neutral">Pending</Badge>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="mt-4 text-xs text-neutral-400">Missing the pass mark in even one module means not cleared, however well you do in the others.</p>
+      </div>
+    </GlassCard>
   );
 }
 
