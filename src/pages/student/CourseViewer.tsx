@@ -1,4 +1,5 @@
-import { ExamOpensTimer } from '../../components/ExamCountdown';
+import { ExamLockNotice, ExamOpensTimer } from '../../components/ExamCountdown';
+import { useExamLock } from '../../lib/useExamLock';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { AlertTriangle, Download, FileText, GraduationCap, Lock, PlayCircle } from 'lucide-react';
@@ -202,6 +203,7 @@ export function CourseViewer() {
   const { profile } = useAuth();
   const toast = useToast();
   const uid = profile?.id ?? '';
+  const lockUntil = useExamLock();
 
   const q = useQuery(async () => {
     const course = (await unwrap(
@@ -274,6 +276,10 @@ export function CourseViewer() {
     if (opensMs !== null && nowMs < opensMs) examGate = `The exam opens on ${new Date(opensMs).toLocaleString()}.`;
     else if (closesMs !== null && nowMs > closesMs && !resumable) examGate = `The exam window closed on ${new Date(closesMs).toLocaleString()}.`;
   }
+
+  // Study material is locked in the database while an exam window is open; the exam course itself stays reachable.
+  const ownWindowOpen = course.exam_access === 'scheduled' && (opensMs === null || nowMs >= opensMs) && closesMs !== null && nowMs < closesMs;
+  if (lockUntil !== null && lockUntil > nowMs && !ownWindowOpen) return <ExamLockNotice until={lockUntil} />;
 
   return (
     <div>

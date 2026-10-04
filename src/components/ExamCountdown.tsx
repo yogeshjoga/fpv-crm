@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, CalendarClock, Timer } from 'lucide-react';
+import { ArrowRight, CalendarClock, Lock, Timer } from 'lucide-react';
 import { GlassCard } from './ui/shared';
 import { Badge } from './ui/kit';
 
@@ -194,5 +194,29 @@ export function ExamOpensTimer({ opensAt }: { opensAt: string }) {
       <div className="mb-1 text-xs font-medium text-amber-800">Opens in</div>
       <CountdownTiles ms={ms} tone="text-amber-600" />
     </div>
+  );
+}
+
+/** Shown instead of study material while an exam window is open. */
+export function ExamLockNotice({ until }: { until: number }) {
+  const now = useNow();
+  const ms = until - now;
+  return (
+    <GlassCard className="flex flex-col items-center gap-3 p-10 text-center">
+      <Lock size={26} className="text-neutral-400" />
+      <div className="text-lg font-semibold text-neutral-900">Courses are locked during your exam</div>
+      <p className="max-w-md text-sm text-neutral-500">
+        Lessons and study material are unavailable while the exam is running. Everything opens again when the exam window closes.
+      </p>
+      {ms > 0 && (
+        <>
+          <div className="text-xs font-medium text-neutral-500">Unlocks in</div>
+          <CountdownTiles ms={ms} />
+        </>
+      )}
+      <Link to="/app" className="mt-1 text-sm font-medium text-blue-600 hover:underline">
+        Go to dashboard
+      </Link>
+    </GlassCard>
   );
 }

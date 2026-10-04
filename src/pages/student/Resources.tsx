@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabase';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, Button, EmptyState, Modal, PageHeader, Spinner, TextInput, useToast } from '../../components/ui/kit';
+import { ExamLockNotice } from '../../components/ExamCountdown';
+import { useExamLock } from '../../lib/useExamLock';
 
 export interface ResourceRow {
   id: string;
@@ -44,6 +46,7 @@ export function Resources() {
   const [search, setSearch] = useState('');
   const [viewing, setViewing] = useState<{ row: ResourceRow; url: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const lockUntil = useExamLock();
 
   const q = useQuery<ResourceRow[]>(
     () => unwrap(supabase.from('resources').select('*').order('created_at', { ascending: false })) as Promise<ResourceRow[]>,
@@ -75,6 +78,8 @@ export function Resources() {
     a.rel = 'noreferrer';
     a.click();
   };
+
+  if (lockUntil !== null && lockUntil > Date.now()) return <ExamLockNotice until={lockUntil} />;
 
   return (
     <div>

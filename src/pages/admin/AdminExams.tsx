@@ -249,14 +249,14 @@ function SettingsPanel({ course, canConfigure, onSaved }: { course: Course; canC
               onChange={(e) => setF((p) => ({ ...p, closes: e.target.value, exam_access: e.target.value || p.opens ? 'scheduled' : p.exam_access }))}
             />
           </Field>
-          <Field label="Who can start the online exam" hint="Picking a date above switches this to Scheduled">
+          <Field label="Who can start the online exam" hint="Only students enrolled in this course by an admin are affected. This never gives anyone course access">
             <Select
               disabled={ro}
               value={f.exam_access}
               onChange={(e) => setF((p) => ({ ...p, exam_access: e.target.value, ...(e.target.value === 'scheduled' ? {} : { opens: '', closes: '' }) }))}
             >
-              <option value="open">Open — any time</option>
-              <option value="closed">Closed — nobody can start</option>
+              <option value="open">Open — enrolled students can start any time</option>
+              <option value="closed">Closed — not even enrolled students can start</option>
               <option value="scheduled">Scheduled — only between the dates above</option>
             </Select>
           </Field>
