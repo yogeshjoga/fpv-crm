@@ -21,6 +21,32 @@ Deno.serve(async (req) => {
     const { data: course } = await admin.from('courses').select('*').eq('id', attempt.course_id).single();
     if (!course) throw new HttpError(404, 'Course not found.');
 
+    // The time limit is enforced here, not just in the browser. The page auto-submits when time
+    // runs out, so allow two minutes for a slow connection; beyond that the attempt is expired
+    // (used up, scored 0) exactly like an abandoned one — it cannot be finished hours later.
+    const GRACE_MS = 120_000;
+    if (Date.now() - new Date(attempt.expires_at).getTime() > GRACE_MS) {
+      const { count: finished } = await admin
+        .from('exam_attempts')
+        .select('*', { count: 'exact', head: true })
+        .eq('student_id', user.id)
+        .eq('course_id', course.id)
+        .neq('status', 'in_progress');
+      const exhausted = (finished ?? 0) + 1 >= course.max_attempts;
+      await admin
+        .from('exam_attempts')
+        .update({
+          status: 'expired',
+          submitted_at: new Date().toISOString(),
+          score_pct: 0,
+          passed: false,
+          locked: exhausted,
+          cooldown_until: exhausted ? null : new Date(Date.now() + course.cooldown_hours * 3600_000).toISOString(),
+        })
+        .eq('id', attempt_id);
+      throw new HttpError(409, 'The time limit for this exam ran out before it was submitted, so the attempt has closed.');
+    }
+
     const questionIds = attempt.question_ids_json as string[];
     const { data: options } = await admin
       .from('question_options')

@@ -12,12 +12,16 @@ Deno.serve(async (req) => {
     const admin = adminClient();
     const payload = await req.json();
 
+    // Public endpoint: refuse oversized payloads so the form can't be used to stuff the database.
+    if (JSON.stringify(payload).length > 60_000) throw new HttpError(413, 'That submission is too large.');
+
     // ---- bulk CSV import (staff only) ------------------------------------
     if (payload.source === 'csv' && Array.isArray(payload.rows)) {
       const user = await requireUser(req, admin);
       const { data: me } = await admin.from('profiles').select('role').eq('id', user.id).single();
       if (!me || !['instructor', 'super_admin'].includes(me.role)) throw new HttpError(403, 'Forbidden.');
 
+      if (payload.rows.length > 2000) throw new HttpError(413, 'Import at most 2000 rows at a time.');
       let inserted = 0;
       let skipped = 0;
       for (const r of payload.rows) {
@@ -48,9 +52,12 @@ Deno.serve(async (req) => {
     // ---- single public form submission ---------------------------------
     const { form_slug, full_name, email, phone, answers } = payload;
     const cleanEmail = String(email ?? '').trim().toLowerCase();
-    if (!cleanEmail || !cleanEmail.includes('@')) throw new HttpError(400, 'A valid email is required.');
+    if (!cleanEmail || cleanEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) throw new HttpError(400, 'A valid email is required.');
     if (!String(full_name ?? '').trim()) throw new HttpError(400, 'Your name is required.');
-    if (!form_slug) throw new HttpError(400, 'Missing form.');
+    if (String(full_name).length > 120) throw new HttpError(400, 'That name is too long.');
+    if (phone && String(phone).length > 30) throw new HttpError(400, 'That phone number is too long.');
+    if (!form_slug || String(form_slug).length > 100) throw new HttpError(400, 'Missing form.');
+    if (answers !== undefined && answers !== null && (typeof answers !== 'object' || Array.isArray(answers))) throw new HttpError(400, 'Invalid answers.');
 
     const { data: form } = await admin
       .from('enrollment_forms')
@@ -63,6 +70,15 @@ Deno.serve(async (req) => {
       throw new HttpError(403, 'This registration form is closed.');
 
     if (await pendingExists(admin, cleanEmail)) return json({ ok: true, duplicate: true });
+
+    // Flood guard: a normal class registers a few dozen people; hundreds in ten minutes is abuse.
+    const since = new Date(Date.now() - 10 * 60_000).toISOString();
+    const { count: recent } = await admin
+      .from('registrations')
+      .select('id', { count: 'exact', head: true })
+      .eq('source', 'registration_form')
+      .gte('created_at', since);
+    if ((recent ?? 0) >= 300) throw new HttpError(429, 'Registration is very busy right now. Please try again in a few minutes.');
 
     const { error } = await admin.from('registrations').insert({
       source: 'registration_form',
