@@ -1,5 +1,9 @@
 import { adminClient, cors, emailShell, HttpError, json, requireUser, sendEmail } from '../_shared/common.ts';
 
+// Text a student typed must never become markup in an email sent to someone else.
+const esc = (s: unknown) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const oneLine = (s: unknown) => String(s ?? '').replace(/[\r\n]+/g, ' ').trim();
+
 /**
  * Fans out a notification for one "Ask us" thread. Direction is inferred from
  * who's calling: a student notifies staff of a new question, staff notify the
@@ -45,10 +49,10 @@ Deno.serve(async (req) => {
       if (student?.email) {
         await sendEmail({
           to: student.email,
-          subject: `New reply — ${thread.subject}`,
+          subject: `New reply — ${oneLine(thread.subject)}`,
           html: emailShell(
-            `<p>Hi ${student.full_name || 'there'},</p>` +
-              `<p>You have a new reply to your question &ldquo;<strong>${thread.subject}</strong>&rdquo;.</p>` +
+            `<p>Hi ${esc(student.full_name || 'there')},</p>` +
+              `<p>You have a new reply to your question &ldquo;<strong>${esc(thread.subject)}</strong>&rdquo;.</p>` +
               `<p><a href="${appUrl}/app/ask">Open the conversation</a></p>`,
             org,
           ),
@@ -76,10 +80,10 @@ Deno.serve(async (req) => {
       });
       await sendEmail({
         to: s.email,
-        subject: `New question — ${thread.subject}`,
+        subject: `New question — ${oneLine(thread.subject)}`,
         html: emailShell(
-          `<p><strong>${askerName}</strong> asked a new question:</p>` +
-            `<p>&ldquo;${thread.subject}&rdquo;</p>` +
+          `<p><strong>${esc(askerName)}</strong> asked a new question:</p>` +
+            `<p>&ldquo;${esc(thread.subject)}&rdquo;</p>` +
             `<p><a href="${appUrl}/admin/ask">Open in admin</a></p>`,
           org,
         ),
