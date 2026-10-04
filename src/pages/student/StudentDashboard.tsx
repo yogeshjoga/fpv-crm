@@ -11,6 +11,7 @@ import { ExamScheduleCard, examStillRelevant, useNow, type ExamScheduleCourse } 
 interface Row {
   id: string;
   status: string;
+  extra_attempts: number;
   course: (ExamScheduleCourse & { summary: string; pass_pct: number; max_attempts: number }) | null;
 }
 
@@ -26,7 +27,7 @@ export function StudentDashboard() {
       unwrap(
         supabase
           .from('enrollments')
-          .select('id, status, course:courses(id, slug, title, summary, pass_pct, max_attempts, exam_name, exam_access, exam_opens_at, exam_closes_at, exam_time_limit_min)')
+          .select('id, status, extra_attempts, course:courses(id, slug, title, summary, pass_pct, max_attempts, exam_name, exam_access, exam_opens_at, exam_closes_at, exam_time_limit_min)')
           .eq('student_id', uid)
           .order('enrolled_at', { ascending: false }),
       ) as Promise<Row[]>,
@@ -61,7 +62,13 @@ export function StudentDashboard() {
   for (const a of attempts.data ?? []) if (a.status !== 'in_progress') finishedAttempts[a.course_id] = (finishedAttempts[a.course_id] ?? 0) + 1;
   const examCards = (enrollments.data ?? [])
     .filter((e) => e.status === 'active' && e.course)
-    .map((e) => e.course!)
+    .map((e) => {
+      const c = e.course!;
+      const extra = e.extra_attempts ?? 0;
+      // a student using an extra attempt can start even after the scheduled window has closed
+      const usingExtra = extra > 0 && (finishedAttempts[c.id] ?? 0) >= c.max_attempts;
+      return { ...c, max_attempts: c.max_attempts + extra, exam_closes_at: usingExtra ? null : c.exam_closes_at };
+    })
     .filter((c) => examStillRelevant(c, now, { certCourseIds, finishedAttempts }) !== null);
 
   // Report card: ready (a finalised result exists) or pending (enrolled in a module-graded course).

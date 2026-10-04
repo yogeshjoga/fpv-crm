@@ -221,7 +221,7 @@ export function CourseViewer() {
     // every student's rows, which would break the .maybeSingle() calls and
     // pollute attempt counts when a staff account uses the student view.
     const [enrollment, attempts, cert] = await Promise.all([
-      unwrap(supabase.from('enrollments').select('id, status').eq('course_id', course.id).eq('student_id', uid).maybeSingle()) as Promise<any>,
+      unwrap(supabase.from('enrollments').select('id, status, extra_attempts').eq('course_id', course.id).eq('student_id', uid).maybeSingle()) as Promise<any>,
       unwrap(supabase.from('exam_attempts').select('*').eq('course_id', course.id).eq('student_id', uid).order('attempt_no', { ascending: false })) as Promise<any[]>,
       unwrap(supabase.from('certificates').select('id, cert_id_string').eq('course_id', course.id).eq('student_id', uid).eq('revoked', false).maybeSingle()) as Promise<any>,
     ]);
@@ -257,11 +257,15 @@ export function CourseViewer() {
 
   const latest = attempts[0];
   const attemptsUsed = attempts.filter((a: any) => a.status !== 'in_progress').length;
+  // An admin can give a student extra attempts on top of the course's allowance.
+  const extraAttempts = Number(enrollment?.extra_attempts ?? 0);
+  const attemptsAllowed = course.max_attempts + extraAttempts;
+  const usingExtraAttempt = extraAttempts > 0 && attemptsUsed >= course.max_attempts;
   const bestScore = attempts.reduce((m: number, a: any) => Math.max(m, Number(a.score_pct ?? 0)), 0);
   const locked = latest?.locked;
   const cooldownActive = latest?.cooldown_until && new Date(latest.cooldown_until) > new Date();
   const canStart =
-    enrollment?.status === 'active' && !cert && !locked && !cooldownActive && attemptsUsed < course.max_attempts;
+    enrollment?.status === 'active' && !cert && !locked && !cooldownActive && attemptsUsed < attemptsAllowed;
   const hasAccess = enrollment?.status === 'active' || enrollment?.status === 'completed';
   const composite = course.scoring_mode === 'composite';
 
@@ -274,7 +278,7 @@ export function CourseViewer() {
   if (course.exam_access === 'closed') examGate = 'The exam is not open yet. Your instructor will announce when it opens.';
   else if (course.exam_access === 'scheduled') {
     if (opensMs !== null && nowMs < opensMs) examGate = `The exam opens on ${new Date(opensMs).toLocaleString()}.`;
-    else if (closesMs !== null && nowMs > closesMs && !resumable) examGate = `The exam window closed on ${new Date(closesMs).toLocaleString()}.`;
+    else if (closesMs !== null && nowMs > closesMs && !resumable && !usingExtraAttempt) examGate = `The exam window closed on ${new Date(closesMs).toLocaleString()}.`;
   }
 
   // Study material is locked in the database while an exam window is open; the exam course itself stays reachable.
@@ -402,12 +406,12 @@ export function CourseViewer() {
               {composite ? (
                 <>
                   <Row k="Online exam" v={`${Number(course.marks_online)} marks`} />
-                  <Row k="Attempts" v={attemptsUsed >= course.max_attempts ? 'Used' : course.max_attempts === 1 ? 'One only' : `${attemptsUsed} / ${course.max_attempts}`} />
+                  <Row k="Attempts" v={attemptsUsed >= attemptsAllowed ? 'Used' : attemptsAllowed === 1 ? 'One only' : `${attemptsUsed} / ${attemptsAllowed}`} />
                 </>
               ) : (
                 <>
                   <Row k="Pass mark" v={`${course.pass_pct}%`} />
-                  <Row k="Attempts" v={`${attemptsUsed} / ${course.max_attempts}`} />
+                  <Row k="Attempts" v={`${attemptsUsed} / ${attemptsAllowed}`} />
                   {bestScore > 0 && <Row k="Best score" v={`${bestScore}%`} />}
                 </>
               )}
@@ -472,7 +476,7 @@ export function CourseViewer() {
               ) : locked ? (
                 <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
                   <Lock size={15} />{' '}
-                  {composite ? 'Online exam completed. Your final result and certificate come from your instructors.' : 'Attempts exhausted. Ask an instructor to reset.'}
+                  {composite ? 'Online exam completed. Your final result and certificate come from your instructors.' : 'Attempts used up. Ask an admin for another attempt.'}
                 </div>
               ) : examGate ? (
                 <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">

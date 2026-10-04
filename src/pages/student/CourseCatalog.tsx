@@ -34,7 +34,7 @@ export function CourseCatalog() {
           .eq('status', 'published')
           .order('title'),
       ) as Promise<Course[]>,
-      unwrap(supabase.from('enrollments').select('course_id, status').eq('student_id', uid)) as Promise<{ course_id: string; status: string }[]>,
+      unwrap(supabase.from('enrollments').select('course_id, status, extra_attempts').eq('student_id', uid)) as Promise<{ course_id: string; status: string; extra_attempts: number }[]>,
       unwrap(supabase.from('certificates').select('course_id').eq('student_id', uid).eq('revoked', false)) as Promise<{ course_id: string }[]>,
       unwrap(supabase.from('exam_attempts').select('course_id, status').eq('student_id', uid)) as Promise<{ course_id: string; status: string }[]>,
     ]);
@@ -99,7 +99,7 @@ export function CourseCatalog() {
                 <div className="flex-1">
                   <div className="font-semibold text-neutral-900">{c.title}</div>
                   <p className="mt-1 line-clamp-3 text-sm text-neutral-500">{c.summary}</p>
-                  {enrolled && examStillRelevant(c, now, done) && <ExamStatusPill course={c} />}
+                  {enrolled && examStillRelevant({ ...c, max_attempts: c.max_attempts! + (enrollments.find((e) => e.course_id === c.id)?.extra_attempts ?? 0) }, now, done) && <ExamStatusPill course={c} />}
                 </div>
                 <div className="mt-4 flex items-center justify-between gap-2">
                   {enrolled ? (
