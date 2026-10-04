@@ -1,5 +1,8 @@
 import { adminClient, cors, emailShell, HttpError, json, requireUser, sendEmail } from '../_shared/common.ts';
 
+const STAFF_ROLES = ['instructor', 'coordinator', 'admin', 'super_admin'];
+const esc = (s: unknown) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
 /** Sends account / enrollment notification emails. Callable by staff or service role. */
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -19,7 +22,7 @@ Deno.serve(async (req) => {
     if (!isServiceRole) {
       const caller = await requireUser(req, admin);
       const { data: p } = await admin.from('profiles').select('role').eq('id', caller.id).single();
-      if (!p || !['instructor', 'super_admin'].includes(p.role)) throw new HttpError(403, 'Forbidden.');
+      if (!p || !STAFF_ROLES.includes(p.role)) throw new HttpError(403, 'Forbidden.');
     }
 
     const { kind, user_id, course_id } = await req.json();
@@ -40,15 +43,15 @@ Deno.serve(async (req) => {
     const templates: Record<string, { subject: string; html: string }> = {
       account_activated: {
         subject: `Your ${org?.org_name} account is active`,
-        html: `<p>Hi ${user.full_name || 'there'},</p><p>Your account has been activated. You can now sign in and enroll in courses.</p><p><a href="${appUrl}/login">Sign in</a></p>`,
+        html: `<p>Hi ${esc(user.full_name || 'there')},</p><p>Your account has been activated. You can now sign in and enroll in courses.</p><p><a href="${esc(appUrl)}/login">Sign in</a></p>`,
       },
       enrollment_approved: {
         subject: `You're enrolled${course ? ` in ${course.title}` : ''}`,
-        html: `<p>Hi ${user.full_name || 'there'},</p><p>Your enrollment${course ? ` in <strong>${course.title}</strong>` : ''} has been approved. Open the course to start learning.</p><p><a href="${appUrl}/app/courses">Go to my courses</a></p>`,
+        html: `<p>Hi ${esc(user.full_name || 'there')},</p><p>Your enrollment${course ? ` in <strong>${esc(course.title)}</strong>` : ''} has been approved. Open the course to start learning.</p><p><a href="${esc(appUrl)}/app/courses">Go to my courses</a></p>`,
       },
       attempts_locked: {
         subject: `Exam attempts exhausted${course ? ` — ${course.title}` : ''}`,
-        html: `<p>Hi ${user.full_name || 'there'},</p><p>You've used all your exam attempts${course ? ` for <strong>${course.title}</strong>` : ''}. Contact ${org?.support_email} to request a reset.</p>`,
+        html: `<p>Hi ${esc(user.full_name || 'there')},</p><p>You've used all your exam attempts${course ? ` for <strong>${esc(course.title)}</strong>` : ''}. Contact ${esc(org?.support_email)} to request a reset.</p>`,
       },
     };
 

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
-import { BookOpen, FolderPlus, Layers3, ShieldCheck, Trash2, Users as UsersIcon } from 'lucide-react';
+import { BookOpen, FolderPlus, Layers3, ShieldCheck, Trash2, UserPlus, Users as UsersIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { invokeFn } from '../../lib/functions';
 import { useAuth } from '../../auth/AuthProvider';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
@@ -26,6 +27,8 @@ export function CourseGroups() {
   const [studentsFor, setStudentsFor] = useState<Group | null>(null);
   const [coordinatorsFor, setCoordinatorsFor] = useState<Group | null>(null);
   const [deleting, setDeleting] = useState<Group | null>(null);
+  // 'all' = opened from the page header (pick any groups); a group = opened from that group's Students window
+  const [addingPeople, setAddingPeople] = useState<'all' | Group | null>(null);
 
   const q = useQuery(async () => {
     const [groups, courses, students, coordinators, groupCourses, groupMembers, groupCoordinators] = await Promise.all([
@@ -61,9 +64,14 @@ export function CourseGroups() {
         subtitle="Bundle courses into a workshop and grant a batch of students access at once"
         actions={
           writable && (
-            <Button onClick={() => setCreating(true)}>
-              <FolderPlus size={16} /> New group
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => setAddingPeople('all')}>
+                <UserPlus size={16} /> Add people by email
+              </Button>
+              <Button onClick={() => setCreating(true)}>
+                <FolderPlus size={16} /> New group
+              </Button>
+            </div>
           )
         }
       />
@@ -121,6 +129,16 @@ export function CourseGroups() {
         </div>
       )}
 
+      {addingPeople && writable && (
+        <AddPeopleModal
+          groups={q.data?.groups ?? []}
+          courses={q.data?.courses ?? []}
+          defaultGroupId={addingPeople === 'all' ? null : addingPeople.id}
+          onClose={() => setAddingPeople(null)}
+          onDone={q.refetch}
+        />
+      )}
+
       <CreateGroupModal
         open={creating && writable}
         onClose={() => setCreating(false)}
@@ -151,6 +169,7 @@ export function CourseGroups() {
           courseIds={(q.data?.groupCourses ?? []).filter((gc) => gc.group_id === studentsFor.id).map((gc) => gc.course_id)}
           adminId={profile!.id}
           writable={writable}
+          onAddByEmail={() => setAddingPeople(studentsFor)}
           onClose={() => setStudentsFor(null)}
           onChanged={q.refetch}
         />
@@ -342,6 +361,7 @@ function GroupStudentsModal({
   courseIds,
   adminId,
   writable,
+  onAddByEmail,
   onClose,
   onChanged,
 }: {
@@ -351,6 +371,7 @@ function GroupStudentsModal({
   courseIds: string[];
   adminId: string;
   writable: boolean;
+  onAddByEmail: () => void;
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -400,7 +421,14 @@ function GroupStudentsModal({
           ? 'Adding a student here immediately enrolls them in every course currently in this group.'
           : 'You have read-only access to Course Groups.'}
       </p>
-      <TextInput placeholder="Search name or email…" value={search} onChange={(e) => setSearch(e.target.value)} className="mb-3" />
+      <div className="mb-3 flex items-center gap-2">
+        <TextInput placeholder="Search name or email…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        {writable && (
+          <Button variant="secondary" onClick={onAddByEmail} className="shrink-0">
+            <UserPlus size={15} /> Add by email
+          </Button>
+        )}
+      </div>
       {!rows.length ? (
         <p className="text-sm text-neutral-500">No students match.</p>
       ) : (
@@ -525,6 +553,159 @@ function GroupCoordinatorsModal({
       <div className="mt-5 flex justify-end">
         <Button variant="ghost" onClick={onClose}>
           Done
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+type AddResult = { email: string; outcome: 'created' | 'existing' | 'skipped'; note?: string; email_sent?: boolean; temp_password?: string };
+
+/**
+ * Add people straight from their email addresses, with no registration form. Existing students are
+ * reused; new addresses get an account and an emailed temporary password. Everyone is put into the
+ * chosen groups and enrolled in every course those groups hold.
+ */
+function AddPeopleModal({
+  groups,
+  courses,
+  defaultGroupId,
+  onClose,
+  onDone,
+}: {
+  groups: Group[];
+  courses: Course[];
+  defaultGroupId: string | null;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const toast = useToast();
+  const [text, setText] = useState('');
+  const [groupIds, setGroupIds] = useState<Set<string>>(new Set(defaultGroupId ? [defaultGroupId] : []));
+  const [courseIds, setCourseIds] = useState<Set<string>>(new Set());
+  const [showCourses, setShowCourses] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [report, setReport] = useState<{ created: number; existing: number; skipped: number; granted_courses: number; results: AddResult[] } | null>(null);
+
+  const toggle = (set: Set<string>, id: string, on: boolean, apply: (s: Set<string>) => void) => {
+    const next = new Set(set);
+    if (on) next.add(id);
+    else next.delete(id);
+    apply(next);
+  };
+
+  // one person per line: "email" or "email, name" (comma, tab or semicolon)
+  const people = useMemo(
+    () =>
+      text
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .map((l) => {
+          const [email, ...rest] = l.split(/[,;\t]/);
+          return { email: email.trim(), full_name: rest.join(' ').trim() };
+        }),
+    [text],
+  );
+
+  const submit = async () => {
+    if (!people.length) return toast('Type or paste at least one email address', 'error');
+    if (!groupIds.size && !courseIds.size) return toast('Pick at least one group or course to give them', 'error');
+    setBusy(true);
+    try {
+      const res = await invokeFn<NonNullable<typeof report>>('add-students', {
+        people,
+        group_ids: [...groupIds],
+        course_ids: [...courseIds],
+      });
+      setReport(res);
+      onDone();
+    } catch (e) {
+      toast((e as Error).message, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (report) {
+    const attention = report.results.filter((r) => r.outcome === 'skipped' || r.temp_password);
+    return (
+      <Modal open onClose={onClose} title="People added" wide>
+        <div className="mb-3 flex flex-wrap gap-2 text-xs">
+          <Badge tone="green">{report.created} new account{report.created === 1 ? '' : 's'}</Badge>
+          <Badge tone="blue">{report.existing} existing student{report.existing === 1 ? '' : 's'}</Badge>
+          {report.skipped > 0 && <Badge tone="amber">{report.skipped} skipped</Badge>}
+          <Badge tone="neutral">{report.granted_courses} course{report.granted_courses === 1 ? '' : 's'} granted each</Badge>
+        </div>
+        <p className="mb-3 text-sm text-neutral-600">New students were emailed their sign-in details. Existing students were simply added.</p>
+        {attention.length > 0 && (
+          <div className="max-h-64 space-y-2 overflow-y-auto">
+            {attention.map((r) => (
+              <div key={r.email} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <div className="font-medium">{r.email}</div>
+                {r.note && <div className="text-xs">{r.note}</div>}
+                {r.temp_password && (
+                  <div className="text-xs">
+                    The email could not be sent. Temporary password: <span className="font-mono font-semibold">{r.temp_password}</span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="mt-5 flex justify-end">
+          <Button onClick={onClose}>Done</Button>
+        </div>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Add people by email" wide>
+      <p className="mb-3 text-xs text-neutral-500">
+        No registration form needed. Type or paste one person per line, as <span className="font-mono">email</span> or{' '}
+        <span className="font-mono">email, name</span>. Existing students are reused; new emails get an account and a temporary password by email.
+      </p>
+      <TextArea
+        rows={6}
+        placeholder={'asha@example.com, Asha Rao\nravi@example.com'}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+      />
+      <div className="mt-1 text-xs text-neutral-400">{people.length} {people.length === 1 ? 'person' : 'people'}</div>
+
+      <div className="mt-4 text-sm font-medium text-neutral-800">Add them to these groups (batches)</div>
+      {!groups.length ? (
+        <p className="mt-1 text-sm text-neutral-500">No course groups yet. Create one first, or pick courses below.</p>
+      ) : (
+        <div className="mt-2 grid max-h-44 gap-2 overflow-y-auto sm:grid-cols-2">
+          {groups.map((g) => (
+            <div key={g.id} className="rounded-xl border border-white/60 bg-white/40 px-3 py-2">
+              <Checkbox label={g.name} checked={groupIds.has(g.id)} onChange={(e) => toggle(groupIds, g.id, e.target.checked, setGroupIds)} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button type="button" onClick={() => setShowCourses((v) => !v)} className="mt-4 text-sm font-medium text-blue-600 hover:underline">
+        {showCourses ? 'Hide' : 'Also give'} individual courses{courseIds.size ? ` (${courseIds.size})` : ''}
+      </button>
+      {showCourses && (
+        <div className="mt-2 grid max-h-44 gap-2 overflow-y-auto sm:grid-cols-2">
+          {courses.map((c) => (
+            <div key={c.id} className="rounded-xl border border-white/60 bg-white/40 px-3 py-2">
+              <Checkbox label={c.title} checked={courseIds.has(c.id)} onChange={(e) => toggle(courseIds, c.id, e.target.checked, setCourseIds)} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-5 flex justify-end gap-2">
+        <Button variant="ghost" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={submit} disabled={busy}>
+          {busy ? 'Adding…' : `Add ${people.length || ''} ${people.length === 1 ? 'person' : 'people'}`.replace('  ', ' ')}
         </Button>
       </div>
     </Modal>

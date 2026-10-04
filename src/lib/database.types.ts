@@ -203,6 +203,7 @@ export type Database = {
           revoked_reason: string | null
           score_pct: number
           student_id: string
+          student_name: string | null
         }
         Insert: {
           attempt_id?: string | null
@@ -218,6 +219,7 @@ export type Database = {
           revoked_reason?: string | null
           score_pct: number
           student_id: string
+          student_name?: string | null
         }
         Update: {
           attempt_id?: string | null
@@ -233,6 +235,7 @@ export type Database = {
           revoked_reason?: string | null
           score_pct?: number
           student_id?: string
+          student_name?: string | null
         }
         Relationships: [
           {
@@ -2174,6 +2177,7 @@ export type Database = {
         Args: { p_course_id: string; p_seconds: number }
         Returns: undefined
       }
+      has_module_access: { Args: { p_key: string; p_level: string }; Returns: boolean }
       is_active_user: { Args: never; Returns: boolean }
       is_enrolled: { Args: { course: string }; Returns: boolean }
       is_staff: { Args: never; Returns: boolean }

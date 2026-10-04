@@ -11,6 +11,9 @@ import {
   sendEmail,
 } from '../_shared/common.ts';
 
+const STAFF_ROLES = ['instructor', 'coordinator', 'admin', 'super_admin'];
+const esc = (s: unknown) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
 /**
  * Staff: accept a registration -> create (or reuse) the student account,
  * join them to the chosen course groups (granting every course each group
@@ -24,7 +27,7 @@ Deno.serve(async (req) => {
     const admin = adminClient();
     const caller = await requireUser(req, admin);
     const { data: me } = await admin.from('profiles').select('role').eq('id', caller.id).single();
-    if (!me || !['instructor', 'super_admin'].includes(me.role)) throw new HttpError(403, 'Forbidden.');
+    if (!me || !STAFF_ROLES.includes(me.role)) throw new HttpError(403, 'Forbidden.');
 
     const { registration_id, course_group_ids, review_note, payment } = await req.json();
     if (!registration_id) throw new HttpError(400, 'registration_id is required.');
@@ -61,7 +64,10 @@ Deno.serve(async (req) => {
     }
 
     // reuse an existing account with this email if there is one
-    const { data: existing } = await admin.from('profiles').select('id').eq('email', email).maybeSingle();
+    const { data: existing } = await admin.from('profiles').select('id, status, archived_at').eq('email', email).maybeSingle();
+    // Accepting a registration must not quietly bring back a suspended or deleted account.
+    if (existing && (existing.status === 'suspended' || existing.archived_at))
+      throw new HttpError(409, 'This email belongs to a suspended or deleted account. Restore it from Users first.');
 
     let profileId: string;
     let tempPassword: string | null = null;
@@ -136,7 +142,7 @@ Deno.serve(async (req) => {
       .select('org_name, verify_base_url, logo_url, signatory_name, signatory_title, signatory_image_url, support_email')
       .single();
     const appUrl = String(org?.verify_base_url ?? '').replace(/\/+$/, '');
-    const orgName = org?.org_name ?? 'EgireRobotics';
+    const orgName = esc(org?.org_name ?? 'EgireRobotics');
 
     await admin.from('notifications').insert({
       recipient_id: profileId,
@@ -148,7 +154,7 @@ Deno.serve(async (req) => {
       link: '/app',
     });
 
-    const safeName = String(reg.full_name || 'there').replace(/</g, '&lt;');
+    const safeName = esc(reg.full_name || 'there');
     const firstName = safeName.split(' ')[0] || 'there';
     const coursesLine = courses.length
       ? `<p style="margin:0 0 16px;color:#444">You now have access to <strong>${courses.length}</strong> course${courses.length > 1 ? 's' : ''}.</p>`
