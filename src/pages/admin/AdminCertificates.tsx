@@ -10,6 +10,7 @@ import { Badge, Button, EmptyState, Modal, PageHeader, Spinner, TextInput, useTo
 interface Cert {
   id: string;
   cert_id_string: string;
+  cert_type: string | null;
   score_pct: number;
   issued_at: string;
   revoked: boolean;
@@ -36,7 +37,7 @@ export function AdminCertificates() {
         supabase
           .from('certificates')
           .select(
-            'id, cert_id_string, score_pct, issued_at, revoked, revoked_reason, ' +
+            'id, cert_id_string, cert_type, score_pct, issued_at, revoked, revoked_reason, ' +
               'student:profiles!certificates_student_id_fkey(full_name, email), course:courses(title, cert_type)',
           )
           .order('issued_at', { ascending: false }),
@@ -101,7 +102,10 @@ export function AdminCertificates() {
                     <div className="font-medium text-neutral-900">{c.student?.full_name}</div>
                     <div className="text-xs text-neutral-500">{c.student?.email}</div>
                   </td>
-                  <td className="px-4 py-3 text-neutral-600">{c.course?.title}</td>
+                  <td className="px-4 py-3 text-neutral-600">
+                    <div>{c.course?.title}</div>
+                    <div className="mt-0.5 text-xs text-neutral-400">{c.cert_type || c.course?.cert_type}</div>
+                  </td>
                   <td className="px-4 py-3">{Number(c.score_pct)}%</td>
                   <td className="px-4 py-3 text-neutral-500">{new Date(c.issued_at).toLocaleDateString()}</td>
                   <td className="px-4 py-3">
@@ -137,7 +141,7 @@ export function AdminCertificates() {
               certId: viewing.cert_id_string,
               studentName: viewing.student?.full_name || viewing.student?.email || '',
               courseTitle: viewing.course?.title ?? '',
-              certType: viewing.course?.cert_type || 'Participation',
+              certType: viewing.cert_type || viewing.course?.cert_type || 'Participation',
               scorePct: viewing.score_pct,
               issuedAt: viewing.issued_at,
               orgName: q.data?.org?.org_name || 'EgireRobotics',

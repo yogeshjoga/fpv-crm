@@ -207,7 +207,7 @@ export function CourseViewer() {
       supabase
         .from('courses')
         .select(
-          'id, title, slug, description, pass_pct, exam_time_limit_min, exam_question_count, max_attempts, cooldown_hours, exam_access, exam_opens_at, exam_closes_at, ' +
+          'id, title, slug, description, pass_pct, exam_time_limit_min, exam_question_count, max_attempts, cooldown_hours, exam_access, exam_opens_at, exam_closes_at, scoring_mode, marks_online, marks_viva, marks_simulation, marks_piloting, merit_min_marks, ' +
             'modules(id, title, position, lessons(id, title, position, kind, content, video_url, embed_url, lesson_resources(id, file_name, file_path, mime)))',
         )
         .eq('slug', slug as string)
@@ -260,6 +260,7 @@ export function CourseViewer() {
   const canStart =
     enrollment?.status === 'active' && !cert && !locked && !cooldownActive && attemptsUsed < course.max_attempts;
   const hasAccess = enrollment?.status === 'active' || enrollment?.status === 'completed';
+  const composite = course.scoring_mode === 'composite';
 
   // Admin-controlled exam availability (mirrors the check start-exam enforces on the server).
   const nowMs = Date.now();
@@ -391,22 +392,40 @@ export function CourseViewer() {
               {course.exam_access === 'scheduled' && closesMs !== null && <Row k="Closes" v={new Date(closesMs).toLocaleString()} />}
               <Row k="Questions" v={course.exam_question_count} />
               <Row k="Time limit" v={`${course.exam_time_limit_min} min`} />
-              <Row k="Pass mark" v={`${course.pass_pct}%`} />
-              <Row k="Attempts" v={`${attemptsUsed} / ${course.max_attempts}`} />
-              {bestScore > 0 && <Row k="Best score" v={`${bestScore}%`} />}
+              {composite ? (
+                <>
+                  <Row k="Online exam" v={`${Number(course.marks_online)} marks`} />
+                  <Row k="Attempts" v={attemptsUsed >= course.max_attempts ? 'Used' : course.max_attempts === 1 ? 'One only' : `${attemptsUsed} / ${course.max_attempts}`} />
+                </>
+              ) : (
+                <>
+                  <Row k="Pass mark" v={`${course.pass_pct}%`} />
+                  <Row k="Attempts" v={`${attemptsUsed} / ${course.max_attempts}`} />
+                  {bestScore > 0 && <Row k="Best score" v={`${bestScore}%`} />}
+                </>
+              )}
             </dl>
+            {composite && (
+              <p className="mt-3 rounded-xl bg-white/50 p-3 text-xs leading-relaxed text-neutral-600">
+                Final result out of {Number(course.marks_online) + Number(course.marks_viva) + Number(course.marks_simulation) + Number(course.marks_piloting)}: online
+                exam {Number(course.marks_online)} + viva {Number(course.marks_viva)} + simulation {Number(course.marks_simulation)} + real FPV piloting{' '}
+                {Number(course.marks_piloting)}. Score {Number(course.merit_min_marks)} or more for a Merit certificate; otherwise you receive a Participation
+                certificate.
+              </p>
+            )}
 
             <div className="mt-4">
               {cert ? (
                 <div className="rounded-2xl border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-                  Passed 🎉 —{' '}
+                  {composite ? 'Your certificate is ready' : 'Passed 🎉'} —{' '}
                   <Link to="/app/certificates" className="font-medium underline">
                     view certificate
                   </Link>
                 </div>
               ) : locked ? (
                 <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-                  <Lock size={15} /> Attempts exhausted. Ask an instructor to reset.
+                  <Lock size={15} />{' '}
+                  {composite ? 'Online exam completed. Your final result and certificate come from your instructors.' : 'Attempts exhausted. Ask an instructor to reset.'}
                 </div>
               ) : examGate ? (
                 <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">

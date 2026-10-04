@@ -49,7 +49,16 @@ Deno.serve(async (req) => {
   try {
     if (!callerIsServiceRole(req)) throw new HttpError(403, 'Forbidden.');
     const admin = adminClient();
-    const { attempt_id, student_id, course_id, score_pct } = await req.json();
+    const { attempt_id, student_id, course_id, score_pct, cert_type, breakdown } = (await req.json()) as {
+      attempt_id?: string;
+      student_id?: string;
+      course_id?: string;
+      score_pct?: number;
+      /** Per-certificate type (e.g. "Merit"); falls back to the course's cert_type. */
+      cert_type?: string;
+      /** Composite assessment marks; when present the certificate reports total marks, not exam %. */
+      breakdown?: { online: number; viva: number; simulation: number; piloting: number; total: number; max: number };
+    };
     if (!student_id || !course_id) throw new HttpError(400, 'student_id and course_id are required.');
 
     const { data: existing } = await admin
@@ -74,6 +83,7 @@ Deno.serve(async (req) => {
     const base = String(org.verify_base_url || '').replace(/\/+$/, '');
     const verifyUrl = `${base}/verify/${certId}`;
     const issuedAt = new Date();
+    const certType = String(cert_type || course.cert_type || 'Participation');
 
     const pdf = await PDFDocument.create();
     const page = pdf.addPage([PAGE_W, PAGE_H]);
@@ -113,7 +123,7 @@ Deno.serve(async (req) => {
       page.drawRectangle({ x: 672 * artX, y: PAGE_H - 434 * artY, width: 92 * artX, height: 46 * artY, color: rgb(0.996, 0.996, 0.996) });
       // Centre the type between the template's two gold rules (x 641-1325, y 413), shrinking
       // long names so they never run into the rules.
-      const ofText = `OF ${String(course.cert_type || 'Participation').toUpperCase()}`;
+      const ofText = `OF ${certType.toUpperCase()}`;
       const ofMaxW = (1325 - 641 - 60) * artX;
       const ofSize = Math.min(20, (20 * ofMaxW) / serifBold.widthOfTextAtSize(ofText, 20));
       const ofCapH = serifBold.heightAtSize(ofSize, { descender: false });
@@ -127,7 +137,11 @@ Deno.serve(async (req) => {
 
       centre(student.full_name || student.email, PAGE_H * 0.585, serifBold, 22, navy);
 
-      const scoreLine = score_pct != null ? ` and achieved a score of ${Number(score_pct)}% in the certification exam.` : '.';
+      const scoreLine = breakdown
+        ? ` and achieved a total score of ${breakdown.total} out of ${breakdown.max} in the final assessment.`
+        : score_pct != null
+          ? ` and achieved a score of ${Number(score_pct)}% in the certification exam.`
+          : '.';
       const blurb =
         `has successfully completed the ${course.title} program conducted by ${org.org_name}${scoreLine}`;
       let by = PAGE_H * 0.465;
@@ -227,23 +241,52 @@ Deno.serve(async (req) => {
       issued_at: issuedAt.toISOString(),
       pdf_path: pdfPath,
       qr_url: verifyUrl,
+      cert_type: cert_type ? certType : null,
     });
     if (insErr) throw new HttpError(500, insErr.message);
 
     await admin.from('notifications').insert({
       recipient_id: student_id,
-      title: `Certificate issued — ${course.title}`,
-      body: `You passed ${course.title} with ${Number(score_pct ?? 0)}%. Certificate ${certId} is ready to download.`,
+      title: breakdown ? `${certType} certificate issued — ${course.title}` : `Certificate issued — ${course.title}`,
+      body: breakdown
+        ? `Your final score is ${breakdown.total} out of ${breakdown.max}. Your Certificate of ${certType} (${certId}) is ready to download.`
+        : `You passed ${course.title} with ${Number(score_pct ?? 0)}%. Certificate ${certId} is ready to download.`,
       kind: 'exam_passed',
       link: '/app/certificates',
     });
 
+    const isMerit = certType.toLowerCase() === 'merit';
+    const marksTable = breakdown
+      ? `<table style="border-collapse:collapse;margin:0 0 16px;font-size:14px;color:#444">` +
+        (
+          [
+            ['Online exam', breakdown.online],
+            ['Viva', breakdown.viva],
+            ['Simulation', breakdown.simulation],
+            ['Real FPV piloting', breakdown.piloting],
+          ] as [string, number][]
+        )
+          .map(([k, v]) => `<tr><td style="padding:3px 24px 3px 0">${k}</td><td style="padding:3px 0;font-weight:600">${v}</td></tr>`)
+          .join('') +
+        `<tr><td style="padding:6px 24px 3px 0;border-top:1px solid #e5e5e5"><strong>Total</strong></td><td style="padding:6px 0 3px;border-top:1px solid #e5e5e5;font-weight:700">${breakdown.total} / ${breakdown.max}</td></tr></table>`
+      : '';
+    const intro = breakdown
+      ? isMerit
+        ? `<h1 style="font-size:20px;margin:0 0 12px;color:#0a0a0a">Congratulations, ${esc(student.full_name || 'there')}! 🎉</h1>` +
+          `<p style="margin:0 0 16px;color:#444">You earned a <strong>Certificate of Merit</strong> for <strong>${esc(course.title)}</strong>. Here is your score breakdown:</p>`
+        : `<h1 style="font-size:20px;margin:0 0 12px;color:#0a0a0a">Thank you for taking part, ${esc(student.full_name || 'there')}!</h1>` +
+          `<p style="margin:0 0 16px;color:#444">You completed <strong>${esc(course.title)}</strong>. Here is your Certificate of Participation and your score breakdown:</p>`
+      : `<h1 style="font-size:20px;margin:0 0 12px;color:#0a0a0a">Congratulations, ${esc(student.full_name || 'there')}! 🎉</h1>` +
+        `<p style="margin:0 0 16px;color:#444">You passed <strong>${esc(course.title)}</strong> with a score of ${Number(score_pct ?? 0)}%.</p>`;
+
     await sendEmail({
       to: student.email,
-      subject: `Your ${org.org_name} certificate - ${course.title}`,
+      subject: breakdown
+        ? `Your ${org.org_name} Certificate of ${certType} - ${course.title}`
+        : `Your ${org.org_name} certificate - ${course.title}`,
       html: emailShell(
-        `<h1 style="font-size:20px;margin:0 0 12px;color:#0a0a0a">Congratulations, ${esc(student.full_name || 'there')}! 🎉</h1>` +
-          `<p style="margin:0 0 16px;color:#444">You passed <strong>${esc(course.title)}</strong> with a score of ${Number(score_pct ?? 0)}%.</p>` +
+        intro +
+          marksTable +
           `<p style="margin:0 0 16px;color:#444">Your certificate <strong>${certId}</strong> is attached to this email. Anyone can confirm it here:</p>` +
           `<p style="margin:0"><a href="${verifyUrl}" style="color:#0a0a0a">${verifyUrl}</a></p>`,
         org,

@@ -47,6 +47,7 @@ import { AdminResources } from './pages/admin/AdminResources';
 import { Resources } from './pages/student/Resources';
 import { Reviews } from './pages/student/Reviews';
 import { AdminReviews } from './pages/admin/AdminReviews';
+import { AdminExams } from './pages/admin/AdminExams';
 import { IdCards } from './pages/admin/IdCards';
 import { AdminAnalytics } from './pages/admin/AdminAnalytics';
 import { AdminAsk } from './pages/admin/AdminAsk';
@@ -221,6 +222,14 @@ export function AppRoutes() {
           element={
             <RequireModule moduleKey="resources">
               <AdminResources />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="exams"
+          element={
+            <RequireModule moduleKey="exams">
+              <AdminExams />
             </RequireModule>
           }
         />

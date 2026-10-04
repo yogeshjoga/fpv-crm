@@ -14,6 +14,61 @@ export type Database = {
   }
   public: {
     Tables: {
+      assessment_marks: {
+        Row: {
+          component: string
+          course_id: string
+          created_at: string
+          entered_by: string | null
+          id: string
+          marks: number
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          component: string
+          course_id: string
+          created_at?: string
+          entered_by?: string | null
+          id?: string
+          marks: number
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          component?: string
+          course_id?: string
+          created_at?: string
+          entered_by?: string | null
+          id?: string
+          marks?: number
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_marks_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_marks_entered_by_fkey"
+            columns: ["entered_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_marks_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       broadcasts: {
         Row: {
           audience_ref: Json
@@ -137,6 +192,7 @@ export type Database = {
         Row: {
           attempt_id: string | null
           cert_id_string: string
+          cert_type: string | null
           course_id: string
           id: string
           issued_at: string
@@ -150,6 +206,7 @@ export type Database = {
         Insert: {
           attempt_id?: string | null
           cert_id_string: string
+          cert_type?: string | null
           course_id: string
           id?: string
           issued_at?: string
@@ -163,6 +220,7 @@ export type Database = {
         Update: {
           attempt_id?: string | null
           cert_id_string?: string
+          cert_type?: string | null
           course_id?: string
           id?: string
           issued_at?: string
@@ -371,11 +429,17 @@ export type Database = {
           exam_time_limit_min: number
           grading_mode: string
           id: string
+          marks_online: number
+          marks_piloting: number
+          marks_simulation: number
+          marks_viva: number
           max_attempts: number
+          merit_min_marks: number
           mix_easy: number | null
           mix_hard: number | null
           mix_medium: number | null
           pass_pct: number
+          scoring_mode: string
           show_review: boolean
           slug: string
           status: Database["public"]["Enums"]["course_status"]
@@ -399,11 +463,17 @@ export type Database = {
           exam_time_limit_min?: number
           grading_mode?: string
           id?: string
+          marks_online?: number
+          marks_piloting?: number
+          marks_simulation?: number
+          marks_viva?: number
           max_attempts?: number
+          merit_min_marks?: number
           mix_easy?: number | null
           mix_hard?: number | null
           mix_medium?: number | null
           pass_pct?: number
+          scoring_mode?: string
           show_review?: boolean
           slug: string
           status?: Database["public"]["Enums"]["course_status"]
@@ -427,11 +497,17 @@ export type Database = {
           exam_time_limit_min?: number
           grading_mode?: string
           id?: string
+          marks_online?: number
+          marks_piloting?: number
+          marks_simulation?: number
+          marks_viva?: number
           max_attempts?: number
+          merit_min_marks?: number
           mix_easy?: number | null
           mix_hard?: number | null
           mix_medium?: number | null
           pass_pct?: number
+          scoring_mode?: string
           show_review?: boolean
           slug?: string
           status?: Database["public"]["Enums"]["course_status"]
