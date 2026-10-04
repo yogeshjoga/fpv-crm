@@ -441,6 +441,26 @@ export function CourseViewer() {
               </div>
             )}
 
+            {attempts.some((a: any) => a.status !== 'in_progress') && (
+              <div className="mt-4 rounded-xl bg-white/50 p-3 text-xs">
+                <div className="font-semibold text-neutral-800">Your attempts</div>
+                <ul className="mt-2 space-y-1.5">
+                  {attempts
+                    .filter((a: any) => a.status !== 'in_progress')
+                    .map((a: any) => (
+                      <li key={a.id} className="flex items-center justify-between gap-2">
+                        <span className="text-neutral-600">
+                          Attempt {a.attempt_no} · {Number(a.score_pct ?? 0)}%
+                        </span>
+                        <Link to={`/app/courses/${course.slug}/review/${a.id}`} className="font-medium text-blue-600 hover:underline">
+                          Wrong answers
+                        </Link>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
+
             <div className="mt-4">
               {cert ? (
                 <div className="rounded-2xl border border-green-200 bg-green-50 p-3 text-sm text-green-800">

@@ -21,6 +21,7 @@ import { StudentDashboard } from './pages/student/StudentDashboard';
 import { CourseCatalog } from './pages/student/CourseCatalog';
 import { CourseViewer } from './pages/student/CourseViewer';
 import { ExamFlow } from './pages/student/ExamFlow';
+import { ExamReview } from './pages/student/ExamReview';
 import { StudentCertificates } from './pages/student/StudentCertificates';
 import { StudentProfile } from './pages/student/StudentProfile';
 import { Ask } from './pages/student/Ask';
@@ -96,6 +97,7 @@ export function AppRoutes() {
         <Route path="courses" element={<RequireStudentModule moduleKey="courses"><CourseCatalog /></RequireStudentModule>} />
         <Route path="courses/:slug" element={<RequireStudentModule moduleKey="courses"><CourseViewer /></RequireStudentModule>} />
         <Route path="courses/:slug/exam" element={<RequireStudentModule moduleKey="courses"><ExamFlow /></RequireStudentModule>} />
+        <Route path="courses/:slug/review/:attemptId" element={<RequireStudentModule moduleKey="courses"><ExamReview /></RequireStudentModule>} />
         <Route path="calendar" element={<RequireStudentModule moduleKey="calendar"><StudentCalendar /></RequireStudentModule>} />
         <Route path="resources" element={<RequireStudentModule moduleKey="resources"><Resources /></RequireStudentModule>} />
         <Route path="certificates" element={<RequireStudentModule moduleKey="certificates"><StudentCertificates /></RequireStudentModule>} />
