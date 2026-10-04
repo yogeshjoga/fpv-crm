@@ -79,8 +79,20 @@ async function identify(token) {
   });
 }
 
+// While a student has a scheduled exam window open (or an attempt running) study material is locked.
+async function examLocked(token) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/exam_lock_until`, {
+    method: 'POST',
+    headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  if (!res.ok) return true; // fail closed
+  return (await res.json()) !== null;
+}
+
 async function allowed(rule, who, token) {
   if (STAFF_ROLES.includes(who.role)) return true;
+  if (await examLocked(token)) return false;
   return remember(`rule|${who.id}|${rule.prefix}`, async () => {
     if (rule.course) {
       const rows = await rest(

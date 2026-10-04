@@ -2155,6 +2155,10 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["user_status"]
       }
+      exam_lock_until: {
+        Args: never
+        Returns: string
+      }
       enrollment_form_course: {
         Args: { p_form_id: string }
         Returns: {
