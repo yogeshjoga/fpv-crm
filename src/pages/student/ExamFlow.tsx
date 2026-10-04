@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Clock, Maximize, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Clock, Download, Maximize, XCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { invokeFn } from '../../lib/functions';
 import { GlassCard } from '../../components/ui/shared';
-import { Button, Spinner } from '../../components/ui/kit';
+import { Button, Spinner, useToast } from '../../components/ui/kit';
+import { useAuth } from '../../auth/AuthProvider';
+import { downloadReviewPdf } from '../../lib/reviewPdf';
 
 function isFullscreenActive() {
   return !!document.fullscreenElement;
@@ -75,6 +77,19 @@ export function ExamFlow() {
   const startedRef = useRef(false);
   // Composite exams: the online exam is one module with its own pass mark, shown on the result.
   const [onlinePass, setOnlinePass] = useState<number | null>(null);
+  const toast = useToast();
+  const { profile } = useAuth();
+  const [courseTitle, setCourseTitle] = useState('');
+  const [pdfBusy, setPdfBusy] = useState(false);
+  useEffect(() => {
+    if (!result) return;
+    supabase
+      .from('courses')
+      .select('title')
+      .eq('slug', slug as string)
+      .maybeSingle()
+      .then(({ data }) => setCourseTitle(data?.title ?? ''));
+  }, [result, slug]);
   useEffect(() => {
     if (!result?.composite) return;
     supabase
@@ -273,7 +288,30 @@ export function ExamFlow() {
 
       {result.review && result.review.length > 0 && (
         <section>
-          <h3 className="text-lg font-semibold text-neutral-900">Review your {result.review.length} wrong {result.review.length === 1 ? 'answer' : 'answers'}</h3>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-lg font-semibold text-neutral-900">Review your {result.review.length} wrong {result.review.length === 1 ? 'answer' : 'answers'}</h3>
+            <Button
+              variant="secondary"
+              loading={pdfBusy}
+              onClick={async () => {
+                setPdfBusy(true);
+                try {
+                  await downloadReviewPdf({
+                    studentName: profile?.full_name || profile?.email || 'Student',
+                    courseTitle: courseTitle || 'Online exam',
+                    summary: `Score ${Number(result.score_pct)}% - ${result.correct_count}/${result.total} correct - ${wrongCount} wrong`,
+                    items: result.review!,
+                  });
+                } catch (e) {
+                  toast((e as Error).message || 'Could not create the PDF', 'error');
+                } finally {
+                  setPdfBusy(false);
+                }
+              }}
+            >
+              <Download size={15} /> Download PDF
+            </Button>
+          </div>
           <p className="mt-1 text-sm text-neutral-500">
             Read the correct answer and the explanation for each question below — this is how you learn each topic{result.composite ? '.' : ' before your next attempt.'}
           </p>
