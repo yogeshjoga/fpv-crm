@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Award, ClipboardCheck, Download, FileSpreadsheet, FileText, Search, Settings2 } from 'lucide-react';
+import { Award, ClipboardCheck, Download, Eye, FileSpreadsheet, FileText, Search, Settings2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { invokeFn } from '../../lib/functions';
 import { useAuth } from '../../auth/AuthProvider';
@@ -10,6 +10,7 @@ import { GlassCard } from '../../components/ui/shared';
 import { Badge, Button, EmptyState, Field, Modal, PageHeader, Select, Spinner, TextInput, useToast } from '../../components/ui/kit';
 import { exportMarkSheet, type SheetFormat, type SheetPart } from '../../lib/markSheet';
 import { evaluate, type Scheme } from '../../lib/assessment';
+import { ReportCardView } from '../student/ReportCard';
 import type { Tables } from '../../lib/database.types';
 
 type Course = Tables<'courses'>;
@@ -367,6 +368,8 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
   const [issuing, setIssuing] = useState<string | null>(null);
   // Printable / Excel mark sheets for rounds examined offline (pen and paper first).
   const [sheetOpen, setSheetOpen] = useState(false);
+  // Shows what a student will see on their report card, before the certificate is issued.
+  const [previewId, setPreviewId] = useState<string | null>(null);
   const [sheetBusy, setSheetBusy] = useState(false);
   const [sheet, setSheet] = useState<{ part: SheetPart; format: SheetFormat; withMarks: boolean; withEmail: boolean }>({
     part: 'viva',
@@ -673,11 +676,18 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
                     )}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    {canMark && r.complete && !r.cert && (
-                      <Button variant="secondary" onClick={() => issue([r.id])} loading={issuing === r.id}>
-                        Issue
-                      </Button>
-                    )}
+                    <div className="flex justify-end gap-2">
+                      {r.ev && (
+                        <Button variant="ghost" onClick={() => setPreviewId(r.id)} title="See this student's report card">
+                          <Eye size={14} /> Preview
+                        </Button>
+                      )}
+                      {canMark && r.complete && !r.cert && (
+                        <Button variant="secondary" onClick={() => issue([r.id])} loading={issuing === r.id}>
+                          Issue
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -689,6 +699,28 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
         Marks save when you leave a box or press Enter. Clear a box to remove its mark. Marks lock once a certificate is issued — revoke it in Certificates to
         correct them.
       </p>
+
+      {previewId &&
+        (() => {
+          const r = rows.find((x) => x.id === previewId);
+          if (!r?.ev) return null;
+          return (
+            <Modal open onClose={() => setPreviewId(null)} title="Report card preview" wide>
+              <ReportCardView
+                course={course.title}
+                studentName={r.name}
+                issuedAt={new Date().toISOString()}
+                certId={r.cert?.cert_id_string}
+                certType={r.ev.result}
+                report={r.ev}
+                preview={r.cert ? 'Preview — current marks' : 'Preview — not issued yet'}
+              />
+              <p className="mt-3 text-xs text-neutral-500">
+                Built from the marks and pass marks as they are right now. The student only sees their report card after you issue the certificate.
+              </p>
+            </Modal>
+          );
+        })()}
 
       {canExport && sheetOpen && (
         <Modal open onClose={() => setSheetOpen(false)} title="Export a mark sheet">

@@ -1,11 +1,11 @@
 import { Link } from 'react-router-dom';
-import { Award, CheckCircle2, ClipboardList, XCircle } from 'lucide-react';
+import { Award, CheckCircle2, ClipboardList, Eye, XCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, EmptyState, PageHeader, Spinner } from '../../components/ui/kit';
-import type { Evaluation } from '../../lib/assessment';
+import { evaluate, type Evaluation, type Scheme } from '../../lib/assessment';
 
 interface CertRow {
   id: string;
@@ -18,13 +18,24 @@ interface CertRow {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+// The standard Sivani scheme, used only to draw the sample report cards staff can preview.
+const SAMPLE_SCHEME: Scheme = {
+  max: { online: 15, viva: 15, simulation: 30, piloting: 40 },
+  pass: { online: 11.25, viva: 8, simulation: 24, piloting: 32 },
+  meritMin: 75,
+};
+const SAMPLES = [
+  { name: 'Sample student — cleared every module', marks: { online: 13.5, viva: 12, simulation: 27, piloting: 36 } },
+  { name: 'Sample student — high total, but one module missed', marks: { online: 14, viva: 6, simulation: 28, piloting: 38 } },
+];
+
 /**
  * The student's report card: every module with their marks, the pass mark and a clear
  * Cleared / Not cleared, then the overall result. It is the snapshot taken when the results
  * were finalised, so it always matches the certificate they received.
  */
 export function ReportCard() {
-  const { profile } = useAuth();
+  const { profile, isStaff } = useAuth();
   const q = useQuery(
     () =>
       unwrap(
@@ -46,25 +57,73 @@ export function ReportCard() {
     <div>
       <PageHeader title="Report card" subtitle="Your result in every module of the assessment" />
 
-      {!cards.length ? (
+      {cards.length ? (
+        <div className="space-y-6">
+          {cards.map((c) => (
+            <ReportCardView
+              key={c.id}
+              course={c.report!.course ?? c.course?.title ?? ''}
+              studentName={profile?.full_name || profile?.email || ''}
+              issuedAt={c.issued_at}
+              certId={c.cert_id_string}
+              certType={c.cert_type}
+              report={c.report!}
+            />
+          ))}
+        </div>
+      ) : isStaff ? (
+        <div className="space-y-6">
+          <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-800">
+            <Eye size={16} className="mt-0.5 shrink-0" />
+            <span>
+              Staff preview — these are <strong>sample</strong> report cards, not real students. A real report card appears for each student once you issue their
+              certificate. To see one with a real student's marks, use <strong>Preview</strong> in Exams → Student marks.
+            </span>
+          </div>
+          {SAMPLES.map((s) => {
+            const ev = evaluate(SAMPLE_SCHEME, s.marks)!;
+            return (
+              <ReportCardView
+                key={s.name}
+                course="Sivani FPV Final Exam"
+                studentName={s.name}
+                issuedAt={new Date().toISOString()}
+                certType={ev.result}
+                report={{ ...ev }}
+                preview="Sample"
+              />
+            );
+          })}
+        </div>
+      ) : (
         <EmptyState
           icon={<ClipboardList size={22} />}
           title="No report card yet"
           description="Your report card appears here once your instructors have finalised your results, after the viva, simulation, free flight and online exam."
         />
-      ) : (
-        <div className="space-y-6">
-          {cards.map((c) => (
-            <Card key={c.id} row={c} studentName={profile?.full_name || profile?.email || ''} />
-          ))}
-        </div>
       )}
     </div>
   );
 }
 
-function Card({ row, studentName }: { row: CertRow; studentName: string }) {
-  const r = row.report!;
+export function ReportCardView({
+  course,
+  studentName,
+  issuedAt,
+  certId,
+  certType,
+  report: r,
+  preview,
+}: {
+  course: string;
+  studentName: string;
+  issuedAt: string;
+  certId?: string;
+  certType: string | null;
+  report: Evaluation;
+  /** Set for sample / not-yet-issued cards, e.g. "Sample" or "Preview — not issued yet". */
+  preview?: string;
+}) {
   const cleared = r.clearedAll;
   const pct = r.max ? round2((r.total / r.max) * 100) : 0;
 
@@ -73,14 +132,18 @@ function Card({ row, studentName }: { row: CertRow; studentName: string }) {
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/60 p-5">
         <div>
           <div className="text-xs font-semibold uppercase tracking-wide text-neutral-400">Report card</div>
-          <h2 className="mt-0.5 text-lg font-semibold text-neutral-900">{r.course ?? row.course?.title}</h2>
+          <h2 className="mt-0.5 text-lg font-semibold text-neutral-900">{course}</h2>
           <div className="mt-0.5 text-sm text-neutral-500">
-            {studentName} · issued {new Date(row.issued_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+            {studentName} · {preview ? 'as of' : 'issued'} {new Date(issuedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
           </div>
         </div>
-        <Link to="/app/certificates" className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-white">
-          <Award size={13} /> Certificate <span className="font-mono">{row.cert_id_string}</span>
-        </Link>
+        {preview ? (
+          <Badge tone="amber">{preview}</Badge>
+        ) : (
+          <Link to="/app/certificates" className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-white">
+            <Award size={13} /> Certificate <span className="font-mono">{certId}</span>
+          </Link>
+        )}
       </div>
 
       <div className={`flex flex-wrap items-center gap-4 px-5 py-4 ${cleared ? 'bg-green-50/80' : 'bg-red-50/80'}`}>
@@ -91,8 +154,10 @@ function Card({ row, studentName }: { row: CertRow; studentName: string }) {
           </div>
           <p className={`text-sm ${cleared ? 'text-green-800/80' : 'text-red-800/80'}`}>
             {cleared
-              ? `Certificate of ${row.cert_type ?? 'Merit'} awarded.`
-              : `You did not clear: ${r.failed.join(', ')}. Every module has to be cleared on its own, so a high score in the other modules cannot make up for it. You received a Certificate of ${row.cert_type ?? 'Participation'}.`}
+              ? `Certificate of ${certType ?? 'Merit'}${preview ? ' will be awarded' : ' awarded'}.`
+              : `You did not clear: ${r.failed.join(', ')}. Every module has to be cleared on its own, so a high score in the other modules cannot make up for it. ${
+                  preview ? 'A' : 'You received a'
+                } Certificate of ${certType ?? 'Participation'}${preview ? ' will be issued' : ''}.`}
           </p>
         </div>
         <div className="text-right">
