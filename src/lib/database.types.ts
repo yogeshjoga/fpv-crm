@@ -2177,6 +2177,7 @@ export type Database = {
         Args: { p_course_id: string; p_seconds: number }
         Returns: undefined
       }
+      my_exam_review: { Args: { p_attempt_id: string }; Returns: Json }
       has_module_access: { Args: { p_key: string; p_level: string }; Returns: boolean }
       is_active_user: { Args: never; Returns: boolean }
       is_enrolled: { Args: { course: string }; Returns: boolean }
