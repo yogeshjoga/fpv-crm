@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Check, Download, MessageSquareHeart, Pencil, Trash2, X } from 'lucide-react';
+import { CalendarDays, Check, Download, MessageSquareHeart, MessageSquareText, Pencil, ThumbsUp, Trash2, Users, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
@@ -62,6 +62,8 @@ export function AdminReviews() {
       ) as unknown as Promise<EditRequestRow[]>,
     [],
   );
+  // Group sizes, so the dashboard can show how many students have actually reviewed.
+  const mq = useQuery(() => unwrap(supabase.from('course_group_members').select('group_id')) as Promise<{ group_id: string }[]>, []);
   const requests = rq.data ?? [];
   const pending = requests.filter((r) => r.status === 'pending');
   const approved = requests.filter((r) => r.status === 'approved');
@@ -86,8 +88,33 @@ export function AdminReviews() {
     [all, group, stars],
   );
 
-  const avg = rows.length ? rows.reduce((s, r) => s + r.rating, 0) / rows.length : 0;
-  const dist = [5, 4, 3, 2, 1].map((n) => ({ n, count: rows.filter((r) => r.rating === n).length }));
+  // The dashboard follows the group filter only; the star filter just narrows the list below.
+  const scoped = useMemo(() => all.filter((r) => group === 'all' || r.group_id === group), [all, group]);
+  const avg = scoped.length ? scoped.reduce((sum, r) => sum + r.rating, 0) / scoped.length : 0;
+  const dist = [5, 4, 3, 2, 1].map((n) => ({ n, count: scoped.filter((r) => r.rating === n).length }));
+  const stats = useMemo(() => {
+    const members = (mq.data ?? []).filter((m) => group === 'all' || m.group_id === group).length;
+    const pct = (n: number) => (scoped.length ? Math.round((n / scoped.length) * 100) : 0);
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - (6 - i));
+      return { key: d.toDateString(), label: d.toLocaleDateString('en-GB', { weekday: 'short' }), count: 0 };
+    });
+    for (const r of scoped) {
+      const hit = days.find((d) => d.key === new Date(r.created_at).toDateString());
+      if (hit) hit.count++;
+    }
+    return {
+      members,
+      responseRate: members ? Math.min(100, Math.round((scoped.length / members) * 100)) : null,
+      satisfied: pct(scoped.filter((r) => r.rating >= 4).length),
+      commented: pct(scoped.filter((r) => r.comment.trim()).length),
+      edited: scoped.filter((r) => new Date(r.updated_at).getTime() - new Date(r.created_at).getTime() > 60_000).length,
+      days,
+      week: days.reduce((sum, d) => sum + d.count, 0),
+    };
+  }, [scoped, mq.data, group]);
 
   // Exports exactly what is on screen: the current group and star filters are applied.
   // Without names the file has no name or email column and only dates (no times), so feedback
@@ -126,23 +153,27 @@ export function AdminReviews() {
         title="Reviews"
         subtitle="What each course group says about the program"
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Select value={group} onChange={(e) => setGroup(e.target.value)} className="w-60">
-              <option value="all">All course groups</option>
-              {groupOptions.map(([id, name]) => (
-                <option key={id} value={id}>
-                  {name}
-                </option>
-              ))}
-            </Select>
-            <Select value={stars} onChange={(e) => setStars(e.target.value)} className="w-32">
-              <option value="all">All stars</option>
-              {[5, 4, 3, 2, 1].map((n) => (
-                <option key={n} value={n}>
-                  {n} star{n > 1 ? 's' : ''}
-                </option>
-              ))}
-            </Select>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="w-56">
+              <Select value={group} onChange={(e) => setGroup(e.target.value)}>
+                <option value="all">All course groups</option>
+                {groupOptions.map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="w-36">
+              <Select value={stars} onChange={(e) => setStars(e.target.value)}>
+                <option value="all">All stars</option>
+                {[5, 4, 3, 2, 1].map((n) => (
+                  <option key={n} value={n}>
+                    {n} star{n > 1 ? 's' : ''}
+                  </option>
+                ))}
+              </Select>
+            </div>
             <Button variant="secondary" onClick={() => setExporting(true)} disabled={!rows.length}>
               <Download size={15} /> Export CSV
             </Button>
@@ -204,26 +235,93 @@ export function AdminReviews() {
         <EmptyState icon={<MessageSquareHeart size={22} />} title="No reviews yet" description="Students can leave a rating and feedback from Reviews in their sidebar." />
       ) : (
         <>
-          <GlassCard className="mb-6 grid gap-5 p-5 sm:grid-cols-[auto_1fr] sm:items-center">
-            <div className="text-center sm:pr-6">
-              <div className="text-4xl font-semibold text-neutral-900">{rows.length ? avg.toFixed(1) : '–'}</div>
-              <div className="mt-1 flex justify-center">
-                <StarRating value={Math.round(avg)} size={16} />
+          <GlassCard className="mb-6 p-5">
+            <div className="grid gap-6 lg:grid-cols-[170px_minmax(0,1fr)_minmax(0,1.3fr)] lg:items-center">
+              <div className="text-center lg:border-r lg:border-white/60 lg:pr-6">
+                <div className="text-5xl font-semibold text-neutral-900">{scoped.length ? avg.toFixed(1) : '–'}</div>
+                <div className="mt-1 flex justify-center">
+                  <StarRating value={Math.round(avg)} size={18} />
+                </div>
+                <div className="mt-1 text-xs text-neutral-500">
+                  {scoped.length} review{scoped.length === 1 ? '' : 's'}
+                </div>
               </div>
-              <div className="mt-1 text-xs text-neutral-500">
-                {rows.length} review{rows.length === 1 ? '' : 's'}
+
+              <div className="space-y-1.5">
+                {dist.map((d) => (
+                  <button
+                    key={d.n}
+                    type="button"
+                    aria-pressed={stars === String(d.n)}
+                    title={stars === String(d.n) ? 'Show all stars' : `Show only ${d.n}-star reviews`}
+                    onClick={() => setStars(stars === String(d.n) ? 'all' : String(d.n))}
+                    className={`flex w-full items-center gap-2 rounded-lg px-1.5 py-0.5 text-xs text-neutral-600 transition-colors hover:bg-white/60 ${stars === String(d.n) ? 'bg-white/80 ring-1 ring-amber-300' : ''}`}
+                  >
+                    <span className="w-3 text-right">{d.n}</span>
+                    <span className="h-2 flex-1 overflow-hidden rounded-full bg-white/70">
+                      <span className="block h-full rounded-full bg-amber-400" style={{ width: scoped.length ? `${(d.count / scoped.length) * 100}%` : 0 }} />
+                    </span>
+                    <span className="w-6 text-right text-neutral-400">{d.count}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <StatTile icon={<ThumbsUp size={15} />} label="Satisfied (4–5★)" value={scoped.length ? `${stats.satisfied}%` : '–'} />
+                <StatTile icon={<MessageSquareText size={15} />} label="Wrote a comment" value={scoped.length ? `${stats.commented}%` : '–'} />
+                <StatTile icon={<CalendarDays size={15} />} label="Last 7 days" value={String(stats.week)} sub={stats.week === 1 ? 'new review' : 'new reviews'} />
+                <StatTile
+                  icon={<Pencil size={15} />}
+                  label="Edit requests"
+                  value={String(pending.length)}
+                  sub={stats.edited ? `${stats.edited} edited so far` : 'waiting for you'}
+                  highlight={pending.length > 0}
+                />
               </div>
             </div>
-            <div className="space-y-1.5">
-              {dist.map((d) => (
-                <div key={d.n} className="flex items-center gap-2 text-xs text-neutral-600">
-                  <span className="w-3 text-right">{d.n}</span>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/70">
-                    <div className="h-full rounded-full bg-amber-400" style={{ width: rows.length ? `${(d.count / rows.length) * 100}%` : 0 }} />
-                  </div>
-                  <span className="w-6 text-neutral-400">{d.count}</span>
+
+            <div className="mt-5 grid gap-5 border-t border-white/60 pt-5 md:grid-cols-2">
+              <div>
+                <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-neutral-500">
+                  <Users size={14} /> Response rate
                 </div>
-              ))}
+                {stats.members ? (
+                  <>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-2xl font-semibold text-neutral-900">{stats.responseRate}%</span>
+                      <span className="text-xs text-neutral-500">
+                        {scoped.length} of {stats.members} students have reviewed
+                      </span>
+                    </div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/70">
+                      <div className="h-full rounded-full bg-blue-500" style={{ width: `${stats.responseRate}%` }} />
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-neutral-400">No students in this group yet.</p>
+                )}
+              </div>
+              <div>
+                <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-neutral-500">
+                  <CalendarDays size={14} /> Reviews per day · last 7 days
+                </div>
+                <div className="flex h-14 items-end gap-2">
+                  {stats.days.map((d) => {
+                    const max = Math.max(1, ...stats.days.map((x) => x.count));
+                    return (
+                      <div key={d.key} className="flex flex-1 flex-col items-center gap-1" title={`${d.label}: ${d.count}`}>
+                        <div className="flex h-9 w-full items-end">
+                          <div
+                            className={`w-full rounded-t-md ${d.count ? 'bg-amber-400' : 'bg-white/70'}`}
+                            style={{ height: d.count ? `${Math.max(14, (d.count / max) * 100)}%` : '8%' }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-neutral-400">{d.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </GlassCard>
 
@@ -286,6 +384,18 @@ export function AdminReviews() {
           </div>
         </Modal>
       )}
+    </div>
+  );
+}
+
+function StatTile({ icon, label, value, sub, highlight }: { icon: React.ReactNode; label: string; value: string; sub?: string; highlight?: boolean }) {
+  return (
+    <div className={`rounded-2xl border p-3 ${highlight ? 'border-amber-200 bg-amber-50/70' : 'border-white/60 bg-white/50'}`}>
+      <div className="flex items-center gap-1.5 text-xs text-neutral-500">
+        {icon} {label}
+      </div>
+      <div className="mt-1 text-2xl font-semibold text-neutral-900">{value}</div>
+      {sub && <div className="text-[11px] text-neutral-400">{sub}</div>}
     </div>
   );
 }
