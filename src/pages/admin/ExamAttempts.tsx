@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Search } from 'lucide-react';
+import { Search, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, Button, Checkbox, EmptyState, Modal, Select, Spinner, TextInput, useToast } from '../../components/ui/kit';
+import { ResetExamModal } from './ResetExamModal';
 import type { Tables } from '../../lib/database.types';
 
 type Course = Tables<'courses'>;
@@ -31,6 +32,7 @@ export function ExamAttempts({ course }: { course: Course }) {
   const [skipWait, setSkipWait] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [bulk, setBulk] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
 
   const q = useQuery(async () => {
@@ -137,6 +139,9 @@ export function ExamAttempts({ course }: { course: Course }) {
           <Button variant="secondary" disabled={!outCount} onClick={() => setBulk(true)}>
             Give +1 to all {outCount} out of attempts
           </Button>
+          <Button variant="secondary" className="text-red-600" onClick={() => setResetOpen(true)}>
+            <Trash2 size={15} /> Reset exam…
+          </Button>
         </div>
       </GlassCard>
 
@@ -192,6 +197,16 @@ export function ExamAttempts({ course }: { course: Course }) {
             </tbody>
           </table>
         </GlassCard>
+      )}
+
+      {resetOpen && (
+        <ResetExamModal
+          course={course}
+          composite={course.scoring_mode === 'composite'}
+          students={rows.map((r) => ({ id: r.studentId, name: r.name, email: r.email }))}
+          onClose={() => setResetOpen(false)}
+          onDone={() => q.refetch()}
+        />
       )}
 
       <Modal open={bulk} onClose={() => setBulk(false)} title="Give everyone one more attempt?">
