@@ -98,7 +98,7 @@ export function AdminExams() {
       )}
 
       {activeTab === 'marks' && composite ? (
-        <MarksPanel key={selected.id} course={selected} canMark={canMark} />
+        <MarksPanel key={selected.id} course={selected} canMark={canMark} canExport={canConfigure} />
       ) : (
         <SettingsPanel key={selected.id} course={selected} canConfigure={canConfigure} onSaved={() => q.refetch()} />
       )}
@@ -301,7 +301,7 @@ const COMPONENTS: { key: Component; label: string; field: 'marks_viva' | 'marks_
   { key: 'piloting', label: 'Real piloting', field: 'marks_piloting' },
 ];
 
-function MarksPanel({ course, canMark }: { course: Course; canMark: boolean }) {
+function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: boolean; canExport: boolean }) {
   const toast = useToast();
   const [search, setSearch] = useState('');
   const [issuing, setIssuing] = useState<string | null>(null);
@@ -470,9 +470,11 @@ function MarksPanel({ course, canMark }: { course: Course; canMark: boolean }) {
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" onClick={() => setSheetOpen(true)} disabled={!rows.length}>
-            <Download size={15} /> Export sheet
-          </Button>
+          {canExport && (
+            <Button variant="secondary" onClick={() => setSheetOpen(true)} disabled={!rows.length}>
+              <Download size={15} /> Export sheet
+            </Button>
+          )}
           {canMark && (
             <Button onClick={issueAll} disabled={!ready.length} loading={issuing === 'all'}>
               <Award size={15} /> Issue {ready.length || ''} certificate{ready.length === 1 ? '' : 's'}
@@ -563,7 +565,7 @@ function MarksPanel({ course, canMark }: { course: Course; canMark: boolean }) {
         correct them.
       </p>
 
-      {sheetOpen && (
+      {canExport && sheetOpen && (
         <Modal open onClose={() => setSheetOpen(false)} title="Export a mark sheet">
           <div className="space-y-5">
             <p className="text-sm text-neutral-600">

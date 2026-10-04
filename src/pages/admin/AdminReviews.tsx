@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { CalendarDays, Check, Download, MessageSquareHeart, MessageSquareText, Pencil, ThumbsUp, Trash2, Users, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../auth/AuthProvider';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { downloadCsv } from '../../lib/csv';
@@ -32,6 +33,9 @@ export function AdminReviews() {
   const toast = useToast();
   const { canWrite } = useAdminAccess();
   const writable = canWrite('reviews');
+  // Exports carry names, emails and feedback, so they are limited to admins.
+  const { profile } = useAuth();
+  const canExport = profile?.role === 'admin' || profile?.role === 'super_admin';
   const [group, setGroup] = useState('all');
   const [stars, setStars] = useState('all');
   const [exporting, setExporting] = useState(false);
@@ -174,9 +178,11 @@ export function AdminReviews() {
                 ))}
               </Select>
             </div>
-            <Button variant="secondary" onClick={() => setExporting(true)} disabled={!rows.length}>
-              <Download size={15} /> Export CSV
-            </Button>
+            {canExport && (
+              <Button variant="secondary" onClick={() => setExporting(true)} disabled={!rows.length}>
+                <Download size={15} /> Export CSV
+              </Button>
+            )}
           </div>
         }
       />
@@ -357,7 +363,7 @@ export function AdminReviews() {
         </>
       )}
 
-      {exporting && (
+      {canExport && exporting && (
         <Modal open onClose={() => setExporting(false)} title="Export reviews to CSV">
           <div className="space-y-4">
             <p className="text-sm text-neutral-600">
