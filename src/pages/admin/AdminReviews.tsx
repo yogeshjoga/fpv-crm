@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CalendarDays, Check, Download, MessageSquareHeart, MessageSquareText, Pencil, ThumbsUp, Trash2, Users, X } from 'lucide-react';
+import { CalendarDays, Check, Download, Eye, EyeOff, MessageSquareHeart, MessageSquareText, Pencil, ThumbsUp, Trash2, Users, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
@@ -36,6 +36,9 @@ export function AdminReviews() {
   // Exports carry names, emails and feedback, so they are limited to admins.
   const { profile } = useAuth();
   const canExport = profile?.role === 'admin' || profile?.role === 'super_admin';
+  // Reviewer names stay hidden until an admin unlocks them with the eye button, so the page is safe
+  // to show to students or on a shared screen. It re-hides every time the page is opened.
+  const [showNames, setShowNames] = useState(false);
   const [group, setGroup] = useState('all');
   const [stars, setStars] = useState('all');
   const [exporting, setExporting] = useState(false);
@@ -81,6 +84,11 @@ export function AdminReviews() {
   };
 
   const all = useMemo(() => q.data ?? [], [q.data]);
+  // A steady "Anonymous #n" per review (oldest first), so a review can still be pointed at without a name.
+  const anonNo = useMemo(
+    () => new Map([...all].sort((a, b) => a.created_at.localeCompare(b.created_at)).map((r, i) => [r.id, i + 1] as const)),
+    [all],
+  );
   const groupOptions = useMemo(() => {
     const groups = new Map<string, string>();
     for (const r of all) if (r.group_id && r.group) groups.set(r.group_id, r.group.name);
@@ -179,9 +187,29 @@ export function AdminReviews() {
               </Select>
             </div>
             {canExport && (
-              <Button variant="secondary" onClick={() => setExporting(true)} disabled={!rows.length}>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setWithNames(showNames); // names are only pre-ticked when they're unlocked on screen
+                  setExporting(true);
+                }}
+                disabled={!rows.length}
+              >
                 <Download size={15} /> Export CSV
               </Button>
+            )}
+            {canExport && (
+              <button
+                type="button"
+                onClick={() => setShowNames((v) => !v)}
+                aria-pressed={showNames}
+                aria-label={showNames ? 'Hide reviewer names' : 'Show reviewer names'}
+                className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
+                  showNames ? 'bg-[#1a1a1a] text-white' : 'bg-white/70 text-neutral-500 hover:bg-white hover:text-neutral-800'
+                }`}
+              >
+                {showNames ? <Eye size={16} /> : <EyeOff size={16} />}
+              </button>
             )}
           </div>
         }
@@ -200,7 +228,7 @@ export function AdminReviews() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-neutral-900">{r.student?.full_name || r.student?.email || 'Student'}</span>
+                      <span className="font-medium text-neutral-900">{showNames ? r.student?.full_name || r.student?.email || 'Student' : 'Anonymous student'}</span>
                       <Badge tone="amber">{r.review?.group?.name ?? 'Group'}</Badge>
                       {r.status === 'approved' && <Badge tone="green">Approved — waiting for the student</Badge>}
                     </div>
@@ -340,7 +368,7 @@ export function AdminReviews() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium text-neutral-900">{r.student?.full_name || r.student?.email || 'Student'}</span>
+                        <span className="font-medium text-neutral-900">{showNames ? r.student?.full_name || r.student?.email || 'Student' : `Anonymous #${anonNo.get(r.id) ?? ''}`}</span>
                         <Badge tone="amber">{r.group?.name ?? 'Group'}</Badge>
                         {new Date(r.updated_at).getTime() - new Date(r.created_at).getTime() > 60_000 && <Badge tone="blue">Edited</Badge>}
                       </div>
