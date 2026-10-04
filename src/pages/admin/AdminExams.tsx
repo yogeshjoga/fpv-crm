@@ -430,6 +430,28 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
     if (confirm(msg)) issue(ready.map((r) => r.id));
   };
 
+  // One click: every student with every mark, the total and the Merit/Participation result.
+  const [excelBusy, setExcelBusy] = useState(false);
+  const quickExcel = async () => {
+    setExcelBusy(true);
+    try {
+      await exportMarkSheet('xlsx', {
+        course: course.title,
+        part: 'all',
+        max: { viva: num(course.marks_viva), simulation: num(course.marks_simulation), piloting: num(course.marks_piloting), online: onlineMax },
+        withMarks: true,
+        withEmail: true,
+        meritMin: merit,
+        students: rows.map((r) => ({ name: r.name, email: r.email, viva: r.marks.viva, simulation: r.marks.simulation, piloting: r.marks.piloting, online: r.online })),
+      });
+      toast(`Excel sheet for ${rows.length} students downloaded`);
+    } catch (e) {
+      toast((e as Error).message || 'Could not create the Excel sheet', 'error');
+    } finally {
+      setExcelBusy(false);
+    }
+  };
+
   const downloadSheet = async () => {
     setSheetBusy(true);
     try {
@@ -472,7 +494,7 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
         <div className="flex flex-wrap items-center gap-2">
           {canExport && (
             <Button variant="secondary" onClick={() => setSheetOpen(true)} disabled={!rows.length}>
-              <Download size={15} /> Export sheet
+              <Download size={15} /> PDF / blank sheet
             </Button>
           )}
           {canMark && (
@@ -488,9 +510,16 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
         by itself when a student submits.
       </div>
 
-      <div className="relative mb-3 max-w-xs">
-        <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-        <TextInput placeholder="Find a student…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="relative w-72 max-w-full">
+          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+          <TextInput placeholder="Find a student…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+        </div>
+        {canExport && (
+          <Button variant="secondary" onClick={quickExcel} loading={excelBusy} disabled={!rows.length}>
+            <FileSpreadsheet size={15} /> Export Excel
+          </Button>
+        )}
       </div>
 
       {!rows.length ? (

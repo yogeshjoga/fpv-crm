@@ -24,6 +24,8 @@ export interface SheetOptions {
   /** Fill in marks already entered; otherwise the mark boxes are left blank for handwriting. */
   withMarks: boolean;
   withEmail: boolean;
+  /** With every part filled in, adds a Result column: Merit at/above this total, else Participation. */
+  meritMin?: number;
   students: SheetStudent[];
 }
 
@@ -37,12 +39,14 @@ function layout(o: SheetOptions) {
     o.part === 'all'
       ? `Viva ${o.max.viva} · Simulation ${o.max.simulation} · Real piloting ${o.max.piloting} · Online exam ${o.max.online} · Total ${total}`
       : `${PART_LABEL[o.part]} — out of ${total} marks`;
+  const showResult = o.part === 'all' && o.withMarks && o.meritMin !== undefined;
   const headers = [
     'No.',
     'Student',
     ...(o.withEmail ? ['Email'] : []),
     ...parts.map((p) => `${PART_LABEL[p]} (/${o.max[p]})`),
     ...(o.part === 'all' && o.withMarks ? [`Online (/${o.max.online})`, `Total (/${total})`] : []),
+    ...(showResult ? ['Result'] : []),
     'Remarks',
   ];
   const body = o.students.map((s, i) => {
@@ -56,10 +60,11 @@ function layout(o: SheetOptions) {
       ...(o.withEmail ? [s.email] : []),
       ...partValues,
       ...(o.part === 'all' && o.withMarks ? [s.online ?? '', sum] : []),
+      ...(showResult ? [sum === '' ? 'Incomplete' : sum >= o.meritMin! ? 'Merit' : 'Participation'] : []),
       '',
     ];
   });
-  return { parts, total, title, subtitle, headers, body };
+  return { parts, total, title, subtitle, headers, body, showResult };
 }
 
 const stamp = () => new Date().toISOString().slice(0, 10);
@@ -89,7 +94,7 @@ export async function exportMarkSheet(format: SheetFormat, o: SheetOptions) {
 
 async function buildXlsx(o: SheetOptions): Promise<BuiltSheet> {
   const { default: writeXlsxFile } = await import('write-excel-file/universal');
-  const { title, subtitle, headers, body, parts } = layout(o);
+  const { title, subtitle, headers, body, parts, showResult } = layout(o);
   const border = { borderColor: '#9ca3af', borderStyle: 'thin' as const };
   const nCols = headers.length;
   const filler = (n: number) => Array.from({ length: n }, () => null);
@@ -117,7 +122,7 @@ async function buildXlsx(o: SheetOptions): Promise<BuiltSheet> {
     ),
   ];
 
-  const widths = [6, 30, ...(o.withEmail ? [34] : []), ...parts.map(() => 16), ...(o.part === 'all' && o.withMarks ? [14, 14] : []), 36];
+  const widths = [6, 30, ...(o.withEmail ? [34] : []), ...parts.map(() => 16), ...(o.part === 'all' && o.withMarks ? [14, 14] : []), ...(showResult ? [16] : []), 36];
   const blob = await writeXlsxFile(sheetData as never, {
     sheet: o.part === 'all' ? 'Mark sheet' : PART_LABEL[o.part],
     columns: widths.map((width) => ({ width })),
@@ -129,7 +134,7 @@ async function buildXlsx(o: SheetOptions): Promise<BuiltSheet> {
 
 async function buildPdf(o: SheetOptions): Promise<BuiltSheet> {
   const [{ jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
-  const { title, subtitle, headers, body, parts } = layout(o);
+  const { title, subtitle, headers, body, parts, showResult } = layout(o);
   const landscape = headers.length > 6;
   const doc = new jsPDF({ orientation: landscape ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
   const w = doc.internal.pageSize.getWidth();
@@ -159,6 +164,7 @@ async function buildPdf(o: SheetOptions): Promise<BuiltSheet> {
   if (o.part === 'all' && o.withMarks) {
     columnStyles[markStart + parts.length] = { cellWidth: 22, halign: 'center' };
     columnStyles[markStart + parts.length + 1] = { cellWidth: 22, halign: 'center' };
+    if (showResult) columnStyles[markStart + parts.length + 2] = { cellWidth: 28, halign: 'center' };
   }
 
   autoTable(doc, {
