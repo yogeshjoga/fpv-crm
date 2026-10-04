@@ -51,6 +51,10 @@ interface SubmitResponse {
   cert_id_string?: string;
   cooldown_until?: string;
   locked?: boolean;
+  /** Composite courses: the online exam is one part of a 100-mark assessment. */
+  composite?: boolean;
+  exam_marks?: number;
+  exam_max?: number;
 }
 
 type Phase = 'loading' | 'error' | 'ready' | 'exam' | 'result';
@@ -186,8 +190,14 @@ export function ExamFlow() {
     return (
       <div className="mx-auto max-w-3xl space-y-6">
       <GlassCard className="mx-auto max-w-lg p-8 text-center">
-        {result.passed ? <CheckCircle2 className="mx-auto text-green-500" size={44} /> : <XCircle className="mx-auto text-red-500" size={44} />}
-        <h2 className="mt-3 text-2xl font-semibold text-neutral-900">{result.passed ? 'You passed!' : 'Not this time'}</h2>
+        {result.composite ? (
+          <CheckCircle2 className="mx-auto text-blue-500" size={44} />
+        ) : result.passed ? (
+          <CheckCircle2 className="mx-auto text-green-500" size={44} />
+        ) : (
+          <XCircle className="mx-auto text-red-500" size={44} />
+        )}
+        <h2 className="mt-3 text-2xl font-semibold text-neutral-900">{result.composite ? 'Exam submitted' : result.passed ? 'You passed!' : 'Not this time'}</h2>
         <p className="mt-1 text-neutral-600">
           Score <span className="font-semibold text-neutral-900">{Number(result.score_pct)}%</span> — {result.correct_count}/{result.total} correct
           {wrongCount > 0 && (
@@ -197,7 +207,12 @@ export function ExamFlow() {
             </>
           )}
         </p>
-        {result.grade_label && (
+        {result.composite && result.exam_marks !== undefined && (
+          <p className="mt-3 text-lg text-neutral-700">
+            Online exam marks: <span className="font-semibold text-neutral-900">{result.exam_marks} / {result.exam_max}</span>
+          </p>
+        )}
+        {result.grade_label && !result.composite && (
           <p className="mt-2">
             <span
               className={`inline-block rounded-full px-3 py-1 text-sm font-semibold ${
@@ -219,7 +234,13 @@ export function ExamFlow() {
             </div>
           </div>
         )}
-        {!result.passed && (
+        {result.composite && (
+          <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-left text-sm text-blue-900">
+            This was your one attempt. Your final result adds this to your viva, simulation and real FPV piloting marks. Your instructors will finalise it and
+            email your certificate.
+          </div>
+        )}
+        {!result.composite && !result.passed && (
           <p className="mt-4 text-sm text-neutral-500">
             {result.locked
               ? 'You have used all attempts. An instructor can reset your exam.'
@@ -237,7 +258,7 @@ export function ExamFlow() {
         <section>
           <h3 className="text-lg font-semibold text-neutral-900">Review your {result.review.length} wrong {result.review.length === 1 ? 'answer' : 'answers'}</h3>
           <p className="mt-1 text-sm text-neutral-500">
-            Read the correct answer and the explanation for each question below — this is how you learn the topic before your next attempt.
+            Read the correct answer and the explanation for each question below — this is how you learn each topic{result.composite ? '.' : ' before your next attempt.'}
           </p>
           <div className="mt-4 space-y-4">
             {result.review.map((r, i) => (

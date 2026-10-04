@@ -130,9 +130,19 @@ Deno.serve(async (req) => {
       passed,
       grade_label: gradeLabel,
     };
+    // Composite courses: the online exam is only one component of the final mark. Passing it
+    // never issues a certificate — the total (online + viva + simulation + piloting) decides
+    // that later, when an instructor finalises results.
+    const composite = course.scoring_mode === 'composite';
+    const examMarks = composite ? Math.round(((scorePct / 100) * Number(course.marks_online)) * 100) / 100 : undefined;
     let locked = false;
     let cooldownUntil: string | undefined;
-    if (!passed) {
+    if (composite) {
+      if (attemptsUsed >= course.max_attempts) {
+        locked = true;
+        patch.locked = true;
+      }
+    } else if (!passed) {
       if (attemptsUsed >= course.max_attempts) {
         locked = true;
         patch.locked = true;
@@ -144,7 +154,7 @@ Deno.serve(async (req) => {
     await admin.from('exam_attempts').update(patch).eq('id', attempt_id);
 
     let certId: string | undefined;
-    if (passed) {
+    if (passed && !composite) {
       await admin.from('enrollments').update({ status: 'completed' }).eq('id', attempt.enrollment_id);
       const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-certificate`, {
         method: 'POST',
@@ -170,6 +180,9 @@ Deno.serve(async (req) => {
       cert_id_string: certId,
       cooldown_until: cooldownUntil,
       locked,
+      composite,
+      exam_marks: examMarks,
+      exam_max: composite ? Number(course.marks_online) : undefined,
     });
   } catch (e) {
     const status = e instanceof HttpError ? e.status : 500;
