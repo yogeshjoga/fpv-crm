@@ -2177,6 +2177,19 @@ export type Database = {
         Args: { p_course_id: string; p_seconds: number }
         Returns: undefined
       }
+      reset_exam_data: {
+        Args: {
+          p_course_id: string
+          p_student_id?: string
+          p_online?: boolean
+          p_viva?: boolean
+          p_simulation?: boolean
+          p_piloting?: boolean
+          p_revoke_certs?: boolean
+          p_dry_run?: boolean
+        }
+        Returns: Json
+      }
       grant_exam_attempts: {
         Args: { p_student_id: string; p_course_id: string; p_extra?: number; p_skip_wait?: boolean }
         Returns: Json

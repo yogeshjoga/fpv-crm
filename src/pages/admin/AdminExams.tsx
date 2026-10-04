@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Award, ClipboardCheck, Download, Eye, FileSpreadsheet, FileText, RotateCcw, Search, Settings2 } from 'lucide-react';
+import { Award, ClipboardCheck, Download, Eye, FileSpreadsheet, FileText, RotateCcw, Search, Settings2, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { invokeFn } from '../../lib/functions';
 import { useAuth } from '../../auth/AuthProvider';
@@ -12,6 +12,7 @@ import { exportMarkSheet, type SheetFormat, type SheetPart } from '../../lib/mar
 import { evaluate, type Scheme } from '../../lib/assessment';
 import { ReportCardView } from '../student/ReportCard';
 import { ExamAttempts } from './ExamAttempts';
+import { ResetExamModal } from './ResetExamModal';
 import type { Tables } from '../../lib/database.types';
 
 type Course = Tables<'courses'>;
@@ -396,6 +397,7 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
   const [sheetOpen, setSheetOpen] = useState(false);
   // Shows what a student will see on their report card, before the certificate is issued.
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [resetOpen, setResetOpen] = useState(false);
   const [sheetBusy, setSheetBusy] = useState(false);
   const [sheet, setSheet] = useState<{ part: SheetPart; format: SheetFormat; withMarks: boolean; withEmail: boolean }>({
     part: 'viva',
@@ -634,7 +636,22 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
             <FileSpreadsheet size={15} /> Export Excel
           </Button>
         )}
+        {canExport && (
+          <Button variant="secondary" onClick={() => setResetOpen(true)} className="text-red-600">
+            <Trash2 size={15} /> Reset exam…
+          </Button>
+        )}
       </div>
+
+      {canExport && resetOpen && (
+        <ResetExamModal
+          course={course}
+          composite
+          students={rows.map((r) => ({ id: r.id, name: r.name, email: r.email }))}
+          onClose={() => setResetOpen(false)}
+          onDone={() => q.refetch()}
+        />
+      )}
 
       {!rows.length ? (
         <EmptyState icon={<ClipboardCheck size={22} />} title="No students enrolled" description="Enroll students in this course (or add it to a course group) to enter their marks." />
