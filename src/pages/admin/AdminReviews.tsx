@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Check, MessageSquareHeart, Pencil, Trash2, X } from 'lucide-react';
+import { Check, Download, MessageSquareHeart, Pencil, Trash2, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
+import { downloadCsv } from '../../lib/csv';
+import { slugify } from '../../lib/slug';
 import { GlassCard } from '../../components/ui/shared';
 import { StarRating } from '../../components/StarRating';
 import { Badge, Button, EmptyState, PageHeader, Select, Spinner, useToast } from '../../components/ui/kit';
@@ -85,6 +87,24 @@ export function AdminReviews() {
   const avg = rows.length ? rows.reduce((s, r) => s + r.rating, 0) / rows.length : 0;
   const dist = [5, 4, 3, 2, 1].map((n) => ({ n, count: rows.filter((r) => r.rating === n).length }));
 
+  // Exports exactly what is on screen: the current group and star filters are applied.
+  const exportCsv = () => {
+    const headers = ['Student', 'Email', 'Course group', 'Rating (1-5)', 'Comment', 'Submitted', 'Last updated', 'Edited'];
+    const body = rows.map((r) => [
+      r.student?.full_name ?? '',
+      r.student?.email ?? '',
+      r.group?.name ?? '',
+      r.rating,
+      r.comment,
+      new Date(r.created_at).toLocaleString('en-GB'),
+      new Date(r.updated_at).toLocaleString('en-GB'),
+      new Date(r.updated_at).getTime() - new Date(r.created_at).getTime() > 60_000 ? 'Yes' : 'No',
+    ]);
+    const scope = group === 'all' ? 'all-groups' : slugify(groupOptions.find(([id]) => id === group)?.[1] ?? 'group');
+    downloadCsv(`reviews-${scope}-${new Date().toISOString().slice(0, 10)}.csv`, headers, body);
+    toast(`Exported ${rows.length} review${rows.length === 1 ? '' : 's'}`);
+  };
+
   const remove = async (r: ReviewRow) => {
     if (!confirm('Remove this review? The student will no longer see it.')) return;
     const { error } = await supabase.from('reviews').delete().eq('id', r.id);
@@ -101,7 +121,7 @@ export function AdminReviews() {
         title="Reviews"
         subtitle="What each course group says about the program"
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Select value={group} onChange={(e) => setGroup(e.target.value)} className="w-60">
               <option value="all">All course groups</option>
               {groupOptions.map(([id, name]) => (
@@ -118,6 +138,9 @@ export function AdminReviews() {
                 </option>
               ))}
             </Select>
+            <Button variant="secondary" onClick={exportCsv} disabled={!rows.length}>
+              <Download size={15} /> Export CSV
+            </Button>
           </div>
         }
       />
