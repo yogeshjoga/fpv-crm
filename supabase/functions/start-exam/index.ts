@@ -22,11 +22,15 @@ Deno.serve(async (req) => {
     // enrollment
     const { data: enrollment } = await admin
       .from('enrollments')
-      .select('id, status')
+      .select('id, status, extra_attempts')
       .eq('student_id', user.id)
       .eq('course_id', course.id)
       .maybeSingle();
     if (!enrollment || enrollment.status === 'revoked') throw new HttpError(403, 'You are not enrolled in this course.');
+    // An admin can give this student extra attempts on top of the course's allowance.
+    const baseMaxAttempts = Number(course.max_attempts);
+    const extraAttempts = Number(enrollment.extra_attempts ?? 0);
+    course.max_attempts = baseMaxAttempts + extraAttempts;
 
     // already certified?
     const { data: existingCert } = await admin
@@ -53,7 +57,10 @@ Deno.serve(async (req) => {
     // lock out a student who already started, so resuming stays allowed after the close time.
     const access = examAccessState(course, now);
     const canResume = !!latest && latest.status === 'in_progress' && new Date(latest.expires_at).getTime() > now;
-    if (!access.open && !(access.afterClose && canResume)) throw new HttpError(403, access.reason);
+    // A student an admin has given an extra attempt can use it after a scheduled window has closed.
+    const finishedCount = (attempts ?? []).filter((a) => a.status !== 'in_progress').length;
+    const usingExtraAttempt = extraAttempts > 0 && finishedCount >= baseMaxAttempts;
+    if (!access.open && !(access.afterClose && (canResume || usingExtraAttempt))) throw new HttpError(403, access.reason);
 
     // resume an in-progress, unexpired attempt
     if (latest && latest.status === 'in_progress' && new Date(latest.expires_at).getTime() > now) {
@@ -87,7 +94,7 @@ Deno.serve(async (req) => {
 
     if (freshLatest?.locked || used >= course.max_attempts) {
       if (freshLatest && !freshLatest.locked) await admin.from('exam_attempts').update({ locked: true }).eq('id', freshLatest.id);
-      throw new HttpError(403, 'You have used all attempts. Ask an instructor to reset your exam.');
+      throw new HttpError(403, 'You have used all attempts. Ask an admin for another attempt.');
     }
     if (freshLatest?.cooldown_until && new Date(freshLatest.cooldown_until).getTime() > now) {
       throw new HttpError(429, `Next attempt available after ${new Date(freshLatest.cooldown_until).toLocaleString()}.`);

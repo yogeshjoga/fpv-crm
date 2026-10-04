@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Award, ClipboardCheck, Download, Eye, FileSpreadsheet, FileText, Search, Settings2 } from 'lucide-react';
+import { Award, ClipboardCheck, Download, Eye, FileSpreadsheet, FileText, RotateCcw, Search, Settings2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { invokeFn } from '../../lib/functions';
 import { useAuth } from '../../auth/AuthProvider';
@@ -11,6 +11,7 @@ import { Badge, Button, EmptyState, Field, Modal, PageHeader, Select, Spinner, T
 import { exportMarkSheet, type SheetFormat, type SheetPart } from '../../lib/markSheet';
 import { evaluate, type Scheme } from '../../lib/assessment';
 import { ReportCardView } from '../student/ReportCard';
+import { ExamAttempts } from './ExamAttempts';
 import type { Tables } from '../../lib/database.types';
 
 type Course = Tables<'courses'>;
@@ -50,7 +51,7 @@ export function AdminExams() {
   // Exam rules are an admin decision; instructors with write access only enter marks.
   const canConfigure = profile?.role === 'admin' || profile?.role === 'super_admin';
   const [params, setParams] = useSearchParams();
-  const [tab, setTab] = useState<'settings' | 'marks' | null>(null);
+  const [tab, setTab] = useState<'settings' | 'marks' | 'attempts' | null>(null);
 
   const q = useQuery(() => unwrap(supabase.from('courses').select('*').order('title')) as Promise<Course[]>, []);
 
@@ -63,7 +64,9 @@ export function AdminExams() {
   );
   const selected = courses.find((c) => c.id === params.get('course')) ?? courses[0];
   const composite = selected?.scoring_mode === 'composite';
-  const activeTab = composite ? tab ?? (canConfigure ? 'settings' : 'marks') : 'settings';
+  const defaultTab = composite && !canConfigure ? 'marks' : 'settings';
+  const wanted = tab ?? defaultTab;
+  const activeTab = wanted === 'marks' && !composite ? 'settings' : wanted === 'attempts' && !canConfigure ? defaultTab : wanted;
 
   if (q.loading && !q.data) return <Spinner />;
   if (!selected) return <EmptyState icon={<ClipboardCheck size={22} />} title="No courses yet" description="Create a course first, then configure its exam here." />;
@@ -85,12 +88,13 @@ export function AdminExams() {
         }
       />
 
-      {composite && (
+      {(composite || canConfigure) && (
         <div className="mb-5 inline-flex rounded-full border border-white/60 bg-white/50 p-1 text-sm">
           {(
             [
               ['settings', 'Settings', Settings2],
-              ['marks', 'Student marks', ClipboardCheck],
+              ...(composite ? [['marks', 'Student marks', ClipboardCheck] as const] : []),
+              ...(canConfigure ? [['attempts', 'Attempts', RotateCcw] as const] : []),
             ] as const
           ).map(([key, label, Icon]) => (
             <button
@@ -108,6 +112,8 @@ export function AdminExams() {
 
       {activeTab === 'marks' && composite ? (
         <MarksPanel key={selected.id} course={selected} canMark={canMark} canExport={canConfigure} />
+      ) : activeTab === 'attempts' ? (
+        <ExamAttempts key={selected.id} course={selected} />
       ) : (
         <SettingsPanel key={selected.id} course={selected} canConfigure={canConfigure} onSaved={() => q.refetch()} />
       )}

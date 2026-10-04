@@ -20,6 +20,9 @@ Deno.serve(async (req) => {
 
     const { data: course } = await admin.from('courses').select('*').eq('id', attempt.course_id).single();
     if (!course) throw new HttpError(404, 'Course not found.');
+    // An admin can give this student extra attempts on top of the course's allowance.
+    const { data: enr } = await admin.from('enrollments').select('extra_attempts').eq('student_id', user.id).eq('course_id', course.id).maybeSingle();
+    course.max_attempts = Number(course.max_attempts) + Number(enr?.extra_attempts ?? 0);
 
     // The time limit is enforced here, not just in the browser. The page auto-submits when time
     // runs out, so allow two minutes for a slow connection; beyond that the attempt is expired

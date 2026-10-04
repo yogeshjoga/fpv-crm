@@ -2177,6 +2177,10 @@ export type Database = {
         Args: { p_course_id: string; p_seconds: number }
         Returns: undefined
       }
+      grant_exam_attempts: {
+        Args: { p_student_id: string; p_course_id: string; p_extra?: number; p_skip_wait?: boolean }
+        Returns: Json
+      }
       my_exam_review: { Args: { p_attempt_id: string }; Returns: Json }
       has_module_access: { Args: { p_key: string; p_level: string }; Returns: boolean }
       is_active_user: { Args: never; Returns: boolean }
