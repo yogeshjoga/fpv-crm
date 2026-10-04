@@ -26,7 +26,7 @@ export function StudentDashboard() {
       unwrap(
         supabase
           .from('enrollments')
-          .select('id, status, course:courses(id, slug, title, summary, pass_pct, max_attempts, exam_access, exam_opens_at, exam_closes_at, exam_time_limit_min)')
+          .select('id, status, course:courses(id, slug, title, summary, pass_pct, max_attempts, exam_name, exam_access, exam_opens_at, exam_closes_at, exam_time_limit_min)')
           .eq('student_id', uid)
           .order('enrolled_at', { ascending: false }),
       ) as Promise<Row[]>,
@@ -103,6 +103,7 @@ export function StudentDashboard() {
 
       {examCards.length > 0 && (
         <div className="mb-6 space-y-4">
+          <h2 className="text-sm font-semibold text-neutral-700">Exams</h2>
           {examCards.map((c) => (
             <ExamScheduleCard key={c.id} course={c} />
           ))}

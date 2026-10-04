@@ -18,6 +18,7 @@ export interface ExamScheduleCourse {
   id: string;
   slug: string;
   title: string;
+  exam_name?: string | null;
   exam_access: string;
   exam_opens_at: string | null;
   exam_closes_at: string | null;
@@ -26,6 +27,8 @@ export interface ExamScheduleCourse {
 
 /** 'upcoming' (timer to open), 'live' (open now), or null when there is nothing to show. */
 export function examPhase(c: ExamScheduleCourse, now: number): 'upcoming' | 'live' | null {
+  // An open exam only counts as "live" once an admin has named it, so plain courses don't show up as exams.
+  if (c.exam_access === 'open') return c.exam_name?.trim() ? 'live' : null;
   if (c.exam_access !== 'scheduled') return null;
   const opens = c.exam_opens_at ? new Date(c.exam_opens_at).getTime() : null;
   const closes = c.exam_closes_at ? new Date(c.exam_closes_at).getTime() : null;
@@ -87,8 +90,9 @@ export function ExamScheduleCard({ course }: { course: ExamScheduleCourse }) {
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
             <CalendarClock size={17} className={upcoming ? 'text-amber-500' : 'text-green-600'} />
-            Online exam · {course.title}
+            {course.exam_name?.trim() || `Online exam · ${course.title}`}
           </div>
+          {course.exam_name?.trim() && <div className="mt-0.5 text-xs text-neutral-500">{course.title}</div>}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Badge tone={upcoming ? 'amber' : 'green'}>{upcoming ? 'Starts soon' : 'Open now'}</Badge>
             <span className="inline-flex items-center gap-1 text-xs text-neutral-500">
@@ -125,9 +129,15 @@ export function ExamScheduleCard({ course }: { course: ExamScheduleCourse }) {
           ) : (
             <div className="text-sm font-medium text-green-700">Open — start any time</div>
           )}
-          <Link to={`/app/courses/${course.slug}`} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:underline">
-            {upcoming ? 'View course' : 'Start exam'} <ArrowRight size={14} />
-          </Link>
+          {upcoming ? (
+            <Link to={`/app/courses/${course.slug}`} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:underline">
+              View course <ArrowRight size={14} />
+            </Link>
+          ) : (
+            <Link to={`/app/courses/${course.slug}/exam`} className="inline-flex items-center gap-2 rounded-full bg-[#1a1a1a] px-5 py-2 text-sm font-medium text-white hover:bg-black">
+              Start exam <ArrowRight size={14} />
+            </Link>
+          )}
         </div>
       </div>
     </GlassCard>

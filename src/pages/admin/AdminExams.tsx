@@ -121,6 +121,7 @@ function SettingsPanel({ course, canConfigure, onSaved }: { course: Course; canC
   const toast = useToast();
   const [saving, setSaving] = useState(false);
   const [f, setF] = useState(() => ({
+    exam_name: course.exam_name ?? '',
     exam_access: course.exam_access as string,
     opens: toLocalInput(course.exam_opens_at),
     closes: toLocalInput(course.exam_closes_at),
@@ -148,7 +149,7 @@ function SettingsPanel({ course, canConfigure, onSaved }: { course: Course; canC
   const ro = !canConfigure;
 
   const save = async () => {
-    if (f.exam_access === 'scheduled' && !f.opens && !f.closes) return toast('Pick an opening and/or closing time', 'error');
+    if (f.exam_access === 'scheduled' && !f.opens && !f.closes) return toast('Pick an opening and/or closing date and time', 'error');
     if (f.opens && f.closes && new Date(f.closes) <= new Date(f.opens)) return toast('The closing time must be after the opening time', 'error');
     if (f.exam_time_limit_min < 1) return toast('Time limit must be at least 1 minute', 'error');
     if (f.exam_question_count < 1) return toast('The exam needs at least 1 question', 'error');
@@ -167,6 +168,7 @@ function SettingsPanel({ course, canConfigure, onSaved }: { course: Course; canC
     const { error } = await supabase
       .from('courses')
       .update({
+        exam_name: f.exam_name.trim() || null,
         exam_access: f.exam_access,
         exam_opens_at: f.exam_access === 'scheduled' && f.opens ? new Date(f.opens).toISOString() : null,
         exam_closes_at: f.exam_access === 'scheduled' && f.closes ? new Date(f.closes).toISOString() : null,
@@ -227,24 +229,37 @@ function SettingsPanel({ course, canConfigure, onSaved }: { course: Course; canC
           </p>
         )}
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <Field label="Who can start the online exam">
-            <Select disabled={ro} value={f.exam_access} onChange={(e) => set('exam_access', e.target.value)}>
-              <option value="open">Open — any time</option>
-              <option value="closed">Closed — nobody can start</option>
-              <option value="scheduled">Scheduled — only between set times</option>
-            </Select>
+          <Field label="Exam name" hint="Shown to students. Leave empty to use the course name">
+            <TextInput disabled={ro} value={f.exam_name} maxLength={120} placeholder={course.title} onChange={(e) => set('exam_name', e.target.value)} />
           </Field>
           {numberField('Exam duration (minutes)', 'exam_time_limit_min', 'Applies to attempts started from now on')}
-          {f.exam_access === 'scheduled' && (
-            <>
-              <Field label="Opens at" hint="Leave empty to open immediately">
-                <TextInput type="datetime-local" disabled={ro} value={f.opens} onChange={(e) => set('opens', e.target.value)} />
-              </Field>
-              <Field label="Closes at" hint="Leave empty for no end time">
-                <TextInput type="datetime-local" disabled={ro} value={f.closes} onChange={(e) => set('closes', e.target.value)} />
-              </Field>
-            </>
-          )}
+          <Field label="Opens at" hint="Pick the date and time the exam goes live">
+            <TextInput
+              type="datetime-local"
+              disabled={ro}
+              value={f.opens}
+              onChange={(e) => setF((p) => ({ ...p, opens: e.target.value, exam_access: e.target.value || p.closes ? 'scheduled' : p.exam_access }))}
+            />
+          </Field>
+          <Field label="Closes at" hint="Leave empty for no end time">
+            <TextInput
+              type="datetime-local"
+              disabled={ro}
+              value={f.closes}
+              onChange={(e) => setF((p) => ({ ...p, closes: e.target.value, exam_access: e.target.value || p.opens ? 'scheduled' : p.exam_access }))}
+            />
+          </Field>
+          <Field label="Who can start the online exam" hint="Picking a date above switches this to Scheduled">
+            <Select
+              disabled={ro}
+              value={f.exam_access}
+              onChange={(e) => setF((p) => ({ ...p, exam_access: e.target.value, ...(e.target.value === 'scheduled' ? {} : { opens: '', closes: '' }) }))}
+            >
+              <option value="open">Open — any time</option>
+              <option value="closed">Closed — nobody can start</option>
+              <option value="scheduled">Scheduled — only between the dates above</option>
+            </Select>
+          </Field>
         </div>
       </GlassCard>
 
