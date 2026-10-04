@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
   try {
     if (!callerIsServiceRole(req)) throw new HttpError(403, 'Forbidden.');
     const admin = adminClient();
-    const { attempt_id, student_id, course_id, score_pct, cert_type, breakdown } = (await req.json()) as {
+    const { attempt_id, student_id, course_id, score_pct, cert_type, breakdown, report } = (await req.json()) as {
       attempt_id?: string;
       student_id?: string;
       course_id?: string;
@@ -58,6 +58,14 @@ Deno.serve(async (req) => {
       cert_type?: string;
       /** Composite assessment marks; when present the certificate reports total marks, not exam %. */
       breakdown?: { online: number; viva: number; simulation: number; piloting: number; total: number; max: number };
+      /** Per-module report card snapshot (marks, pass marks, cleared flags) from finalize-assessment. */
+      report?: {
+        modules: { key: string; label: string; marks: number; max: number; pass: number; cleared: boolean }[];
+        total: number;
+        max: number;
+        clearedAll: boolean;
+        failed: string[];
+      };
     };
     if (!student_id || !course_id) throw new HttpError(400, 'student_id and course_id are required.');
 
@@ -242,6 +250,7 @@ Deno.serve(async (req) => {
       pdf_path: pdfPath,
       qr_url: verifyUrl,
       cert_type: cert_type ? certType : null,
+      report: report ?? null,
     });
     if (insErr) throw new HttpError(500, insErr.message);
 
@@ -249,33 +258,50 @@ Deno.serve(async (req) => {
       recipient_id: student_id,
       title: breakdown ? `${certType} certificate issued — ${course.title}` : `Certificate issued — ${course.title}`,
       body: breakdown
-        ? `Your final score is ${breakdown.total} out of ${breakdown.max}. Your Certificate of ${certType} (${certId}) is ready to download.`
+        ? `Your final score is ${breakdown.total} out of ${breakdown.max} — ${report ? (report.clearedAll ? 'you cleared every module' : `not cleared: ${report.failed.join(', ')}`) : 'see your report'}. Your Certificate of ${certType} (${certId}) and your report card are ready.`
         : `You passed ${course.title} with ${Number(score_pct ?? 0)}%. Certificate ${certId} is ready to download.`,
       kind: 'exam_passed',
-      link: '/app/certificates',
+      link: report ? '/app/report-card' : '/app/certificates',
     });
 
     const isMerit = certType.toLowerCase() === 'merit';
-    const marksTable = breakdown
-      ? `<table style="border-collapse:collapse;margin:0 0 16px;font-size:14px;color:#444">` +
-        (
-          [
-            ['Online exam', breakdown.online],
-            ['Viva', breakdown.viva],
-            ['Simulation', breakdown.simulation],
-            ['Real FPV piloting', breakdown.piloting],
-          ] as [string, number][]
-        )
-          .map(([k, v]) => `<tr><td style="padding:3px 24px 3px 0">${k}</td><td style="padding:3px 0;font-weight:600">${v}</td></tr>`)
+    const cell = 'padding:6px 14px 6px 0;border-bottom:1px solid #eee';
+    // Module-by-module report card in the email: marks, pass mark and a clear Cleared / Not cleared.
+    const marksTable = report
+      ? `<table style="border-collapse:collapse;margin:0 0 16px;font-size:14px;color:#444;width:100%">` +
+        `<tr style="text-align:left;color:#888;font-size:12px"><th style="${cell}">Module</th><th style="${cell}">Your marks</th><th style="${cell}">Pass mark</th><th style="${cell}">Status</th></tr>` +
+        report.modules
+          .map(
+            (m) =>
+              `<tr><td style="${cell}">${esc(m.label)}</td><td style="${cell};font-weight:600">${m.marks} / ${m.max}</td><td style="${cell}">${m.pass}</td>` +
+              `<td style="${cell};font-weight:600;color:${m.cleared ? '#15803d' : '#b91c1c'}">${m.cleared ? 'Cleared' : 'Not cleared'}</td></tr>`,
+          )
           .join('') +
-        `<tr><td style="padding:6px 24px 3px 0;border-top:1px solid #e5e5e5"><strong>Total</strong></td><td style="padding:6px 0 3px;border-top:1px solid #e5e5e5;font-weight:700">${breakdown.total} / ${breakdown.max}</td></tr></table>`
-      : '';
+        `<tr><td style="padding:8px 14px 4px 0"><strong>Total</strong></td><td style="padding:8px 14px 4px 0;font-weight:700" colspan="3">${report.total} / ${report.max}</td></tr></table>`
+      : breakdown
+        ? `<table style="border-collapse:collapse;margin:0 0 16px;font-size:14px;color:#444">` +
+          (
+            [
+              ['Online exam', breakdown.online],
+              ['Viva', breakdown.viva],
+              ['Simulation', breakdown.simulation],
+              ['Free flight', breakdown.piloting],
+            ] as [string, number][]
+          )
+            .map(([k, v]) => `<tr><td style="padding:3px 24px 3px 0">${k}</td><td style="padding:3px 0;font-weight:600">${v}</td></tr>`)
+            .join('') +
+          `<tr><td style="padding:6px 24px 3px 0;border-top:1px solid #e5e5e5"><strong>Total</strong></td><td style="padding:6px 0 3px;border-top:1px solid #e5e5e5;font-weight:700">${breakdown.total} / ${breakdown.max}</td></tr></table>`
+        : '';
+    const notCleared =
+      report && !report.clearedAll
+        ? `<p style="margin:0 0 16px;color:#444">To earn a Certificate of Merit a student has to clear <strong>every</strong> module, whatever the total. You did not clear: <strong>${esc(report.failed.join(', '))}</strong>.</p>`
+        : '';
     const intro = breakdown
       ? isMerit
         ? `<h1 style="font-size:20px;margin:0 0 12px;color:#0a0a0a">Congratulations, ${esc(student.full_name || 'there')}! 🎉</h1>` +
-          `<p style="margin:0 0 16px;color:#444">You earned a <strong>Certificate of Merit</strong> for <strong>${esc(course.title)}</strong>. Here is your score breakdown:</p>`
+          `<p style="margin:0 0 16px;color:#444">You cleared every module and earned a <strong>Certificate of Merit</strong> for <strong>${esc(course.title)}</strong>. Here is your report card:</p>`
         : `<h1 style="font-size:20px;margin:0 0 12px;color:#0a0a0a">Thank you for taking part, ${esc(student.full_name || 'there')}!</h1>` +
-          `<p style="margin:0 0 16px;color:#444">You completed <strong>${esc(course.title)}</strong>. Here is your Certificate of Participation and your score breakdown:</p>`
+          `<p style="margin:0 0 16px;color:#444">You completed <strong>${esc(course.title)}</strong>. Here is your Certificate of Participation and your report card:</p>`
       : `<h1 style="font-size:20px;margin:0 0 12px;color:#0a0a0a">Congratulations, ${esc(student.full_name || 'there')}! 🎉</h1>` +
         `<p style="margin:0 0 16px;color:#444">You passed <strong>${esc(course.title)}</strong> with a score of ${Number(score_pct ?? 0)}%.</p>`;
 
@@ -287,6 +313,7 @@ Deno.serve(async (req) => {
       html: emailShell(
         intro +
           marksTable +
+          notCleared +
           `<p style="margin:0 0 16px;color:#444">Your certificate <strong>${certId}</strong> is attached to this email. Anyone can confirm it here:</p>` +
           `<p style="margin:0"><a href="${verifyUrl}" style="color:#0a0a0a">${verifyUrl}</a></p>`,
         org,

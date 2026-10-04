@@ -9,12 +9,20 @@ import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, Button, EmptyState, Field, Modal, PageHeader, Select, Spinner, TextInput, useToast } from '../../components/ui/kit';
 import { exportMarkSheet, type SheetFormat, type SheetPart } from '../../lib/markSheet';
+import { evaluate, type Scheme } from '../../lib/assessment';
 import type { Tables } from '../../lib/database.types';
 
 type Course = Tables<'courses'>;
 type Component = 'viva' | 'simulation' | 'piloting';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
+
+const MODULE_ROWS = [
+  { label: 'Online exam', max: 'marks_online', pass: 'pass_marks_online' },
+  { label: 'Viva', max: 'marks_viva', pass: 'pass_marks_viva' },
+  { label: 'Simulation', max: 'marks_simulation', pass: 'pass_marks_simulation' },
+  { label: 'Free flight (real FPV piloting)', max: 'marks_piloting', pass: 'pass_marks_piloting' },
+] as const;
 const num = (v: number | string | null | undefined) => Number(v ?? 0);
 
 const toLocalInput = (iso: string | null) => {
@@ -128,6 +136,10 @@ function SettingsPanel({ course, canConfigure, onSaved }: { course: Course; canC
     marks_simulation: num(course.marks_simulation),
     marks_piloting: num(course.marks_piloting),
     merit_min_marks: num(course.merit_min_marks),
+    pass_marks_online: num(course.pass_marks_online),
+    pass_marks_viva: num(course.pass_marks_viva),
+    pass_marks_simulation: num(course.pass_marks_simulation),
+    pass_marks_piloting: num(course.pass_marks_piloting),
   }));
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((p) => ({ ...p, [k]: v }));
   const isComposite = f.scoring_mode === 'composite';
@@ -145,6 +157,10 @@ function SettingsPanel({ course, canConfigure, onSaved }: { course: Course; canC
       if ([f.marks_online, f.marks_viva, f.marks_simulation, f.marks_piloting].some((m) => m < 0)) return toast('Marks cannot be negative', 'error');
       if (totalMarks <= 0) return toast('The marks must add up to more than 0', 'error');
       if (f.merit_min_marks > totalMarks) return toast(`The Merit mark can't be more than the total (${totalMarks})`, 'error');
+      for (const m of MODULE_ROWS) {
+        const pass = f[m.pass];
+        if (pass < 0 || pass > f[m.max]) return toast(`${m.label}: the pass mark must be between 0 and ${f[m.max]}`, 'error');
+      }
     }
     setSaving(true);
     const { error } = await supabase
@@ -166,6 +182,10 @@ function SettingsPanel({ course, canConfigure, onSaved }: { course: Course; canC
         marks_simulation: f.marks_simulation,
         marks_piloting: f.marks_piloting,
         merit_min_marks: f.merit_min_marks,
+        pass_marks_online: f.pass_marks_online,
+        pass_marks_viva: f.pass_marks_viva,
+        pass_marks_simulation: f.pass_marks_simulation,
+        pass_marks_piloting: f.pass_marks_piloting,
       })
       .eq('id', course.id);
     setSaving(false);
@@ -177,11 +197,6 @@ function SettingsPanel({ course, canConfigure, onSaved }: { course: Course; canC
   const numberField = (label: string, k: 'exam_time_limit_min' | 'exam_question_count' | 'max_attempts' | 'cooldown_hours' | 'pass_pct', hint?: string) => (
     <Field label={label} hint={hint}>
       <TextInput type="number" min={0} disabled={ro} value={f[k]} onChange={(e) => set(k, Number(e.target.value))} />
-    </Field>
-  );
-  const marksField = (label: string, k: 'marks_online' | 'marks_viva' | 'marks_simulation' | 'marks_piloting') => (
-    <Field label={label}>
-      <TextInput type="number" min={0} step="0.5" disabled={ro} value={f[k]} onChange={(e) => set(k, Number(e.target.value))} />
     </Field>
   );
   const checkbox = (label: string, hint: string, k: 'allow_backtrack' | 'show_review') => (
@@ -254,24 +269,69 @@ function SettingsPanel({ course, canConfigure, onSaved }: { course: Course; canC
 
         {isComposite && (
           <>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {marksField('Online exam (marks)', 'marks_online')}
-              {marksField('Viva (marks)', 'marks_viva')}
-              {marksField('Simulation (marks)', 'marks_simulation')}
-              {marksField('Real FPV piloting (marks)', 'marks_piloting')}
+            <div className="mt-4 overflow-x-auto rounded-2xl border border-white/60 bg-white/40">
+              <table className="w-full min-w-[520px] text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase tracking-wide text-neutral-400">
+                    <th className="px-4 py-2.5">Module</th>
+                    <th className="px-4 py-2.5">Total marks</th>
+                    <th className="px-4 py-2.5">Pass mark</th>
+                    <th className="px-4 py-2.5">= % needed</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/50">
+                  {MODULE_ROWS.map((m) => (
+                    <tr key={m.max}>
+                      <td className="px-4 py-2 font-medium text-neutral-900">{m.label}</td>
+                      <td className="px-4 py-2">
+                        <div className="w-24">
+                          <TextInput type="number" min={0} step="0.5" disabled={ro} value={f[m.max]} onChange={(e) => set(m.max, Number(e.target.value))} />
+                        </div>
+                      </td>
+                      <td className="px-4 py-2">
+                        <div className="w-24">
+                          <TextInput type="number" min={0} step="0.25" disabled={ro} value={f[m.pass]} onChange={(e) => set(m.pass, Number(e.target.value))} />
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-neutral-500">{f[m.max] ? Math.round((f[m.pass] / f[m.max]) * 1000) / 10 : 0}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {canConfigure && (
+              <button
+                type="button"
+                className="mt-2 text-xs font-medium text-blue-600 hover:underline"
+                onClick={() =>
+                  setF((p) => ({
+                    ...p,
+                    pass_marks_online: round2(p.marks_online * 0.75),
+                    pass_marks_viva: Math.min(8, p.marks_viva),
+                    pass_marks_simulation: round2(p.marks_simulation * 0.8),
+                    pass_marks_piloting: round2(p.marks_piloting * 0.8),
+                  }))
+                }
+              >
+                Reset to the standard pass marks (Online exam 75%, Viva 8 marks, Simulation 80%, Free flight 80%)
+              </button>
+            )}
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900">
+              <strong>Every module must be cleared.</strong> A student who falls below the pass mark in <em>any one</em> module has not cleared the assessment — however high the
+              total is. Clearing everything is what earns a Merit certificate; otherwise the student gets a Participation certificate.
             </div>
             <div className={`mt-3 text-sm ${totalMarks === 100 ? 'text-green-700' : 'text-amber-700'}`}>
               Total: <span className="font-semibold">{totalMarks}</span> marks{totalMarks !== 100 && ' (usually 100)'}
             </div>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <Field label="Merit certificate from (marks)" hint="Total at or above this → Merit certificate. Below it → Participation certificate.">
+              <Field label="Merit certificate also needs a total of (marks)" hint="On top of clearing every module. With the standard pass marks anyone who clears them all already scores 75.25 or more.">
                 <TextInput type="number" min={0} step="0.5" disabled={ro} value={f.merit_min_marks} onChange={(e) => set('merit_min_marks', Number(e.target.value))} />
               </Field>
             </div>
             <ul className="mt-4 list-disc space-y-1 pl-5 text-xs text-neutral-500">
               <li>Passing the online exam does <strong>not</strong> issue a certificate by itself.</li>
-              <li>Instructors enter viva, simulation and piloting marks per student in the “Student marks” tab.</li>
-              <li>When a student’s four parts are complete, an admin or instructor issues the certificate: it is emailed with the score breakdown.</li>
+              <li>Instructors enter viva, simulation and free flight marks per student in the “Student marks” tab.</li>
+              <li>When a student’s four modules are complete, an admin issues the certificate: it is emailed with a module-by-module report card, and the student sees it under Report card.</li>
             </ul>
           </>
         )}
@@ -340,6 +400,17 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
   const onlineMax = num(course.marks_online);
   const maxTotal = round2(onlineMax + num(course.marks_viva) + num(course.marks_simulation) + num(course.marks_piloting));
   const merit = num(course.merit_min_marks);
+  // Pass marks per module. A student must reach every one of them; total never makes up for a miss.
+  const scheme: Scheme = {
+    max: { online: onlineMax, viva: num(course.marks_viva), simulation: num(course.marks_simulation), piloting: num(course.marks_piloting) },
+    pass: {
+      online: num(course.pass_marks_online),
+      viva: num(course.pass_marks_viva),
+      simulation: num(course.pass_marks_simulation),
+      piloting: num(course.pass_marks_piloting),
+    },
+    meritMin: merit,
+  };
 
   const rows = useMemo(() => {
     if (!q.data) return [];
@@ -353,18 +424,25 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
       .map((e) => {
         const m = marksBy.get(e.student_id) ?? {};
         const best = bestBy.get(e.student_id);
-        const online = best === undefined ? undefined : round2((best / 100) * onlineMax);
+        const onlineRaw = best === undefined ? undefined : (best / 100) * onlineMax;
+        const online = onlineRaw === undefined ? undefined : round2(onlineRaw);
         const missing = [
           ...(online === undefined ? ['online exam'] : []),
           ...COMPONENTS.filter((c) => m[c.key] === undefined).map((c) => c.label.toLowerCase()),
         ];
         const sum = round2((online ?? 0) + (m.viva ?? 0) + (m.simulation ?? 0) + (m.piloting ?? 0));
+        const ev =
+          onlineRaw !== undefined && m.viva !== undefined && m.simulation !== undefined && m.piloting !== undefined
+            ? evaluate(scheme, { online: onlineRaw, viva: m.viva, simulation: m.simulation, piloting: m.piloting })
+            : null;
         return {
           id: e.student_id,
           name: e.student?.full_name || e.student?.email || 'Student',
           email: e.student?.email ?? '',
           marks: m,
           online,
+          onlineRaw,
+          ev,
           missing,
           complete: missing.length === 0,
           sum,
@@ -372,7 +450,8 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
         };
       })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [q.data, onlineMax]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q.data, course]);
 
   const visible = useMemo(() => {
     const s = search.trim().toLowerCase();
@@ -380,7 +459,8 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
   }, [rows, search]);
 
   const ready = rows.filter((r) => r.complete && !r.cert);
-  const readyMerit = ready.filter((r) => r.sum >= merit).length;
+  const readyMerit = ready.filter((r) => r.ev?.result === "Merit").length;
+  const notCleared = rows.filter((r) => r.ev && !r.ev.clearedAll).length;
   const issued = rows.filter((r) => r.cert).length;
 
   const saveMark = async (studentId: string, component: Component, value: number | null): Promise<boolean> => {
@@ -426,7 +506,7 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
   };
 
   const issueAll = () => {
-    const msg = `Issue ${ready.length} certificate${ready.length > 1 ? 's' : ''} now (${readyMerit} Merit, ${ready.length - readyMerit} Participation)?\n\nEach student is emailed their certificate and score breakdown. This cannot be undone without revoking the certificate.`;
+    const msg = `Issue ${ready.length} certificate${ready.length > 1 ? 's' : ''} now (${readyMerit} Merit — cleared every module, ${ready.length - readyMerit} Participation — did not clear every module)?\n\nEach student is emailed their certificate and a module-by-module report card. This cannot be undone without revoking the certificate.`;
     if (confirm(msg)) issue(ready.map((r) => r.id));
   };
 
@@ -441,8 +521,8 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
         max: { viva: num(course.marks_viva), simulation: num(course.marks_simulation), piloting: num(course.marks_piloting), online: onlineMax },
         withMarks: true,
         withEmail: true,
-        meritMin: merit,
-        students: rows.map((r) => ({ name: r.name, email: r.email, viva: r.marks.viva, simulation: r.marks.simulation, piloting: r.marks.piloting, online: r.online })),
+        scheme,
+        students: rows.map((r) => ({ name: r.name, email: r.email, viva: r.marks.viva, simulation: r.marks.simulation, piloting: r.marks.piloting, online: r.online, onlineRaw: r.onlineRaw })),
       });
       toast(`Excel sheet for ${rows.length} students downloaded`);
     } catch (e) {
@@ -461,7 +541,7 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
         max: { viva: num(course.marks_viva), simulation: num(course.marks_simulation), piloting: num(course.marks_piloting), online: onlineMax },
         withMarks: sheet.withMarks,
         withEmail: sheet.withEmail,
-        students: rows.map((r) => ({ name: r.name, email: r.email, viva: r.marks.viva, simulation: r.marks.simulation, piloting: r.marks.piloting, online: r.online })),
+        students: rows.map((r) => ({ name: r.name, email: r.email, viva: r.marks.viva, simulation: r.marks.simulation, piloting: r.marks.piloting, online: r.online, onlineRaw: r.onlineRaw })),
       });
       toast(`${sheet.format === 'pdf' ? 'PDF' : 'Excel'} sheet for ${rows.length} students downloaded`);
       setSheetOpen(false);
@@ -487,6 +567,11 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
           <span>
             <span className="font-semibold text-neutral-900">{issued}</span> issued
           </span>
+          {notCleared > 0 && (
+            <span>
+              <span className="font-semibold text-red-600">{notCleared}</span> not cleared every module
+            </span>
+          )}
           <span className="text-neutral-500">
             Out of {maxTotal} · Merit from {merit}
           </span>
@@ -533,10 +618,12 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
                 {COMPONENTS.map((c) => (
                   <th key={c.key} className="px-3 py-3">
                     {c.label} <span className="normal-case text-neutral-300">/ {num(course[c.field])}</span>
+                    <div className="text-[10px] normal-case tracking-normal text-neutral-400">pass {scheme.pass[c.key]}</div>
                   </th>
                 ))}
                 <th className="px-3 py-3">
                   Online <span className="normal-case text-neutral-300">/ {onlineMax}</span>
+                  <div className="text-[10px] normal-case tracking-normal text-neutral-400">pass {scheme.pass.online}</div>
                 </th>
                 <th className="px-3 py-3">
                   Total <span className="normal-case text-neutral-300">/ {maxTotal}</span>
@@ -557,12 +644,18 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
                       <MarkInput
                         initial={r.marks[c.key]}
                         max={num(course[c.field])}
+                        pass={scheme.pass[c.key]}
                         disabled={!canMark || !!r.cert}
                         onSave={(v) => saveMark(r.id, c.key, v)}
                       />
                     </td>
                   ))}
-                  <td className="px-3 py-2 text-neutral-700">{r.online === undefined ? <span className="text-neutral-300">—</span> : r.online}</td>
+                  <td
+                    className={`px-3 py-2 ${r.onlineRaw !== undefined && r.onlineRaw + 1e-9 < scheme.pass.online ? 'font-semibold text-red-600' : 'text-neutral-700'}`}
+                    title={r.onlineRaw !== undefined && r.onlineRaw + 1e-9 < scheme.pass.online ? `Below the pass mark (${scheme.pass.online})` : undefined}
+                  >
+                    {r.online === undefined ? <span className="text-neutral-300">—</span> : r.online}
+                  </td>
                   <td className={`px-3 py-2 font-semibold ${r.complete ? 'text-neutral-900' : 'text-neutral-400'}`}>{r.sum}</td>
                   <td className="px-3 py-2">
                     {r.cert ? (
@@ -571,7 +664,10 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
                         <div className="mt-0.5 font-mono text-[10px] text-neutral-400">{r.cert.cert_id_string}</div>
                       </div>
                     ) : r.complete ? (
-                      <Badge tone="amber">Ready · {r.sum >= merit ? 'Merit' : 'Participation'}</Badge>
+<div>
+                        <Badge tone="amber">Ready · {r.ev?.result ?? 'Participation'}</Badge>
+                        {r.ev && !r.ev.clearedAll && <div className="mt-0.5 text-[11px] font-medium text-red-600">Not cleared: {r.ev.failed.join(', ')}</div>}
+                      </div>
                     ) : (
                       <span className="text-xs text-neutral-400">Waiting: {r.missing.join(', ')}</span>
                     )}
@@ -686,11 +782,14 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
 function MarkInput({
   initial,
   max,
+  pass,
   disabled,
   onSave,
 }: {
   initial: number | undefined;
   max: number;
+  /** A saved mark below this shows in red: that module is not cleared. */
+  pass?: number;
   disabled: boolean;
   onSave: (value: number | null) => Promise<boolean>;
 }) {
@@ -710,7 +809,8 @@ function MarkInput({
     setState((await onSave(value)) ? 'saved' : 'error');
   };
 
-  const ring = state === 'error' ? 'border-red-400' : state === 'saved' ? 'border-green-400' : 'border-white/70';
+  const below = pass !== undefined && initial !== undefined && initial + 1e-9 < pass;
+  const ring = state === 'error' ? 'border-red-400' : below ? 'border-red-300 text-red-600' : state === 'saved' ? 'border-green-400' : 'border-white/70';
   return (
     <input
       type="number"
@@ -725,7 +825,7 @@ function MarkInput({
       }}
       onBlur={commit}
       onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-      title={state === 'error' ? `Enter a number from 0 to ${max}` : undefined}
+      title={state === 'error' ? `Enter a number from 0 to ${max}` : below ? `Below the pass mark (${pass}) — not cleared` : undefined}
       className={`w-20 rounded-lg border bg-white/70 px-2 py-1.5 text-sm outline-none focus:border-neutral-400 disabled:opacity-60 ${ring}`}
     />
   );

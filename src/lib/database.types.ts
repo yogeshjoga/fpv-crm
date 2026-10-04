@@ -198,6 +198,7 @@ export type Database = {
           issued_at: string
           pdf_path: string | null
           qr_url: string | null
+          report: Json | null
           revoked: boolean
           revoked_reason: string | null
           score_pct: number
@@ -212,6 +213,7 @@ export type Database = {
           issued_at?: string
           pdf_path?: string | null
           qr_url?: string | null
+          report?: Json | null
           revoked?: boolean
           revoked_reason?: string | null
           score_pct: number
@@ -226,6 +228,7 @@ export type Database = {
           issued_at?: string
           pdf_path?: string | null
           qr_url?: string | null
+          report?: Json | null
           revoked?: boolean
           revoked_reason?: string | null
           score_pct?: number
@@ -438,6 +441,10 @@ export type Database = {
           mix_easy: number | null
           mix_hard: number | null
           mix_medium: number | null
+          pass_marks_online: number
+          pass_marks_piloting: number
+          pass_marks_simulation: number
+          pass_marks_viva: number
           pass_pct: number
           scoring_mode: string
           show_review: boolean
@@ -472,6 +479,10 @@ export type Database = {
           mix_easy?: number | null
           mix_hard?: number | null
           mix_medium?: number | null
+          pass_marks_online?: number
+          pass_marks_piloting?: number
+          pass_marks_simulation?: number
+          pass_marks_viva?: number
           pass_pct?: number
           scoring_mode?: string
           show_review?: boolean
@@ -506,6 +517,10 @@ export type Database = {
           mix_easy?: number | null
           mix_hard?: number | null
           mix_medium?: number | null
+          pass_marks_online?: number
+          pass_marks_piloting?: number
+          pass_marks_simulation?: number
+          pass_marks_viva?: number
           pass_pct?: number
           scoring_mode?: string
           show_review?: boolean

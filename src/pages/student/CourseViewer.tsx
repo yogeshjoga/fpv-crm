@@ -207,7 +207,7 @@ export function CourseViewer() {
       supabase
         .from('courses')
         .select(
-          'id, title, slug, description, pass_pct, exam_time_limit_min, exam_question_count, max_attempts, cooldown_hours, exam_access, exam_opens_at, exam_closes_at, scoring_mode, marks_online, marks_viva, marks_simulation, marks_piloting, merit_min_marks, ' +
+          'id, title, slug, description, pass_pct, exam_time_limit_min, exam_question_count, max_attempts, cooldown_hours, exam_access, exam_opens_at, exam_closes_at, scoring_mode, marks_online, marks_viva, marks_simulation, marks_piloting, merit_min_marks, pass_marks_online, pass_marks_viva, pass_marks_simulation, pass_marks_piloting, ' +
             'modules(id, title, position, lessons(id, title, position, kind, content, video_url, embed_url, lesson_resources(id, file_name, file_path, mime)))',
         )
         .eq('slug', slug as string)
@@ -406,12 +406,32 @@ export function CourseViewer() {
               )}
             </dl>
             {composite && (
-              <p className="mt-3 rounded-xl bg-white/50 p-3 text-xs leading-relaxed text-neutral-600">
-                Final result out of {Number(course.marks_online) + Number(course.marks_viva) + Number(course.marks_simulation) + Number(course.marks_piloting)}: online
-                exam {Number(course.marks_online)} + viva {Number(course.marks_viva)} + simulation {Number(course.marks_simulation)} + real FPV piloting{' '}
-                {Number(course.marks_piloting)}. Score {Number(course.merit_min_marks)} or more for a Merit certificate; otherwise you receive a Participation
-                certificate.
-              </p>
+              <div className="mt-3 rounded-xl bg-white/50 p-3 text-xs leading-relaxed text-neutral-600">
+                <div className="font-semibold text-neutral-800">How you clear this assessment</div>
+                <p className="mt-1">You must reach the pass mark in every module. Missing any one means not cleared, however well you score in the others.</p>
+                <ul className="mt-2 space-y-0.5">
+                  {[
+                    ['Online exam', course.marks_online, course.pass_marks_online],
+                    ['Viva', course.marks_viva, course.pass_marks_viva],
+                    ['Simulation', course.marks_simulation, course.pass_marks_simulation],
+                    ['Free flight', course.marks_piloting, course.pass_marks_piloting],
+                  ].map(([label, max, pass]) => (
+                    <li key={label as string} className="flex justify-between gap-2">
+                      <span>{label}</span>
+                      <span className="font-medium text-neutral-800">
+                        {Number(pass)} of {Number(max)} <span className="font-normal text-neutral-400">({Math.round((Number(pass) / Number(max)) * 100)}%)</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2">
+                  Clear all four for a Merit certificate; otherwise you receive a Participation certificate. Your marks and result appear under{' '}
+                  <Link to="/app/report-card" className="font-medium text-blue-600 underline">
+                    Report card
+                  </Link>{' '}
+                  once your instructors finalise them.
+                </p>
+              </div>
             )}
 
             <div className="mt-4">

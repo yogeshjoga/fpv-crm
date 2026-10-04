@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Clock, Maximize, XCircle } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 import { invokeFn } from '../../lib/functions';
 import { GlassCard } from '../../components/ui/shared';
 import { Button, Spinner } from '../../components/ui/kit';
@@ -72,6 +73,17 @@ export function ExamFlow() {
   const [fullscreen, setFullscreen] = useState(isFullscreenActive());
   const submittedRef = useRef(false);
   const startedRef = useRef(false);
+  // Composite exams: the online exam is one module with its own pass mark, shown on the result.
+  const [onlinePass, setOnlinePass] = useState<number | null>(null);
+  useEffect(() => {
+    if (!result?.composite) return;
+    supabase
+      .from('courses')
+      .select('pass_marks_online')
+      .eq('slug', slug as string)
+      .maybeSingle()
+      .then(({ data }) => setOnlinePass(data ? Number(data.pass_marks_online) : null));
+  }, [result?.composite, slug]);
 
   // start (guarded against React 18 StrictMode double-invoke)
   useEffect(() => {
@@ -236,8 +248,13 @@ export function ExamFlow() {
         )}
         {result.composite && (
           <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-left text-sm text-blue-900">
-            This was your one attempt. Your final result adds this to your viva, simulation and real FPV piloting marks. Your instructors will finalise it and
-            email your certificate.
+            {onlinePass !== null && result.exam_marks !== undefined && (
+              <p className={`mb-2 font-semibold ${result.exam_marks + 1e-9 >= onlinePass ? 'text-green-700' : 'text-red-700'}`}>
+                Online exam pass mark: {onlinePass} — {result.exam_marks + 1e-9 >= onlinePass ? 'you cleared this module ✓' : 'not cleared in this module'}
+              </p>
+            )}
+            This was your one attempt. To clear the assessment you need the pass mark in every module — online exam, viva, simulation and free flight — so a
+            high score in one cannot make up for missing another. Your instructors will finalise your report card and email your certificate.
           </div>
         )}
         {!result.composite && !result.passed && (
