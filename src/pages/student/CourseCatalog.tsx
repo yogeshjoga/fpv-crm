@@ -6,11 +6,9 @@ import { useAuth } from '../../auth/AuthProvider';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
 import { EmptyState, PageHeader, Spinner, useToast } from '../../components/ui/kit';
+import { ExamStatusPill, examStillRelevant, useNow, type ExamScheduleCourse } from '../../components/ExamCountdown';
 
-interface Course {
-  id: string;
-  slug: string;
-  title: string;
+interface Course extends ExamScheduleCourse {
   summary: string;
   cover_image_url: string | null;
 }
@@ -28,17 +26,28 @@ export function CourseCatalog() {
   const q = useQuery(async () => {
     // Scoped to the current user explicitly — staff RLS would otherwise return every
     // student's enrollments and mislabel course cards.
-    const [courses, enrollments] = await Promise.all([
-      unwrap(supabase.from('courses').select('id, slug, title, summary, cover_image_url').eq('status', 'published').order('title')) as Promise<Course[]>,
+    const [courses, enrollments, certs, attempts] = await Promise.all([
+      unwrap(
+        supabase
+          .from('courses')
+          .select('id, slug, title, summary, cover_image_url, max_attempts, exam_name, exam_access, exam_opens_at, exam_closes_at, exam_time_limit_min')
+          .eq('status', 'published')
+          .order('title'),
+      ) as Promise<Course[]>,
       unwrap(supabase.from('enrollments').select('course_id, status').eq('student_id', uid)) as Promise<{ course_id: string; status: string }[]>,
+      unwrap(supabase.from('certificates').select('course_id').eq('student_id', uid).eq('revoked', false)) as Promise<{ course_id: string }[]>,
+      unwrap(supabase.from('exam_attempts').select('course_id, status').eq('student_id', uid)) as Promise<{ course_id: string; status: string }[]>,
     ]);
-    return { courses, enrollments };
+    const finishedAttempts: Record<string, number> = {};
+    for (const a of attempts) if (a.status !== 'in_progress') finishedAttempts[a.course_id] = (finishedAttempts[a.course_id] ?? 0) + 1;
+    return { courses, enrollments, done: { certCourseIds: certs.map((c) => c.course_id), finishedAttempts } };
   }, [uid]);
 
+  const now = useNow(30_000);
   if (q.loading) return <Spinner />;
   if (q.error) return <p className="text-sm text-red-600">{q.error}</p>;
 
-  const { courses, enrollments } = q.data!;
+  const { courses, enrollments, done } = q.data!;
   const isEnrolled = (courseId: string) => enrollments.some((e) => e.course_id === courseId && e.status !== 'revoked');
   const visible = isStaff ? courses : courses.filter((c) => isEnrolled(c.id));
 
@@ -90,6 +99,7 @@ export function CourseCatalog() {
                 <div className="flex-1">
                   <div className="font-semibold text-neutral-900">{c.title}</div>
                   <p className="mt-1 line-clamp-3 text-sm text-neutral-500">{c.summary}</p>
+                  {enrolled && examStillRelevant(c, now, done) && <ExamStatusPill course={c} />}
                 </div>
                 <div className="mt-4 flex items-center justify-between gap-2">
                   {enrolled ? (

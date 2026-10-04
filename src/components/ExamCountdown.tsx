@@ -23,18 +23,55 @@ export interface ExamScheduleCourse {
   exam_opens_at: string | null;
   exam_closes_at: string | null;
   exam_time_limit_min: number;
+  max_attempts?: number;
 }
 
-/** 'upcoming' (timer to open), 'live' (open now), or null when there is nothing to show. */
-export function examPhase(c: ExamScheduleCourse, now: number): 'upcoming' | 'live' | null {
+/** 'upcoming' (timer to open), 'live' (open now), 'ended' (scheduled window over), or null when there is nothing to show. */
+export function examPhase(c: ExamScheduleCourse, now: number): 'upcoming' | 'live' | 'ended' | null {
   // An open exam only counts as "live" once an admin has named it, so plain courses don't show up as exams.
   if (c.exam_access === 'open') return c.exam_name?.trim() ? 'live' : null;
   if (c.exam_access !== 'scheduled') return null;
   const opens = c.exam_opens_at ? new Date(c.exam_opens_at).getTime() : null;
   const closes = c.exam_closes_at ? new Date(c.exam_closes_at).getTime() : null;
   if (opens !== null && now < opens) return 'upcoming';
-  if (closes !== null && now >= closes) return null;
+  if (closes !== null && now >= closes) return 'ended';
   return 'live';
+}
+
+/** Should this student still see the exam: not certified for the course and attempts left. An ended window stays visible for 3 days. */
+export function examStillRelevant(
+  c: ExamScheduleCourse,
+  now: number,
+  done: { certCourseIds: string[]; finishedAttempts: Record<string, number> },
+): 'upcoming' | 'live' | 'ended' | null {
+  const phase = examPhase(c, now);
+  if (!phase) return null;
+  if (done.certCourseIds.includes(c.id)) return null;
+  if ((done.finishedAttempts[c.id] ?? 0) >= (c.max_attempts ?? 1)) return null;
+  if (phase === 'ended' && c.exam_closes_at && now - new Date(c.exam_closes_at).getTime() > 3 * 86400_000) return null;
+  return phase;
+}
+
+/** Small status line for course cards: opens in …, live (time left), or closed. */
+export function ExamStatusPill({ course }: { course: ExamScheduleCourse }) {
+  const now = useNow();
+  const phase = examPhase(course, now);
+  if (!phase) return null;
+  const opens = course.exam_opens_at ? new Date(course.exam_opens_at).getTime() : null;
+  const closes = course.exam_closes_at ? new Date(course.exam_closes_at).getTime() : null;
+  const tone =
+    phase === 'upcoming' ? 'bg-amber-50 text-amber-800 border-amber-200' : phase === 'live' ? 'bg-green-50 text-green-800 border-green-200' : 'bg-neutral-100 text-neutral-600 border-neutral-200';
+  return (
+    <div className={`mt-3 flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium ${tone}`}>
+      <CalendarClock size={14} className="shrink-0" />
+      <span className="truncate">{course.exam_name?.trim() || 'Online exam'}</span>
+      <span className="ml-auto shrink-0 tabular-nums">
+        {phase === 'upcoming' && opens !== null && `Opens in ${formatRemaining(opens - now)}`}
+        {phase === 'live' && (closes !== null ? `Live · ${formatRemaining(closes - now)} left` : 'Live now')}
+        {phase === 'ended' && 'Closed'}
+      </span>
+    </div>
+  );
 }
 
 function split(ms: number) {
@@ -83,18 +120,19 @@ export function ExamScheduleCard({ course }: { course: ExamScheduleCourse }) {
   const opens = course.exam_opens_at ? new Date(course.exam_opens_at).getTime() : null;
   const closes = course.exam_closes_at ? new Date(course.exam_closes_at).getTime() : null;
   const upcoming = phase === 'upcoming';
+  const ended = phase === 'ended';
 
   return (
     <GlassCard className="p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
-            <CalendarClock size={17} className={upcoming ? 'text-amber-500' : 'text-green-600'} />
+            <CalendarClock size={17} className={upcoming ? 'text-amber-500' : ended ? 'text-neutral-400' : 'text-green-600'} />
             {course.exam_name?.trim() || `Online exam · ${course.title}`}
           </div>
           {course.exam_name?.trim() && <div className="mt-0.5 text-xs text-neutral-500">{course.title}</div>}
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Badge tone={upcoming ? 'amber' : 'green'}>{upcoming ? 'Starts soon' : 'Open now'}</Badge>
+            <Badge tone={upcoming ? 'amber' : ended ? 'neutral' : 'green'}>{upcoming ? 'Starts soon' : ended ? 'Closed' : 'Open now'}</Badge>
             <span className="inline-flex items-center gap-1 text-xs text-neutral-500">
               <Timer size={13} /> {course.exam_time_limit_min} min once you start
             </span>
@@ -116,7 +154,9 @@ export function ExamScheduleCard({ course }: { course: ExamScheduleCourse }) {
         </div>
 
         <div className="flex flex-col items-start gap-2 sm:items-end">
-          {upcoming && opens !== null ? (
+          {ended ? (
+            <div className="text-sm text-neutral-500">The exam window has closed.</div>
+          ) : upcoming && opens !== null ? (
             <>
               <div className="text-xs font-medium text-neutral-500">Exam opens in</div>
               <CountdownTiles ms={opens - now} tone="text-amber-600" />
@@ -129,7 +169,7 @@ export function ExamScheduleCard({ course }: { course: ExamScheduleCourse }) {
           ) : (
             <div className="text-sm font-medium text-green-700">Open — start any time</div>
           )}
-          {upcoming ? (
+          {upcoming || ended ? (
             <Link to={`/app/courses/${course.slug}`} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:underline">
               View course <ArrowRight size={14} />
             </Link>

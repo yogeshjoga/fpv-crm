@@ -6,7 +6,7 @@ import { useQuery, unwrap } from '../../lib/useQuery';
 import { activityStrip, computeStreak } from '../../lib/streak';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, EmptyState, PageHeader, Spinner } from '../../components/ui/kit';
-import { ExamScheduleCard, examPhase, useNow, type ExamScheduleCourse } from '../../components/ExamCountdown';
+import { ExamScheduleCard, examStillRelevant, useNow, type ExamScheduleCourse } from '../../components/ExamCountdown';
 
 interface Row {
   id: string;
@@ -56,15 +56,13 @@ export function StudentDashboard() {
     [uid],
   );
   const now = useNow(30_000);
+  const certCourseIds = certs.data?.map((x) => x.course_id) ?? [];
+  const finishedAttempts: Record<string, number> = {};
+  for (const a of attempts.data ?? []) if (a.status !== 'in_progress') finishedAttempts[a.course_id] = (finishedAttempts[a.course_id] ?? 0) + 1;
   const examCards = (enrollments.data ?? [])
     .filter((e) => e.status === 'active' && e.course)
     .map((e) => e.course!)
-    .filter((c) => {
-      if (!examPhase(c, now)) return false;
-      if (certs.data?.some((x) => x.course_id === c.id)) return false;
-      const used = attempts.data?.filter((a) => a.course_id === c.id && a.status !== 'in_progress').length ?? 0;
-      return used < c.max_attempts;
-    });
+    .filter((c) => examStillRelevant(c, now, { certCourseIds, finishedAttempts }) !== null);
 
   // Report card: ready (a finalised result exists) or pending (enrolled in a module-graded course).
   const reportCards = useQuery<{ id: string; report: { clearedAll: boolean; total: number; max: number } | null }[]>(
