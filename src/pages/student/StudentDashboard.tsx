@@ -6,11 +6,12 @@ import { useQuery, unwrap } from '../../lib/useQuery';
 import { activityStrip, computeStreak } from '../../lib/streak';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, EmptyState, PageHeader, Spinner } from '../../components/ui/kit';
+import { ExamScheduleCard, examPhase, useNow, type ExamScheduleCourse } from '../../components/ExamCountdown';
 
 interface Row {
   id: string;
   status: string;
-  course: { id: string; slug: string; title: string; summary: string; pass_pct: number } | null;
+  course: (ExamScheduleCourse & { summary: string; pass_pct: number; max_attempts: number }) | null;
 }
 
 export function StudentDashboard() {
@@ -25,7 +26,7 @@ export function StudentDashboard() {
       unwrap(
         supabase
           .from('enrollments')
-          .select('id, status, course:courses(id, slug, title, summary, pass_pct)')
+          .select('id, status, course:courses(id, slug, title, summary, pass_pct, max_attempts, exam_access, exam_opens_at, exam_closes_at, exam_time_limit_min)')
           .eq('student_id', uid)
           .order('enrolled_at', { ascending: false }),
       ) as Promise<Row[]>,
@@ -44,10 +45,26 @@ export function StudentDashboard() {
     [uid],
   );
 
-  const certs = useQuery<{ id: string }[]>(
-    () => unwrap(supabase.from('certificates').select('id').eq('student_id', uid).eq('revoked', false)) as Promise<{ id: string }[]>,
+  const certs = useQuery<{ id: string; course_id: string }[]>(
+    () => unwrap(supabase.from('certificates').select('id, course_id').eq('student_id', uid).eq('revoked', false)) as Promise<{ id: string; course_id: string }[]>,
     [uid],
   );
+
+  // Finished attempts per course, so the exam timer is hidden once a student has used their attempts.
+  const attempts = useQuery<{ course_id: string; status: string }[]>(
+    () => unwrap(supabase.from('exam_attempts').select('course_id, status').eq('student_id', uid)) as Promise<{ course_id: string; status: string }[]>,
+    [uid],
+  );
+  const now = useNow(30_000);
+  const examCards = (enrollments.data ?? [])
+    .filter((e) => e.status === 'active' && e.course)
+    .map((e) => e.course!)
+    .filter((c) => {
+      if (!examPhase(c, now)) return false;
+      if (certs.data?.some((x) => x.course_id === c.id)) return false;
+      const used = attempts.data?.filter((a) => a.course_id === c.id && a.status !== 'in_progress').length ?? 0;
+      return used < c.max_attempts;
+    });
 
   // Report card: ready (a finalised result exists) or pending (enrolled in a module-graded course).
   const reportCards = useQuery<{ id: string; report: { clearedAll: boolean; total: number; max: number } | null }[]>(
@@ -83,6 +100,14 @@ export function StudentDashboard() {
         <Stat icon={<Award size={18} />} label="Certificates" value={certs.data?.length ?? 0} />
         <Stat icon={<Flame size={18} />} label="Day streak" value={streak.current} tone={streak.current > 0 ? 'text-orange-500' : undefined} />
       </div>
+
+      {examCards.length > 0 && (
+        <div className="mb-6 space-y-4">
+          {examCards.map((c) => (
+            <ExamScheduleCard key={c.id} course={c} />
+          ))}
+        </div>
+      )}
 
       {(reportCards.data?.length || gradedCourses.data?.length) ? (
         <Link to="/app/report-card" className="mb-6 block">

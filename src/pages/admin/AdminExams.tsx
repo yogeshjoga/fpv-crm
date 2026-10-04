@@ -221,6 +221,11 @@ function SettingsPanel({ course, canConfigure, onSaved }: { course: Course; canC
       <GlassCard className="p-5">
         <h2 className="font-semibold text-neutral-900">Online exam availability</h2>
         <p className="mt-0.5 text-xs text-neutral-500">{accessSummary({ ...course, exam_access: f.exam_access })}</p>
+        {f.exam_access === 'scheduled' && (
+          <p className="mt-0.5 text-xs text-neutral-500">
+            When you save, enrolled students get a notification and a live countdown on their dashboard — no email is sent.
+          </p>
+        )}
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <Field label="Who can start the online exam">
             <Select disabled={ro} value={f.exam_access} onChange={(e) => set('exam_access', e.target.value)}>
