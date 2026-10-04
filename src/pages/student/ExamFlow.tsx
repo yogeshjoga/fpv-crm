@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Clock, Download, Maximize, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Clock, Download, ListChecks, Lock, Maximize, X, XCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { invokeFn } from '../../lib/functions';
 import { GlassCard } from '../../components/ui/shared';
-import { Button, Spinner, useToast } from '../../components/ui/kit';
+import { Button, Modal, Spinner, useToast } from '../../components/ui/kit';
 import { useAuth } from '../../auth/AuthProvider';
 import { downloadReviewPdf } from '../../lib/reviewPdf';
 
@@ -81,15 +81,23 @@ export function ExamFlow() {
   const { profile } = useAuth();
   const [courseTitle, setCourseTitle] = useState('');
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [confirmSubmit, setConfirmSubmit] = useState(false);
+  const [navOpen, setNavOpen] = useState(false); // question list drawer on small screens
   useEffect(() => {
-    if (!result) return;
+    if (!result && !exam) return;
     supabase
       .from('courses')
       .select('title')
       .eq('slug', slug as string)
       .maybeSingle()
       .then(({ data }) => setCourseTitle(data?.title ?? ''));
-  }, [result, slug]);
+  }, [result, exam, slug]);
+
+  // keep the current question visible in the question list
+  useEffect(() => {
+    if (phase !== 'exam') return;
+    document.getElementById(`qnav-${current}`)?.scrollIntoView({ block: 'nearest' });
+  }, [current, phase]);
   useEffect(() => {
     if (!result?.composite) return;
     supabase
@@ -363,8 +371,64 @@ export function ExamFlow() {
     });
   };
 
+  const unanswered = exam.questions.length - answeredCount;
+  const pct = Math.round((answeredCount / exam.questions.length) * 100);
+
+  const questionList = (
+    <>
+      <div className="px-4 pb-3 pt-4">
+        <div className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
+          <ListChecks size={16} /> Questions
+        </div>
+        <div className="mt-1 text-xs text-neutral-500">
+          {answeredCount} of {exam.questions.length} answered
+        </div>
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-neutral-200">
+          <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+      <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-3">
+        {exam.questions.map((qq, i) => {
+          const locked = !exam.allow_backtrack && i < current;
+          const done = (answers[qq.id] ?? []).length > 0;
+          const here = i === current;
+          return (
+            <button
+              key={qq.id}
+              id={`qnav-${i}`}
+              onClick={() => {
+                if (locked) return;
+                setCurrent(i);
+                setNavOpen(false);
+              }}
+              disabled={locked}
+              title={locked ? 'This exam does not allow returning to earlier questions' : undefined}
+              className={`flex w-full items-start gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors ${
+                here ? 'bg-[#1a1a1a] text-white' : locked ? 'cursor-not-allowed text-neutral-300' : 'text-neutral-700 hover:bg-white/80'
+              }`}
+            >
+              <span
+                className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-xs font-semibold ${
+                  here ? 'bg-white/20 text-white' : done ? 'bg-blue-100 text-blue-700' : locked ? 'bg-neutral-100 text-neutral-300' : 'bg-white text-neutral-500'
+                }`}
+              >
+                {i + 1}
+              </span>
+              <span className="line-clamp-2 min-w-0 flex-1 text-xs leading-snug">{qq.prompt}</span>
+              {locked ? (
+                <Lock size={12} className="mt-1 shrink-0" />
+              ) : done ? (
+                <CheckCircle2 size={14} className={`mt-1 shrink-0 ${here ? 'text-blue-300' : 'text-blue-500'}`} />
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="fixed inset-0 z-[60] flex flex-col bg-gradient-to-br from-blue-50 via-white to-amber-50">
       {!fullscreen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6 text-center backdrop-blur-sm">
           <div className="max-w-sm rounded-3xl bg-white p-8">
@@ -379,82 +443,121 @@ export function ExamFlow() {
           </div>
         </div>
       )}
-      <div className="mb-4 flex items-center justify-between">
-        <div className="text-sm text-neutral-500">
-          Question {current + 1} of {exam.questions.length} · {answeredCount} answered
-        </div>
-        <div className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${remaining < 60 ? 'bg-red-100 text-red-700' : 'bg-white/70 text-neutral-700'}`}>
-          <Clock size={15} /> {mmss}
-        </div>
-      </div>
 
-      <GlassCard className="p-6">
-        <p className="text-lg font-medium text-neutral-900">{q.prompt}</p>
-        <p className="mt-1 text-xs text-neutral-400">{q.type === 'multi' ? 'Select all that apply' : 'Select one'}</p>
-        <div className="mt-4 space-y-2">
-          {q.options.map((o) => {
-            const on = selected.includes(o.id);
-            return (
-              <button
-                key={o.id}
-                onClick={() => toggle(o.id)}
-                className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm transition-colors ${
-                  on ? 'border-blue-400 bg-blue-50 text-blue-900' : 'border-white/60 bg-white/40 text-neutral-700 hover:bg-white/70'
-                }`}
-              >
-                <span className={`flex h-5 w-5 shrink-0 items-center justify-center border ${q.type === 'single' ? 'rounded-full' : 'rounded-md'} ${on ? 'border-blue-500 bg-blue-500 text-white' : 'border-neutral-300'}`}>
-                  {on && <CheckCircle2 size={14} />}
-                </span>
-                {o.label}
-              </button>
-            );
-          })}
+      {/* top bar */}
+      <header className="flex items-center justify-between gap-3 border-b border-white/70 bg-white/70 px-4 py-2.5 backdrop-blur-xl">
+        <div className="flex min-w-0 items-center gap-3">
+          <button
+            onClick={() => setNavOpen(true)}
+            className="flex h-9 items-center gap-1.5 rounded-full bg-white px-3 text-sm font-medium text-neutral-700 shadow-sm md:hidden"
+          >
+            <ListChecks size={15} /> Questions
+          </button>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold text-neutral-900">{courseTitle || 'Online exam'}</div>
+            <div className="text-xs text-neutral-500">
+              Question {current + 1} of {exam.questions.length} · {answeredCount} answered
+            </div>
+          </div>
         </div>
-      </GlassCard>
-
-      <div className="mt-4 flex items-center justify-between">
-        {exam.allow_backtrack ? (
-          <Button variant="secondary" onClick={() => setCurrent((c) => Math.max(0, c - 1))} disabled={current === 0}>
-            <ChevronLeft size={16} /> Prev
-          </Button>
-        ) : (
-          <span />
-        )}
-        {current < exam.questions.length - 1 ? (
-          <Button onClick={() => setCurrent((c) => c + 1)}>
-            Next <ChevronRight size={16} />
-          </Button>
-        ) : (
-          <Button onClick={() => doSubmit(false)} loading={submitting}>
+        <div className="flex items-center gap-3">
+          <div className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold tabular-nums ${remaining < 60 ? 'bg-red-100 text-red-700' : 'bg-white text-neutral-700 shadow-sm'}`}>
+            <Clock size={15} /> {mmss}
+          </div>
+          <Button onClick={() => setConfirmSubmit(true)} loading={submitting}>
             Submit exam
           </Button>
+        </div>
+      </header>
+
+      <div className="flex min-h-0 flex-1">
+        {/* left: every question, click to jump */}
+        <aside className="hidden w-72 shrink-0 flex-col border-r border-white/70 bg-white/50 backdrop-blur-xl md:flex">{questionList}</aside>
+
+        {navOpen && (
+          <div className="fixed inset-0 z-40 md:hidden">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setNavOpen(false)} />
+            <aside className="absolute inset-y-0 left-0 flex w-80 max-w-[85%] flex-col bg-white shadow-2xl">
+              <button onClick={() => setNavOpen(false)} className="absolute right-3 top-3 rounded-full p-1 text-neutral-500 hover:bg-neutral-100" aria-label="Close">
+                <X size={16} />
+              </button>
+              {questionList}
+            </aside>
+          </div>
         )}
+
+        {/* right: the current question */}
+        <main className="min-w-0 flex-1 overflow-y-auto px-4 py-6 md:px-10">
+          <div className="mx-auto max-w-3xl">
+            <GlassCard className="p-6">
+              <div className="text-xs font-semibold uppercase tracking-wide text-neutral-400">Question {current + 1}</div>
+              <p className="mt-1 text-lg font-medium text-neutral-900">{q.prompt}</p>
+              <p className="mt-1 text-xs text-neutral-400">{q.type === 'multi' ? 'Select all that apply' : 'Select one'}</p>
+              <div className="mt-4 space-y-2">
+                {q.options.map((o) => {
+                  const on = selected.includes(o.id);
+                  return (
+                    <button
+                      key={o.id}
+                      onClick={() => toggle(o.id)}
+                      className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm transition-colors ${
+                        on ? 'border-blue-400 bg-blue-50 text-blue-900' : 'border-white/60 bg-white/40 text-neutral-700 hover:bg-white/70'
+                      }`}
+                    >
+                      <span className={`flex h-5 w-5 shrink-0 items-center justify-center border ${q.type === 'single' ? 'rounded-full' : 'rounded-md'} ${on ? 'border-blue-500 bg-blue-500 text-white' : 'border-neutral-300'}`}>
+                        {on && <CheckCircle2 size={14} />}
+                      </span>
+                      {o.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </GlassCard>
+
+            <div className="mt-4 flex items-center justify-between">
+              {exam.allow_backtrack ? (
+                <Button variant="secondary" onClick={() => setCurrent((c) => Math.max(0, c - 1))} disabled={current === 0}>
+                  <ChevronLeft size={16} /> Prev
+                </Button>
+              ) : (
+                <span />
+              )}
+              {current < exam.questions.length - 1 ? (
+                <Button onClick={() => setCurrent((c) => c + 1)}>
+                  Next <ChevronRight size={16} />
+                </Button>
+              ) : (
+                <Button onClick={() => setConfirmSubmit(true)} loading={submitting}>
+                  Submit exam
+                </Button>
+              )}
+            </div>
+          </div>
+        </main>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-1.5">
-        {exam.questions.map((qq, i) => {
-          const locked = !exam.allow_backtrack && i < current;
-          return (
-            <button
-              key={qq.id}
-              onClick={() => !locked && setCurrent(i)}
-              disabled={locked}
-              title={locked ? 'This exam does not allow returning to earlier questions' : undefined}
-              className={`h-8 w-8 rounded-lg text-xs font-medium ${
-                locked
-                  ? 'cursor-not-allowed bg-white/30 text-neutral-300'
-                  : i === current
-                    ? 'bg-[#1a1a1a] text-white'
-                    : (answers[qq.id] ?? []).length
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-white/60 text-neutral-500'
-              }`}
-            >
-              {i + 1}
-            </button>
-          );
-        })}
-      </div>
+      <Modal open={confirmSubmit} onClose={() => setConfirmSubmit(false)} title="Submit your exam?">
+        <p className="text-sm text-neutral-600">
+          {unanswered > 0
+            ? `You have ${unanswered} unanswered question${unanswered === 1 ? '' : 's'}. Unanswered questions count as wrong.`
+            : 'You have answered every question.'}{' '}
+          {exam.allow_backtrack ? 'You can still go back and change answers before submitting.' : 'Once submitted you cannot change your answers.'}
+        </p>
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setConfirmSubmit(false)}>
+            Keep working
+          </Button>
+          <Button
+            onClick={() => {
+              setConfirmSubmit(false);
+              doSubmit(false);
+            }}
+            loading={submitting}
+          >
+            Submit now
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }
