@@ -5,7 +5,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
-import { Badge, Button, EmptyState, Field, PageHeader, Spinner, TextArea, TextInput, useToast } from '../../components/ui/kit';
+import { Badge, Button, EmptyState, Field, PageHeader, Select, Spinner, TextArea, TextInput, useToast } from '../../components/ui/kit';
 import { fileTypeLabel, formatSize, type ResourceRow } from '../student/Resources';
 
 const MAX_MB = 50;
@@ -20,11 +20,16 @@ export function AdminResources() {
   const [description, setDescription] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [audience, setAudience] = useState('all'); // 'all' or a course group id
 
-  const q = useQuery<ResourceRow[]>(
-    () => unwrap(supabase.from('resources').select('*').order('created_at', { ascending: false })) as Promise<ResourceRow[]>,
-    [],
-  );
+  const q = useQuery(async () => {
+    const [rows, groups] = await Promise.all([
+      unwrap(supabase.from('resources').select('*').order('created_at', { ascending: false })) as Promise<(ResourceRow & { group_id: string | null })[]>,
+      unwrap(supabase.from('course_groups').select('id, name').order('name')) as Promise<{ id: string; name: string }[]>,
+    ]);
+    return { rows, groups };
+  }, []);
+  const groupName = (id: string | null) => q.data?.groups.find((g) => g.id === id)?.name;
 
   const add = async () => {
     if (!file) return toast('Choose a file first', 'error');
@@ -46,6 +51,7 @@ export function AdminResources() {
       mime: file.type,
       size_bytes: file.size,
       uploaded_by: profile!.id,
+      group_id: audience === 'all' ? null : audience,
     });
     setSaving(false);
     if (error) {
@@ -56,6 +62,7 @@ export function AdminResources() {
     setTitle('');
     setDescription('');
     setFile(null);
+    setAudience('all');
     if (fileRef.current) fileRef.current.value = '';
     q.refetch();
   };
@@ -89,6 +96,18 @@ export function AdminResources() {
             </Field>
           </div>
           <div className="mt-4">
+            <Field label="Who can see it" hint="Limit a file to one course group, or share it with every student.">
+              <Select value={audience} onChange={(e) => setAudience(e.target.value)}>
+                <option value="all">All students</option>
+                {q.data?.groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    Only {g.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+          <div className="mt-4">
             <Field label="Short description">
               <TextArea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What is this file and when should students use it?" />
             </Field>
@@ -103,11 +122,11 @@ export function AdminResources() {
 
       {q.loading ? (
         <Spinner />
-      ) : !q.data?.length ? (
+      ) : !q.data?.rows.length ? (
         <EmptyState icon={<FolderOpen size={22} />} title="No resources yet" description="Upload the first file above." />
       ) : (
         <div className="space-y-3">
-          {q.data.map((r) => (
+          {q.data.rows.map((r) => (
             <GlassCard key={r.id} className="flex items-center gap-4 p-4">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/70 text-neutral-700">
                 <FileText size={20} />
@@ -116,6 +135,7 @@ export function AdminResources() {
                 <div className="font-medium text-neutral-900">{r.title}</div>
                 <div className="mt-0.5 flex items-center gap-2 text-xs text-neutral-500">
                   <Badge tone="blue">{fileTypeLabel(r)}</Badge>
+                  <Badge tone={r.group_id ? 'amber' : 'neutral'}>{r.group_id ? groupName(r.group_id) ?? 'Group only' : 'All students'}</Badge>
                   {formatSize(r.size_bytes) && <span>{formatSize(r.size_bytes)}</span>}
                   <span>{r.file_name}</span>
                 </div>

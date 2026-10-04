@@ -1313,6 +1313,24 @@ export type Database = {
           },
         ]
       }
+      org_secrets: {
+        Row: {
+          google_form_secret: string
+          id: boolean
+          updated_at: string
+        }
+        Insert: {
+          google_form_secret?: string
+          id?: boolean
+          updated_at?: string
+        }
+        Update: {
+          google_form_secret?: string
+          id?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       org_settings: {
         Row: {
           cert_background_url: string | null
@@ -1323,7 +1341,6 @@ export type Database = {
           default_pass_pct: number
           default_question_count: number
           default_time_limit_min: number
-          google_form_secret: string
           id: boolean
           logo_url: string | null
           org_name: string
@@ -1343,7 +1360,6 @@ export type Database = {
           default_pass_pct?: number
           default_question_count?: number
           default_time_limit_min?: number
-          google_form_secret?: string
           id?: boolean
           logo_url?: string | null
           org_name?: string
@@ -1363,7 +1379,6 @@ export type Database = {
           default_pass_pct?: number
           default_question_count?: number
           default_time_limit_min?: number
-          google_form_secret?: string
           id?: boolean
           logo_url?: string | null
           org_name?: string
@@ -1630,6 +1645,7 @@ export type Database = {
           external_url: string | null
           file_name: string
           file_path: string | null
+          group_id: string | null
           id: string
           mime: string
           size_bytes: number | null
@@ -1642,6 +1658,7 @@ export type Database = {
           external_url?: string | null
           file_name: string
           file_path?: string | null
+          group_id?: string | null
           id?: string
           mime?: string
           size_bytes?: number | null
@@ -1654,6 +1671,7 @@ export type Database = {
           external_url?: string | null
           file_name?: string
           file_path?: string | null
+          group_id?: string | null
           id?: string
           mime?: string
           size_bytes?: number | null
@@ -1661,6 +1679,13 @@ export type Database = {
           uploaded_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "resources_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "course_groups"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "resources_uploaded_by_fkey"
             columns: ["uploaded_by"]
@@ -2027,6 +2052,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_view_course: { Args: { p_course: string }; Returns: boolean }
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
@@ -2034,6 +2060,13 @@ export type Database = {
       current_user_status: {
         Args: never
         Returns: Database["public"]["Enums"]["user_status"]
+      }
+      enrollment_form_course: {
+        Args: { p_form_id: string }
+        Returns: {
+          slug: string
+          title: string
+        }[]
       }
       increment_staff_activity: {
         Args: { p_seconds: number }
