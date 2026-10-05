@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
-import { CalendarDays, Check, Download, Eye, EyeOff, MessageSquareHeart, MessageSquareText, Pencil, ThumbsUp, Trash2, Users, X } from 'lucide-react';
+import { CalendarDays, Check, Download, Eye, EyeOff, FileText, MessageSquareHeart, MessageSquareText, Pencil, ThumbsUp, Trash2, Users, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { downloadCsv } from '../../lib/csv';
+import { downloadReviewsPdf } from '../../lib/reviewsPdf';
 import { slugify } from '../../lib/slug';
 import { GlassCard } from '../../components/ui/shared';
 import { StarRating } from '../../components/StarRating';
@@ -43,6 +44,19 @@ export function AdminReviews() {
   const [stars, setStars] = useState('all');
   const [exporting, setExporting] = useState(false);
   const [withNames, setWithNames] = useState(true);
+  const [format, setFormat] = useState<'pdf' | 'csv'>('pdf');
+  const [withStats, setWithStats] = useState(true);
+  // 'signed' prints the signature and company seal; 'blank' leaves room for an original signature and stamp.
+  const [signMode, setSignMode] = useState<'signed' | 'blank'>('signed');
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const DEFAULT_DESIGNATION = 'Founder, EgireRobotics · DGCA certified pilot';
+  const [designation, setDesignation] = useState(() => {
+    try {
+      return localStorage.getItem('reviews.designation') || DEFAULT_DESIGNATION;
+    } catch {
+      return DEFAULT_DESIGNATION;
+    }
+  });
 
   const q = useQuery(
     () =>
@@ -149,6 +163,65 @@ export function AdminReviews() {
     setExporting(false);
   };
 
+  // A branded PDF for sharing with a college: the dashboard statistics, the reviews, and the founder's signature and seal.
+  const exportPdf = async () => {
+    setPdfBusy(true);
+    try {
+      try {
+        localStorage.setItem('reviews.designation', designation);
+      } catch {
+        /* remembering the line is a convenience only */
+      }
+      const { data: org } = await supabase
+        .from('org_settings')
+        .select('org_name, logo_url, signatory_name, signatory_image_url, company_seal_url')
+        .single();
+      const day = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      const groupName = group === 'all' ? 'All course groups' : groupOptions.find(([id]) => id === group)?.[1] ?? 'Course group';
+      await downloadReviewsPdf({
+        orgName: org?.org_name || 'EgireRobotics',
+        logoUrl: org?.logo_url ?? null,
+        groupLabel: groupName,
+        filterNote: stars === 'all' ? null : `${stars}-star reviews only`,
+        withNames,
+        includeStats: withStats,
+        stats: {
+          avg,
+          count: scoped.length,
+          dist,
+          satisfied: stats.satisfied,
+          commented: stats.commented,
+          week: stats.week,
+          pendingEdits: pending.length,
+          edited: stats.edited,
+          members: stats.members,
+          responseRate: stats.responseRate,
+          days: stats.days.map((d) => ({ label: d.label, count: d.count })),
+        },
+        reviews: rows.map((r) => ({
+          name: withNames ? r.student?.full_name || r.student?.email || 'Student' : `Anonymous #${anonNo.get(r.id) ?? ''}`,
+          group: r.group?.name ?? 'Group',
+          rating: r.rating,
+          date: day(r.updated_at),
+          comment: r.comment,
+        })),
+        sign: {
+          mode: signMode,
+          name: org?.signatory_name || 'Yogesh Joga',
+          designation: designation.trim() || DEFAULT_DESIGNATION,
+          signatureUrl: org?.signatory_image_url ?? null,
+          sealUrl: org?.company_seal_url ?? null,
+        },
+      });
+      toast(`PDF ready: ${rows.length} review${rows.length === 1 ? '' : 's'}${withNames ? '' : ', anonymous'}${signMode === 'blank' ? ', unsigned' : ''}`);
+      setExporting(false);
+    } catch (e) {
+      toast((e as Error).message || 'Could not create the PDF', 'error');
+    } finally {
+      setPdfBusy(false);
+    }
+  };
+
   const remove = async (r: ReviewRow) => {
     if (!confirm('Remove this review? The student will no longer see it.')) return;
     const { error } = await supabase.from('reviews').delete().eq('id', r.id);
@@ -195,7 +268,7 @@ export function AdminReviews() {
                 }}
                 disabled={!rows.length}
               >
-                <Download size={15} /> Export CSV
+                <Download size={15} /> Export
               </Button>
             )}
             {canExport && (
@@ -392,28 +465,101 @@ export function AdminReviews() {
       )}
 
       {canExport && exporting && (
-        <Modal open onClose={() => setExporting(false)} title="Export reviews to CSV">
+        <Modal open onClose={() => setExporting(false)} title="Export reviews" wide>
           <div className="space-y-4">
             <p className="text-sm text-neutral-600">
               {rows.length} review{rows.length === 1 ? '' : 's'} will be exported, matching the group and star filters currently selected.
             </p>
+
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  ['pdf', 'PDF report', 'Coloured like this dashboard, with the statistics. Made for sharing.'],
+                  ['csv', 'CSV spreadsheet', 'Plain data for Excel or Sheets. Keeps every language.'],
+                ] as const
+              ).map(([key, title, hint]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setFormat(key)}
+                  className={`rounded-2xl border p-3 text-left transition-colors ${format === key ? 'border-neutral-900 bg-white' : 'border-white/60 bg-white/40 hover:bg-white/70'}`}
+                >
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-neutral-900">
+                    {key === 'pdf' ? <FileText size={14} /> : <Download size={14} />} {title}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-neutral-500">{hint}</span>
+                </button>
+              ))}
+            </div>
+
             <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/60 bg-white/50 p-3">
               <input type="checkbox" className="mt-1 h-4 w-4" checked={withNames} onChange={(e) => setWithNames(e.target.checked)} />
               <span>
-                <span className="block text-sm font-medium text-neutral-900">Include student names and email addresses</span>
+                <span className="block text-sm font-medium text-neutral-900">Include student names{format === 'csv' ? ' and email addresses' : ''}</span>
                 <span className="block text-xs text-neutral-500">
-                  Untick to export anonymously: no name or email column, and only dates instead of exact times. Comments are exported as written, so a
-                  student may still name themselves in their text.
+                  Untick to export anonymously: reviews are listed as Anonymous #1, #2 and so on{format === 'csv' ? ', with no name or email column and only dates' : ''}. Comments are
+                  exported as written, so a student may still name themselves in their text.
                 </span>
               </span>
             </label>
+
+            {format === 'pdf' && (
+              <>
+                <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/60 bg-white/50 p-3">
+                  <input type="checkbox" className="mt-1 h-4 w-4" checked={withStats} onChange={(e) => setWithStats(e.target.checked)} />
+                  <span>
+                    <span className="block text-sm font-medium text-neutral-900">Include the dashboard statistics</span>
+                    <span className="block text-xs text-neutral-500">Average rating, star breakdown, satisfaction, response rate and the last 7 days.</span>
+                  </span>
+                </label>
+
+                <div className="rounded-2xl border border-white/60 bg-white/50 p-3">
+                  <div className="text-sm font-medium text-neutral-900">Signature and company seal</div>
+                  <div className="mt-2 space-y-2 text-sm text-neutral-700">
+                    <label className="flex cursor-pointer items-start gap-2">
+                      <input type="radio" className="mt-1" checked={signMode === 'signed'} onChange={() => setSignMode('signed')} />
+                      <span>
+                        <span className="font-medium">With signature and seal</span>
+                        <span className="block text-xs text-neutral-500">Your signature and the company seal are printed at the end, above your name.</span>
+                      </span>
+                    </label>
+                    <label className="flex cursor-pointer items-start gap-2">
+                      <input type="radio" className="mt-1" checked={signMode === 'blank'} onChange={() => setSignMode('blank')} />
+                      <span>
+                        <span className="font-medium">Blank, for the original signature and seal</span>
+                        <span className="block text-xs text-neutral-500">Leaves a clear line with your name below it, so you can print it and sign and stamp by hand.</span>
+                      </span>
+                    </label>
+                  </div>
+                  <div className="mt-3">
+                    <div className="mb-1 text-xs text-neutral-500">Printed under the signature line</div>
+                    <div className="rounded-xl bg-white/70 px-3 py-1.5 text-xs text-neutral-500">Yogesh Joga</div>
+                    <input
+                      className="mt-1.5 w-full rounded-xl border border-white/70 bg-white/70 px-3 py-2 text-sm text-neutral-800 outline-none focus:border-neutral-400"
+                      value={designation}
+                      maxLength={120}
+                      onChange={(e) => setDesignation(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <p className="text-xs text-neutral-400">The PDF font covers English only. Comments written in other scripts print as “?”. Use the CSV for those.</p>
+              </>
+            )}
+
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setExporting(false)}>
                 Cancel
               </Button>
-              <Button onClick={exportCsv}>
-                <Download size={15} /> Download {withNames ? 'CSV' : 'anonymous CSV'}
-              </Button>
+              {format === 'pdf' ? (
+                <Button onClick={exportPdf} loading={pdfBusy}>
+                  <FileText size={15} /> Download PDF{withNames ? '' : ' (anonymous)'}
+                </Button>
+              ) : (
+                <Button onClick={exportCsv}>
+                  <Download size={15} /> Download {withNames ? 'CSV' : 'anonymous CSV'}
+                </Button>
+              )}
             </div>
           </div>
         </Modal>
