@@ -200,7 +200,7 @@ Deno.serve(async (req) => {
         const y = opts.centerY !== undefined ? PAGE_H - opts.centerY * artY - h / 2 : PAGE_H - opts.bottom! * artY;
         page.drawImage(img, { x: cx * artX - w / 2, y, width: w, height: h, opacity: opts.opacity ?? 1 });
       };
-      if (sealImg) drawArt(sealImg, 1312, 235, { centerY: 1040, opacity: 0.9 });
+      if (sealImg) drawArt(sealImg, 1524, 235, { centerY: 1040, opacity: 0.9 });
       if (signatureImg) drawArt(signatureImg, 1524, 290, { bottom: 1130 });
       // Cover only the template's own gold "OF" (x 681-754, y 394-428 of the 2000x1414 art,
       // on a pure-white background) so the certificate type can replace it. Anything wider

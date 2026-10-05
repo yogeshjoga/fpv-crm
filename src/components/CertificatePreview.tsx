@@ -111,14 +111,14 @@ export function CertificatePreview({ data }: { data: CertificatePreviewData }) {
       >
         {backgroundUrl ? (
           <>
-            {/* Company seal beside the signature (centre x 1312, nudged 20% of its width right of the original 1265), and the signature on the signing line above the
+            {/* Company seal beside the signature (centred on the signature, x 1524), and the signature on the signing line above the
                 printed name. Same art-pixel positions the PDF uses. */}
             {sealSrc && (
               <img
                 src={sealSrc}
                 alt=""
                 className="absolute"
-                style={{ left: (1312 - 235 / 2) * ART_X, top: 1040 * ART_Y, width: 235 * ART_X, transform: 'translateY(-50%)', opacity: 0.9 }}
+                style={{ left: (1524 - 235 / 2) * ART_X, top: 1040 * ART_Y, width: 235 * ART_X, transform: 'translateY(-50%)', opacity: 0.9 }}
               />
             )}
             {signatureSrc && (
