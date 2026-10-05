@@ -252,13 +252,14 @@ Deno.serve(async (req) => {
         console.error('certificate QR render failed', e);
       }
 
-      const footerX = PAGE_W * 0.06 + 28;
-      page.drawText(`Certificate ID`, { x: footerX, y: PAGE_H * 0.135, size: 9, font: bold, color: navy });
-      page.drawText(certId, { x: footerX + bold.widthOfTextAtSize('Certificate ID  ', 9), y: PAGE_H * 0.135, size: 9, font: reg, color: rgb(0.3, 0.3, 0.3) });
-      page.drawText(`Date of issue`, { x: footerX, y: PAGE_H * 0.11, size: 9, font: bold, color: navy });
+      // Certificate ID and issue date sit level with the signature and printed name (115pt / 99pt up from the bottom).
+      const footerX = PAGE_W * 0.06 + 50;
+      page.drawText(`Certificate ID`, { x: footerX, y: 115, size: 9, font: bold, color: navy });
+      page.drawText(certId, { x: footerX + bold.widthOfTextAtSize('Certificate ID  ', 9), y: 115, size: 9, font: reg, color: rgb(0.3, 0.3, 0.3) });
+      page.drawText(`Date of issue`, { x: footerX, y: 99, size: 9, font: bold, color: navy });
       page.drawText(issuedAt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }), {
         x: footerX + bold.widthOfTextAtSize('Date of issue  ', 9),
-        y: PAGE_H * 0.11,
+        y: 99,
         size: 9,
         font: reg,
         color: rgb(0.3, 0.3, 0.3),
