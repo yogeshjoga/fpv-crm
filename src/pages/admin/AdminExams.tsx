@@ -140,6 +140,7 @@ function SettingsPanel({ course, canConfigure, onSaved }: { course: Course; canC
     allow_backtrack: course.allow_backtrack,
     show_review: course.show_review,
     scoring_mode: course.scoring_mode as string,
+    certificate_mode: (course.certificate_mode ?? 'manual') as string,
     marks_online: num(course.marks_online),
     marks_viva: num(course.marks_viva),
     marks_simulation: num(course.marks_simulation),
@@ -187,6 +188,7 @@ function SettingsPanel({ course, canConfigure, onSaved }: { course: Course; canC
         allow_backtrack: f.allow_backtrack,
         show_review: f.show_review,
         scoring_mode: f.scoring_mode,
+        certificate_mode: f.certificate_mode,
         marks_online: f.marks_online,
         marks_viva: f.marks_viva,
         marks_simulation: f.marks_simulation,
@@ -292,7 +294,15 @@ function SettingsPanel({ course, canConfigure, onSaved }: { course: Course; canC
               <option value="composite">Total marks — online exam + viva + simulation + piloting</option>
             </Select>
           </Field>
-          {!isComposite && numberField('Pass mark (%)', 'pass_pct', 'A certificate is issued automatically when a student reaches this')}
+          {!isComposite && numberField('Pass mark (%)', 'pass_pct', 'The score a student needs to pass the online exam')}
+          {!isComposite && (
+            <Field label="When is the certificate sent?" hint="Nothing is emailed after the online exam unless you choose Automatically">
+              <Select disabled={ro} value={f.certificate_mode} onChange={(e) => set('certificate_mode', e.target.value)}>
+                <option value="manual">When I issue it (Exams → Attempts)</option>
+                <option value="auto">Automatically, the moment a student passes the online exam</option>
+              </Select>
+            </Field>
+          )}
         </div>
 
         {isComposite && (

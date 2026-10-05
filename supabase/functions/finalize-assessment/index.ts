@@ -8,7 +8,7 @@ type Admin = ReturnType<typeof adminClient>;
 type Course = Record<string, any>;
 
 /**
- * Turns a student's online exam score and the instructor-entered viva / simulation / free flight
+ * Staff-only. For 100-mark assessments this turns a student's online exam score and the instructor-entered viva / simulation / free flight
  * marks into a result, then issues the certificate. Every module has its own pass mark and must be
  * cleared on its own; a student who fails any one cannot get Merit however high the total is.
  * "Merit" = every module cleared and the merit total reached, otherwise "Participation". Called by staff, a few students at a time so each
@@ -31,12 +31,12 @@ Deno.serve(async (req) => {
 
     const { data: course } = await admin.from('courses').select('*').eq('id', course_id).single();
     if (!course) throw new HttpError(404, 'Course not found.');
-    if (course.scoring_mode !== 'composite') throw new HttpError(400, 'This course does not use composite marks.');
+    const composite = course.scoring_mode === 'composite';
 
     const results = [];
     for (const studentId of student_ids) {
       try {
-        results.push({ student_id: studentId, ...(await finalizeOne(admin, course, studentId)) });
+        results.push({ student_id: studentId, ...(await (composite ? finalizeOne(admin, course, studentId) : issueOnPass(admin, course, studentId))) });
       } catch (e) {
         results.push({ student_id: studentId, status: 'error', message: (e as Error).message });
       }
@@ -47,6 +47,44 @@ Deno.serve(async (req) => {
     return json({ error: (e as Error).message }, status);
   }
 });
+
+/**
+ * Ordinary (single exam) courses: the admin issues the certificate for a student who has passed. Nothing is
+ * sent automatically after the exam unless the course is set to "auto".
+ */
+async function issueOnPass(admin: Admin, course: Course, studentId: string) {
+  const { data: existing } = await admin
+    .from('certificates')
+    .select('cert_id_string')
+    .eq('student_id', studentId)
+    .eq('course_id', course.id)
+    .eq('revoked', false)
+    .maybeSingle();
+  if (existing) return { status: 'already_issued', cert_id_string: existing.cert_id_string };
+
+  const { data: attempts } = await admin
+    .from('exam_attempts')
+    .select('id, enrollment_id, score_pct, passed')
+    .eq('student_id', studentId)
+    .eq('course_id', course.id)
+    .eq('passed', true)
+    .neq('status', 'in_progress');
+  const best = (attempts ?? []).reduce<{ id: string; enrollment_id: string; score_pct: number | null } | null>(
+    (m, a) => (!m || Number(a.score_pct ?? 0) > Number(m.score_pct ?? 0) ? a : m),
+    null,
+  );
+  if (!best) return { status: 'not_passed' };
+
+  const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-certificate`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ attempt_id: best.id, student_id: studentId, course_id: course.id, score_pct: Number(best.score_pct ?? 0) }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error ?? `Certificate generation failed (${res.status})`);
+  await admin.from('enrollments').update({ status: 'completed' }).eq('id', best.enrollment_id);
+  return { status: 'issued', cert_id_string: body.cert_id_string };
+}
 
 async function finalizeOne(admin: Admin, course: Course, studentId: string) {
   const { data: existing } = await admin

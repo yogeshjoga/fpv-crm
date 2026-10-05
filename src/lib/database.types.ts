@@ -422,6 +422,7 @@ export type Database = {
         Row: {
           allow_backtrack: boolean
           cert_type: string
+          certificate_mode: string
           cooldown_hours: number
           course_code: string
           cover_image_url: string | null
@@ -461,6 +462,7 @@ export type Database = {
         Insert: {
           allow_backtrack?: boolean
           cert_type?: string
+          certificate_mode?: string
           cooldown_hours?: number
           course_code: string
           cover_image_url?: string | null
@@ -500,6 +502,7 @@ export type Database = {
         Update: {
           allow_backtrack?: boolean
           cert_type?: string
+          certificate_mode?: string
           cooldown_hours?: number
           course_code?: string
           cover_image_url?: string | null

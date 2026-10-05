@@ -53,6 +53,8 @@ interface SubmitResponse {
   review?: ReviewItem[];
   total: number;
   cert_id_string?: string;
+  /** Passed, but an admin issues the certificate later. */
+  certificate_pending?: boolean;
   cooldown_until?: string;
   locked?: boolean;
   /** Composite courses: the online exam is one part of a 100-mark assessment. */
@@ -268,6 +270,11 @@ export function ExamFlow() {
                 View your certificates
               </Link>
             </div>
+          </div>
+        )}
+        {result.passed && !result.composite && !result.cert_id_string && result.certificate_pending && (
+          <div className="mt-5 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+            Well done. Your certificate will be issued by your instructors, and you will be notified when it is ready.
           </div>
         )}
         {result.composite && (
