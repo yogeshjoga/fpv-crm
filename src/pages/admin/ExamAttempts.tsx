@@ -67,7 +67,7 @@ export function ExamAttempts({ course }: { course: Course }) {
           email: e.student?.email ?? '',
           used: finished.length,
           extra: e.extra_attempts ?? 0,
-          allowed: course.max_attempts + (e.extra_attempts ?? 0),
+          allowed: Math.max(0, course.max_attempts + (e.extra_attempts ?? 0)),
           best,
           inProgress: mine.some((a) => a.status === 'in_progress'),
           locked: mine.some((a) => a.locked),
@@ -91,7 +91,8 @@ export function ExamAttempts({ course }: { course: Course }) {
     const { error } = await supabase.rpc('grant_exam_attempts', { p_student_id: r.studentId, p_course_id: course.id, p_extra: extra, p_skip_wait: skipWait });
     setBusy(null);
     if (error) return toast(error.message, 'error');
-    toast(`${r.name} now has ${r.allowed + extra} attempts in total`);
+    const total = Math.max(0, r.allowed + extra);
+    toast(extra > 0 ? `${r.name} now has ${total} attempts in total` : `${r.name} is now allowed ${total} attempt${total === 1 ? '' : 's'} in total`);
     q.refetch();
   };
 
@@ -126,8 +127,8 @@ export function ExamAttempts({ course }: { course: Course }) {
       <GlassCard className="p-5">
         <h2 className="font-semibold text-neutral-900">Extra attempts</h2>
         <p className="mt-0.5 text-xs text-neutral-500">
-          Everyone gets <strong>{course.max_attempts}</strong> attempt{course.max_attempts === 1 ? '' : 's'} by default (change it under Settings). Give a student more here: the student is notified, and can use the extra attempt even after a scheduled exam window has
-          closed. Their best score counts.
+          Everyone gets <strong>{course.max_attempts}</strong> attempt{course.max_attempts === 1 ? '' : 's'} by default (change it under Settings). Give a student more here (or take some away, down to zero): the student is notified. An extra attempt can be used even after a scheduled exam window has
+          closed. Taking attempts away never deletes attempts already used; use Reset exam for that. Their best score counts.
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <div className="relative min-w-[14rem] flex-1">
@@ -156,7 +157,7 @@ export function ExamAttempts({ course }: { course: Course }) {
                 <th className="px-4 py-3 font-medium">Attempts used</th>
                 <th className="px-4 py-3 font-medium">Best</th>
                 <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Give more</th>
+                <th className="px-4 py-3 font-medium">Give or take away</th>
               </tr>
             </thead>
             <tbody>
@@ -169,6 +170,7 @@ export function ExamAttempts({ course }: { course: Course }) {
                   <td className="px-4 py-3 tabular-nums">
                     {r.used} / {r.allowed}
                     {r.extra > 0 && <span className="ml-1.5 text-xs text-blue-600">(+{r.extra} extra)</span>}
+                    {r.extra < 0 && <span className="ml-1.5 text-xs text-red-600">({r.extra} fewer)</span>}
                   </td>
                   <td className="px-4 py-3 tabular-nums text-neutral-600">{r.best === null ? '—' : `${r.best}%`}</td>
                   <td className="px-4 py-3">{status(r)}</td>
@@ -177,17 +179,27 @@ export function ExamAttempts({ course }: { course: Course }) {
                       <span className="text-xs text-neutral-400">Already passed</span>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <div className="w-20">
+                        <div className="w-24">
                           <Select value={amount[r.studentId] ?? 1} onChange={(e) => setAmount((p) => ({ ...p, [r.studentId]: Number(e.target.value) }))}>
                             {[1, 2, 3, 5].map((n) => (
                               <option key={n} value={n}>
                                 +{n}
                               </option>
                             ))}
+                            {[-1, -2, -3].map((n) => (
+                              <option key={n} value={n}>
+                                − {Math.abs(n)}
+                              </option>
+                            ))}
                           </Select>
                         </div>
-                        <Button variant="secondary" loading={busy === r.studentId} onClick={() => give(r, amount[r.studentId] ?? 1)}>
-                          Give
+                        <Button
+                          variant="secondary"
+                          loading={busy === r.studentId}
+                          className={(amount[r.studentId] ?? 1) < 0 ? 'text-red-600' : ''}
+                          onClick={() => give(r, amount[r.studentId] ?? 1)}
+                        >
+                          {(amount[r.studentId] ?? 1) < 0 ? 'Take away' : 'Give'}
                         </Button>
                       </div>
                     )}
