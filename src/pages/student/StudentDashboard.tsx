@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, BookOpen, Award, ClipboardList, Clock, Flame } from 'lucide-react';
+import { ArrowRight, BookOpen, Award, Briefcase, ClipboardList, Clock, Flame } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useQuery, unwrap } from '../../lib/useQuery';
@@ -7,6 +7,8 @@ import { activityStrip, computeStreak } from '../../lib/streak';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, EmptyState, PageHeader, Spinner } from '../../components/ui/kit';
 import { ExamScheduleCard, examStillRelevant, useNow, type ExamScheduleCourse } from '../../components/ExamCountdown';
+import { WindowLine } from './Careers';
+import { KIND_LABEL, windowState, type JobKind } from '../../lib/careers';
 
 interface Row {
   id: string;
@@ -84,6 +86,20 @@ export function StudentDashboard() {
     [uid],
   );
 
+  // Open internships and jobs, with their apply window.
+  const jobs = useQuery<{ id: string; slug: string; title: string; kind: JobKind; pay: string; status: string; apply_starts_at: string | null; apply_ends_at: string | null }[]>(
+    () =>
+      unwrap(
+        supabase.from('careers_jobs').select('id, slug, title, kind, pay, status, apply_starts_at, apply_ends_at').eq('status', 'open').order('apply_ends_at', { ascending: true, nullsFirst: false }).limit(6),
+      ) as Promise<{ id: string; slug: string; title: string; kind: JobKind; pay: string; status: string; apply_starts_at: string | null; apply_ends_at: string | null }[]>,
+    [uid],
+  );
+  const jobApps = useQuery<{ job_id: string; status: string }[]>(
+    () => unwrap(supabase.from('careers_applications').select('job_id, status').eq('student_id', uid)) as Promise<{ job_id: string; status: string }[]>,
+    [uid],
+  );
+  const openJobs = (jobs.data ?? []).filter((j) => windowState(j, now) !== 'closed');
+
   const activity = useQuery<{ day: string }[]>(
     () => unwrap(supabase.from('study_time').select('day').eq('student_id', uid)) as Promise<{ day: string }[]>,
     [uid],
@@ -113,6 +129,39 @@ export function StudentDashboard() {
             <ExamScheduleCard key={c.id} course={c} />
           ))}
         </div>
+      )}
+
+      {openJobs.length > 0 && (
+        <GlassCard className="mb-6 p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 font-semibold text-neutral-900">
+              <Briefcase size={17} className="text-blue-500" /> Careers · {openJobs.length} open position{openJobs.length === 1 ? '' : 's'}
+            </div>
+            <Link to="/app/careers" className="inline-flex items-center gap-1 text-sm font-medium text-blue-600">
+              See all <ArrowRight size={14} />
+            </Link>
+          </div>
+          <div className="mt-3 divide-y divide-white/60">
+            {openJobs.slice(0, 3).map((j) => {
+              const mine = jobApps.data?.find((a) => a.job_id === j.id);
+              return (
+                <Link key={j.id} to={`/app/careers/${j.slug}`} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-neutral-900">{j.title}</div>
+                    <div className="text-xs text-neutral-500">
+                      {KIND_LABEL[j.kind]}
+                      {j.pay ? ` · ${j.pay}` : ''}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <WindowLine job={j} />
+                    {mine ? <Badge tone="green">Applied</Badge> : <Badge tone="blue">Apply</Badge>}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </GlassCard>
       )}
 
       {(reportCards.data?.length || gradedCourses.data?.length) ? (
