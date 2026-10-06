@@ -6,6 +6,7 @@ import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, Button, Checkbox, EmptyState, Modal, Select, Spinner, TextInput, useToast } from '../../components/ui/kit';
 import { ResetExamModal } from './ResetExamModal';
+import { CertificateReviewModal, type ReviewCandidate } from './CertificateReviewModal';
 import type { Tables } from '../../lib/database.types';
 
 type Course = Tables<'courses'>;
@@ -36,6 +37,7 @@ export function ExamAttempts({ course }: { course: Course }) {
   const [bulk, setBulk] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [issuing, setIssuing] = useState<string | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const composite = course.scoring_mode === 'composite';
   const [bulkBusy, setBulkBusy] = useState(false);
 
@@ -118,6 +120,19 @@ export function ExamAttempts({ course }: { course: Course }) {
 
   // Certificates for students who passed the online exam, issued by an admin rather than sent automatically.
   const awaiting = rows.filter((r) => !composite && r.passedBest && !r.certified);
+  // Students who have sat the exam and not yet been sent a certificate: passed ones can be ticked, the rest are listed as waiting.
+  const candidates: ReviewCandidate[] = rows
+    .filter((r) => !composite && !r.certified && (r.passedBest || r.used > 0))
+    .map((r) => ({
+      id: r.studentId,
+      name: r.name,
+      email: r.email,
+      state: r.passedBest ? 'ready' : 'waiting',
+      waiting: r.passedBest ? undefined : ['to pass the online exam'],
+      result: 'Passed',
+      qualified: r.passedBest,
+      scorePct: r.best ?? undefined,
+    }));
   const issue = async (ids: string[], label: string) => {
     setIssuing(label);
     let issued = 0;
@@ -170,8 +185,8 @@ export function ExamAttempts({ course }: { course: Course }) {
             Give +1 to all {outCount} out of attempts
           </Button>
           {!composite && (
-            <Button disabled={!awaiting.length} loading={issuing === 'all'} onClick={() => issue(awaiting.map((r) => r.studentId), 'all')}>
-              <Award size={15} /> Issue {awaiting.length || ''} certificate{awaiting.length === 1 ? '' : 's'}
+            <Button disabled={!candidates.length} loading={issuing === 'all'} onClick={() => setReviewOpen(true)}>
+              <Award size={15} /> Review &amp; send certificates{awaiting.length ? ` (${awaiting.length} ready)` : ''}
             </Button>
           )}
           <Button variant="secondary" className="text-red-600" onClick={() => setResetOpen(true)}>
@@ -248,6 +263,10 @@ export function ExamAttempts({ course }: { course: Course }) {
             </tbody>
           </table>
         </GlassCard>
+      )}
+
+      {reviewOpen && (
+        <CertificateReviewModal courseTitle={course.title} candidates={candidates} onSend={(ids) => issue(ids, 'all')} onClose={() => setReviewOpen(false)} />
       )}
 
       {resetOpen && (

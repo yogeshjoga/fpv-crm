@@ -13,6 +13,7 @@ import { evaluate, type Scheme } from '../../lib/assessment';
 import { ReportCardView } from '../student/ReportCard';
 import { ExamAttempts } from './ExamAttempts';
 import { ResetExamModal } from './ResetExamModal';
+import { CertificateReviewModal, type ReviewCandidate } from './CertificateReviewModal';
 import type { Tables } from '../../lib/database.types';
 
 type Course = Tables<'courses'>;
@@ -408,6 +409,7 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
   // Shows what a student will see on their report card, before the certificate is issued.
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [sheetBusy, setSheetBusy] = useState(false);
   const [sheet, setSheet] = useState<{ part: SheetPart; format: SheetFormat; withMarks: boolean; withEmail: boolean }>({
     part: 'viva',
@@ -500,7 +502,22 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
   }, [rows, search]);
 
   const ready = rows.filter((r) => r.complete && !r.cert);
-  const readyMerit = ready.filter((r) => r.ev?.result === "Merit").length;
+  // Everyone who has not been sent a certificate yet, for the admin to review and tick.
+  const candidates: ReviewCandidate[] = rows
+    .filter((r) => !r.cert)
+    .map((r) => ({
+      id: r.id,
+      name: r.name,
+      email: r.email,
+      state: r.complete ? 'ready' : 'waiting',
+      waiting: r.missing,
+      result: r.ev?.result,
+      qualified: !!r.ev?.clearedAll,
+      failed: r.ev?.failed,
+      modules: r.ev?.modules,
+      total: r.ev?.total,
+      max: r.ev?.max,
+    }));
   const notCleared = rows.filter((r) => r.ev && !r.ev.clearedAll).length;
   const issued = rows.filter((r) => r.cert).length;
 
@@ -544,11 +561,6 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
     if (done) toast(`${done} certificate${done > 1 ? 's' : ''} issued and emailed`);
     if (problems.length) toast(problems.slice(0, 3).join(' · '), 'error');
     q.refetch();
-  };
-
-  const issueAll = () => {
-    const msg = `Issue ${ready.length} certificate${ready.length > 1 ? 's' : ''} now (${readyMerit} Merit — cleared every module, ${ready.length - readyMerit} Participation — did not clear every module)?\n\nEach student is emailed their certificate and a module-by-module report card. This cannot be undone without revoking the certificate.`;
-    if (confirm(msg)) issue(ready.map((r) => r.id));
   };
 
   // One click: every student with every mark, the total and the Merit/Participation result.
@@ -624,8 +636,8 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
             </Button>
           )}
           {canMark && (
-            <Button onClick={issueAll} disabled={!ready.length} loading={issuing === 'all'}>
-              <Award size={15} /> Issue {ready.length || ''} certificate{ready.length === 1 ? '' : 's'}
+            <Button onClick={() => setReviewOpen(true)} disabled={!candidates.length} loading={issuing === 'all'}>
+              <Award size={15} /> Review &amp; send certificates{ready.length ? ` (${ready.length} ready)` : ''}
             </Button>
           )}
         </div>
@@ -652,6 +664,10 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
           </Button>
         )}
       </div>
+
+      {canMark && reviewOpen && (
+        <CertificateReviewModal courseTitle={course.title} candidates={candidates} onSend={(ids) => issue(ids)} onClose={() => setReviewOpen(false)} />
+      )}
 
       {canExport && resetOpen && (
         <ResetExamModal
