@@ -99,7 +99,7 @@ export function CourseCatalog() {
                 <div className="flex-1">
                   <div className="font-semibold text-neutral-900">{c.title}</div>
                   <p className="mt-1 line-clamp-3 text-sm text-neutral-500">{c.summary}</p>
-                  {enrolled && examStillRelevant({ ...c, max_attempts: c.max_attempts! + (enrollments.find((e) => e.course_id === c.id)?.extra_attempts ?? 0) }, now, done) && <ExamStatusPill course={c} />}
+                  {enrolled && examStillRelevant({ ...c, max_attempts: Math.max(0, c.max_attempts! + (enrollments.find((e) => e.course_id === c.id)?.extra_attempts ?? 0)) }, now, done) && <ExamStatusPill course={c} />}
                 </div>
                 <div className="mt-4 flex items-center justify-between gap-2">
                   {enrolled ? (

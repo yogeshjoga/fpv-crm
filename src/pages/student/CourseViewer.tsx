@@ -259,7 +259,7 @@ export function CourseViewer() {
   const attemptsUsed = attempts.filter((a: any) => a.status !== 'in_progress').length;
   // An admin can give a student extra attempts on top of the course's allowance.
   const extraAttempts = Number(enrollment?.extra_attempts ?? 0);
-  const attemptsAllowed = course.max_attempts + extraAttempts;
+  const attemptsAllowed = Math.max(0, course.max_attempts + extraAttempts);
   const usingExtraAttempt = extraAttempts > 0 && attemptsUsed >= course.max_attempts;
   const bestScore = attempts.reduce((m: number, a: any) => Math.max(m, Number(a.score_pct ?? 0)), 0);
   const locked = latest?.locked;

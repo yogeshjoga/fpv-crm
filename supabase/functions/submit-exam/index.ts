@@ -182,8 +182,11 @@ Deno.serve(async (req) => {
     }
     await admin.from('exam_attempts').update(patch).eq('id', attempt_id);
 
+    // A certificate is only sent straight after the exam when the course is set to "auto". Otherwise an admin
+    // issues it later, once they are happy the student has earned it.
+    const autoCertificate = course.certificate_mode === 'auto';
     let certId: string | undefined;
-    if (passed && !composite) {
+    if (passed && !composite && autoCertificate) {
       await admin.from('enrollments').update({ status: 'completed' }).eq('id', attempt.enrollment_id);
       const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-certificate`, {
         method: 'POST',
@@ -207,6 +210,7 @@ Deno.serve(async (req) => {
       total,
       review,
       cert_id_string: certId,
+      certificate_pending: passed && !composite && !autoCertificate,
       cooldown_until: cooldownUntil,
       locked,
       composite,

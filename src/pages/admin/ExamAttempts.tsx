@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Search, Trash2 } from 'lucide-react';
+import { Award, Search, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { invokeFn } from '../../lib/functions';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, Button, Checkbox, EmptyState, Modal, Select, Spinner, TextInput, useToast } from '../../components/ui/kit';
@@ -17,6 +18,7 @@ interface Row {
   extra: number;
   allowed: number;
   best: number | null;
+  passedBest: boolean;
   inProgress: boolean;
   locked: boolean;
   certified: boolean;
@@ -33,6 +35,8 @@ export function ExamAttempts({ course }: { course: Course }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [bulk, setBulk] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
+  const [issuing, setIssuing] = useState<string | null>(null);
+  const composite = course.scoring_mode === 'composite';
   const [bulkBusy, setBulkBusy] = useState(false);
 
   const q = useQuery(async () => {
@@ -45,8 +49,8 @@ export function ExamAttempts({ course }: { course: Course }) {
           .neq('status', 'revoked'),
       ) as Promise<{ student_id: string; status: string; extra_attempts: number; student: { full_name: string; email: string } | null }[]>,
       unwrap(
-        supabase.from('exam_attempts').select('student_id, status, score_pct, locked, cooldown_until').eq('course_id', course.id),
-      ) as Promise<{ student_id: string; status: string; score_pct: number | null; locked: boolean; cooldown_until: string | null }[]>,
+        supabase.from('exam_attempts').select('student_id, status, score_pct, passed, locked, cooldown_until').eq('course_id', course.id),
+      ) as Promise<{ student_id: string; status: string; score_pct: number | null; passed: boolean | null; locked: boolean; cooldown_until: string | null }[]>,
       unwrap(supabase.from('certificates').select('student_id').eq('course_id', course.id).eq('revoked', false)) as Promise<{ student_id: string }[]>,
     ]);
     return { enrolled, attempts, certs };
@@ -67,8 +71,9 @@ export function ExamAttempts({ course }: { course: Course }) {
           email: e.student?.email ?? '',
           used: finished.length,
           extra: e.extra_attempts ?? 0,
-          allowed: course.max_attempts + (e.extra_attempts ?? 0),
+          allowed: Math.max(0, course.max_attempts + (e.extra_attempts ?? 0)),
           best,
+          passedBest: finished.some((a) => a.passed === true),
           inProgress: mine.some((a) => a.status === 'in_progress'),
           locked: mine.some((a) => a.locked),
           certified: certified.has(e.student_id),
@@ -91,7 +96,8 @@ export function ExamAttempts({ course }: { course: Course }) {
     const { error } = await supabase.rpc('grant_exam_attempts', { p_student_id: r.studentId, p_course_id: course.id, p_extra: extra, p_skip_wait: skipWait });
     setBusy(null);
     if (error) return toast(error.message, 'error');
-    toast(`${r.name} now has ${r.allowed + extra} attempts in total`);
+    const total = Math.max(0, r.allowed + extra);
+    toast(extra > 0 ? `${r.name} now has ${total} attempts in total` : `${r.name} is now allowed ${total} attempt${total === 1 ? '' : 's'} in total`);
     q.refetch();
   };
 
@@ -110,11 +116,35 @@ export function ExamAttempts({ course }: { course: Course }) {
     q.refetch();
   };
 
+  // Certificates for students who passed the online exam, issued by an admin rather than sent automatically.
+  const awaiting = rows.filter((r) => !composite && r.passedBest && !r.certified);
+  const issue = async (ids: string[], label: string) => {
+    setIssuing(label);
+    let issued = 0;
+    let failed = 0;
+    for (let i = 0; i < ids.length; i += 5) {
+      try {
+        const res = await invokeFn<{ results: { status: string }[] }>('finalize-assessment', { course_id: course.id, student_ids: ids.slice(i, i + 5) });
+        for (const r of res.results) {
+          if (r.status === 'issued') issued++;
+          else if (r.status !== 'already_issued') failed++;
+        }
+      } catch (e) {
+        failed += ids.slice(i, i + 5).length;
+        toast((e as Error).message, 'error');
+      }
+    }
+    setIssuing(null);
+    toast(failed ? `${issued} certificate${issued === 1 ? '' : 's'} sent, ${failed} could not be issued` : `${issued} certificate${issued === 1 ? '' : 's'} issued and emailed`, failed ? 'error' : undefined);
+    q.refetch();
+  };
+
   if (q.loading && !q.data) return <Spinner />;
   if (q.error) return <p className="text-sm text-red-600">{q.error}</p>;
 
   const status = (r: Row) => {
-    if (r.certified) return <Badge tone="green">Passed</Badge>;
+    if (r.certified) return <Badge tone="green">Certificate issued</Badge>;
+    if (!composite && r.passedBest) return <Badge tone="amber">Passed, certificate not sent</Badge>;
     if (r.inProgress) return <Badge tone="blue">Taking it now</Badge>;
     if (r.used >= r.allowed) return <Badge tone="red">No attempts left</Badge>;
     if (r.waitUntil) return <Badge tone="amber">Waiting</Badge>;
@@ -126,8 +156,8 @@ export function ExamAttempts({ course }: { course: Course }) {
       <GlassCard className="p-5">
         <h2 className="font-semibold text-neutral-900">Extra attempts</h2>
         <p className="mt-0.5 text-xs text-neutral-500">
-          Everyone gets <strong>{course.max_attempts}</strong> attempt{course.max_attempts === 1 ? '' : 's'} by default (change it under Settings). Give a student more here: the student is notified, and can use the extra attempt even after a scheduled exam window has
-          closed. Their best score counts.
+          Everyone gets <strong>{course.max_attempts}</strong> attempt{course.max_attempts === 1 ? '' : 's'} by default (change it under Settings). A student who passes the online exam is not emailed a certificate unless the course is set to send it automatically (Settings). Issue it here when you are happy they have earned it. Give a student more attempts here (or take some away, down to zero): the student is notified. An extra attempt can be used even after a scheduled exam window has
+          closed. Taking attempts away never deletes attempts already used; use Reset exam for that. Their best score counts.
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <div className="relative min-w-[14rem] flex-1">
@@ -139,6 +169,11 @@ export function ExamAttempts({ course }: { course: Course }) {
           <Button variant="secondary" disabled={!outCount} onClick={() => setBulk(true)}>
             Give +1 to all {outCount} out of attempts
           </Button>
+          {!composite && (
+            <Button disabled={!awaiting.length} loading={issuing === 'all'} onClick={() => issue(awaiting.map((r) => r.studentId), 'all')}>
+              <Award size={15} /> Issue {awaiting.length || ''} certificate{awaiting.length === 1 ? '' : 's'}
+            </Button>
+          )}
           <Button variant="secondary" className="text-red-600" onClick={() => setResetOpen(true)}>
             <Trash2 size={15} /> Reset exam…
           </Button>
@@ -156,7 +191,7 @@ export function ExamAttempts({ course }: { course: Course }) {
                 <th className="px-4 py-3 font-medium">Attempts used</th>
                 <th className="px-4 py-3 font-medium">Best</th>
                 <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Give more</th>
+                <th className="px-4 py-3 font-medium">Give or take away</th>
               </tr>
             </thead>
             <tbody>
@@ -169,25 +204,41 @@ export function ExamAttempts({ course }: { course: Course }) {
                   <td className="px-4 py-3 tabular-nums">
                     {r.used} / {r.allowed}
                     {r.extra > 0 && <span className="ml-1.5 text-xs text-blue-600">(+{r.extra} extra)</span>}
+                    {r.extra < 0 && <span className="ml-1.5 text-xs text-red-600">({r.extra} fewer)</span>}
                   </td>
                   <td className="px-4 py-3 tabular-nums text-neutral-600">{r.best === null ? '—' : `${r.best}%`}</td>
                   <td className="px-4 py-3">{status(r)}</td>
                   <td className="px-4 py-3">
                     {r.certified ? (
-                      <span className="text-xs text-neutral-400">Already passed</span>
+                      <span className="text-xs text-neutral-400">Certificate sent</span>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <div className="w-20">
+                        {!composite && r.passedBest && (
+                          <Button loading={issuing === r.studentId} onClick={() => issue([r.studentId], r.studentId)}>
+                            <Award size={14} /> Issue certificate
+                          </Button>
+                        )}
+                        <div className="w-24">
                           <Select value={amount[r.studentId] ?? 1} onChange={(e) => setAmount((p) => ({ ...p, [r.studentId]: Number(e.target.value) }))}>
                             {[1, 2, 3, 5].map((n) => (
                               <option key={n} value={n}>
                                 +{n}
                               </option>
                             ))}
+                            {[-1, -2, -3].map((n) => (
+                              <option key={n} value={n}>
+                                − {Math.abs(n)}
+                              </option>
+                            ))}
                           </Select>
                         </div>
-                        <Button variant="secondary" loading={busy === r.studentId} onClick={() => give(r, amount[r.studentId] ?? 1)}>
-                          Give
+                        <Button
+                          variant="secondary"
+                          loading={busy === r.studentId}
+                          className={(amount[r.studentId] ?? 1) < 0 ? 'text-red-600' : ''}
+                          onClick={() => give(r, amount[r.studentId] ?? 1)}
+                        >
+                          {(amount[r.studentId] ?? 1) < 0 ? 'Take away' : 'Give'}
                         </Button>
                       </div>
                     )}

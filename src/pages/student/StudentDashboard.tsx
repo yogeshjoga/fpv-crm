@@ -67,7 +67,7 @@ export function StudentDashboard() {
       const extra = e.extra_attempts ?? 0;
       // a student using an extra attempt can start even after the scheduled window has closed
       const usingExtra = extra > 0 && (finishedAttempts[c.id] ?? 0) >= c.max_attempts;
-      return { ...c, max_attempts: c.max_attempts + extra, exam_closes_at: usingExtra ? null : c.exam_closes_at };
+      return { ...c, max_attempts: Math.max(0, c.max_attempts + extra), exam_closes_at: usingExtra ? null : c.exam_closes_at };
     })
     .filter((c) => examStillRelevant(c, now, { certCourseIds, finishedAttempts }) !== null);
 

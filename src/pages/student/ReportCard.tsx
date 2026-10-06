@@ -203,6 +203,7 @@ export function ReportCardView({
   certType,
   report: r,
   preview,
+  audience = 'student',
 }: {
   course: string;
   studentName: string;
@@ -212,7 +213,10 @@ export function ReportCardView({
   report: Evaluation;
   /** Set for sample / not-yet-issued cards, e.g. "Sample" or "Preview — not issued yet". */
   preview?: string;
+  /** 'public' = shown to someone who scanned the certificate's QR code: third person, no sign-in link. */
+  audience?: 'student' | 'public';
 }) {
+  const isPublic = audience === 'public';
   const cleared = r.clearedAll;
   const pct = r.max ? round2((r.total / r.max) * 100) : 0;
 
@@ -228,6 +232,10 @@ export function ReportCardView({
         </div>
         {preview ? (
           <Badge tone="amber">{preview}</Badge>
+        ) : isPublic ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5 text-xs font-medium text-neutral-700">
+            <Award size={13} /> Certificate <span className="font-mono">{certId}</span>
+          </span>
         ) : (
           <Link to="/app/certificates" className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-white">
             <Award size={13} /> Certificate <span className="font-mono">{certId}</span>
@@ -239,14 +247,14 @@ export function ReportCardView({
         {cleared ? <CheckCircle2 size={34} className="shrink-0 text-green-600" /> : <XCircle size={34} className="shrink-0 text-red-600" />}
         <div className="min-w-0 flex-1">
           <div className={`text-lg font-semibold ${cleared ? 'text-green-800' : 'text-red-800'}`}>
-            {cleared ? 'Cleared — you passed every module' : 'Not cleared'}
+            {cleared ? (isPublic ? 'Cleared — passed every module' : 'Cleared — you passed every module') : 'Not cleared'}
           </div>
           <p className={`text-sm ${cleared ? 'text-green-800/80' : 'text-red-800/80'}`}>
             {cleared
               ? `Certificate of ${certType ?? 'Merit'}${preview ? ' will be awarded' : ' awarded'}.`
-              : `You did not clear: ${r.failed.join(', ')}. Every module has to be cleared on its own, so a high score in the other modules cannot make up for it. ${
-                  preview ? 'A' : 'You received a'
-                } Certificate of ${certType ?? 'Participation'}${preview ? ' will be issued' : ''}.`}
+              : `${isPublic ? 'Did' : 'You did'} not clear: ${r.failed.join(', ')}. Every module has to be cleared on its own, so a high score in the other modules cannot make up for it. ${
+                  preview ? 'A' : isPublic ? 'A' : 'You received a'
+                } Certificate of ${certType ?? 'Participation'}${preview ? ' will be issued' : isPublic ? ' was awarded' : ''}.`}
           </p>
         </div>
         <div className="text-right">
@@ -263,7 +271,7 @@ export function ReportCardView({
           <thead>
             <tr className="text-left text-xs uppercase tracking-wide text-neutral-400">
               <th className="pb-2 pr-4">Module</th>
-              <th className="pb-2 pr-4">Your marks</th>
+              <th className="pb-2 pr-4">{isPublic ? 'Marks' : 'Your marks'}</th>
               <th className="pb-2 pr-4">Pass mark</th>
               <th className="w-[26%] pb-2 pr-4">Progress</th>
               <th className="pb-2">Result</th>

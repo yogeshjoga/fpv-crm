@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { BadgeCheck, Search, ShieldX } from 'lucide-react';
+import { BadgeCheck, Printer, Search, ShieldX } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Button, Field, TextInput, Spinner } from '../../components/ui/kit';
 import { CertificatePreview } from '../../components/CertificatePreview';
+import { ReportCardView } from '../student/ReportCard';
+import type { Evaluation } from '../../lib/assessment';
 
 type Result =
   | { state: 'idle' }
@@ -26,6 +28,8 @@ type Result =
       company_seal_url: string | null;
       report_total: number | null;
       report_max: number | null;
+      /** Per-module report card snapshot kept on the certificate (100-mark assessments only). */
+      report: Evaluation | null;
     };
 
 export function VerifyCertificate() {
@@ -43,7 +47,7 @@ export function VerifyCertificate() {
       setResult({ state: 'not-found' });
       return;
     }
-    setResult({ state: 'found', ...data[0] });
+    setResult({ state: 'found', ...data[0], report: (data[0].report as unknown as Evaluation | null) ?? null });
   }, []);
 
   useEffect(() => {
@@ -60,11 +64,11 @@ export function VerifyCertificate() {
     <div className="w-full max-w-3xl rounded-[2rem] border border-white/70 bg-white/60 p-8 shadow-[0_8px_40px_rgb(0,0,0,0.06)] backdrop-blur-2xl">
       <h1 className="font-display text-2xl font-semibold text-neutral-900">Certificate verification</h1>
       <p className="mt-1.5 text-sm text-neutral-500">
-        Enter a certificate ID (for example <span className="font-mono">EGR-FPV-2026-000123</span>) to confirm it was
-        genuinely issued by us and see the certificate itself — no account needed.
+        Scan the QR code on a certificate, or enter its certificate ID, to confirm it was genuinely issued by us. You will see the
+        certificate itself and, for assessments with marks, the student's report card — no account needed.
       </p>
 
-      <form onSubmit={submit} className="mt-6 flex items-end gap-2">
+      <form onSubmit={submit} className="mt-6 flex items-end gap-2 print:hidden">
         <div className="flex-1">
           <Field label="Certificate ID">
             <TextInput value={input} onChange={(e) => setInput(e.target.value)} placeholder="EGR-…" className="font-mono" />
@@ -115,6 +119,24 @@ export function VerifyCertificate() {
                 totalMarks: result.report_total != null && result.report_max != null ? { total: Number(result.report_total), max: Number(result.report_max) } : null,
               }}
             />
+
+            {result.report && Array.isArray(result.report.modules) && result.report.modules.length > 0 && (
+              <ReportCardView
+                audience="public"
+                course={result.course_title}
+                studentName={result.student_name}
+                issuedAt={result.issued_at}
+                certId={result.cert_id_string}
+                certType={result.cert_type || null}
+                report={result.report}
+              />
+            )}
+
+            <div className="flex justify-end print:hidden">
+              <Button type="button" variant="secondary" onClick={() => window.print()}>
+                <Printer size={15} /> Print or save as PDF
+              </Button>
+            </div>
           </div>
         )}
       </div>
