@@ -2216,6 +2216,7 @@ export type Database = {
           issued_at: string
           org_name: string
           report_max: number
+          report: Json
           report_total: number
           revoked: boolean
           score_pct: number
