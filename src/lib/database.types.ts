@@ -449,6 +449,190 @@ export type Database = {
           },
         ]
       }
+      careers_offers: {
+        Row: {
+          application_id: string | null
+          candidate_email: string
+          candidate_name: string
+          compensation_mode: string
+          compensation_note: string
+          created_at: string
+          created_by: string | null
+          department: string
+          employment_type: string
+          end_date: string | null
+          id: string
+          issued_on: string
+          jd: string
+          level: string
+          location: string
+          notice_days: number | null
+          offer_no: string | null
+          pay_amount: number | null
+          pay_period: string
+          post_training_amount: number | null
+          post_training_from: string | null
+          probation_months: number | null
+          reporting_to: string
+          responded_at: string | null
+          role_template_id: string | null
+          role_title: string
+          signatory_designation: string
+          signatory_name: string
+          start_date: string | null
+          status: string
+          terms: string
+          training_fee: number | null
+          training_months: number | null
+          updated_at: string
+          valid_until: string | null
+          work_mode: string
+          working_hours: string
+        }
+        Insert: {
+          application_id?: string | null
+          candidate_email?: string
+          candidate_name: string
+          compensation_mode?: string
+          compensation_note?: string
+          created_at?: string
+          created_by?: string | null
+          department?: string
+          employment_type?: string
+          end_date?: string | null
+          id?: string
+          issued_on?: string
+          jd?: string
+          level?: string
+          location?: string
+          notice_days?: number | null
+          offer_no?: string | null
+          pay_amount?: number | null
+          pay_period?: string
+          post_training_amount?: number | null
+          post_training_from?: string | null
+          probation_months?: number | null
+          reporting_to?: string
+          responded_at?: string | null
+          role_template_id?: string | null
+          role_title: string
+          signatory_designation?: string
+          signatory_name?: string
+          start_date?: string | null
+          status?: string
+          terms?: string
+          training_fee?: number | null
+          training_months?: number | null
+          updated_at?: string
+          valid_until?: string | null
+          work_mode?: string
+          working_hours?: string
+        }
+        Update: {
+          application_id?: string | null
+          candidate_email?: string
+          candidate_name?: string
+          compensation_mode?: string
+          compensation_note?: string
+          created_at?: string
+          created_by?: string | null
+          department?: string
+          employment_type?: string
+          end_date?: string | null
+          id?: string
+          issued_on?: string
+          jd?: string
+          level?: string
+          location?: string
+          notice_days?: number | null
+          offer_no?: string | null
+          pay_amount?: number | null
+          pay_period?: string
+          post_training_amount?: number | null
+          post_training_from?: string | null
+          probation_months?: number | null
+          reporting_to?: string
+          responded_at?: string | null
+          role_template_id?: string | null
+          role_title?: string
+          signatory_designation?: string
+          signatory_name?: string
+          start_date?: string | null
+          status?: string
+          terms?: string
+          training_fee?: number | null
+          training_months?: number | null
+          updated_at?: string
+          valid_until?: string | null
+          work_mode?: string
+          working_hours?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "careers_offers_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "careers_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "careers_offers_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "careers_offers_role_template_id_fkey"
+            columns: ["role_template_id"]
+            isOneToOne: false
+            referencedRelation: "careers_role_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      careers_role_templates: {
+        Row: {
+          created_at: string
+          department: string
+          id: string
+          is_active: boolean
+          jd: string
+          level_notes: Json
+          slug: string
+          sort_order: number
+          summary: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          department?: string
+          id?: string
+          is_active?: boolean
+          jd?: string
+          level_notes?: Json
+          slug: string
+          sort_order?: number
+          summary?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          department?: string
+          id?: string
+          is_active?: boolean
+          jd?: string
+          level_notes?: Json
+          slug?: string
+          sort_order?: number
+          summary?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       careers_rounds: {
         Row: {
           description: string
@@ -2566,6 +2750,10 @@ export type Database = {
           scheduled_at: string
           status: string
         }[]
+      }
+      careers_respond_offer: {
+        Args: { p_accept: boolean; p_offer: string }
+        Returns: undefined
       }
       careers_start_round: {
         Args: {

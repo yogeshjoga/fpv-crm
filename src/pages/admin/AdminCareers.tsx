@@ -8,6 +8,8 @@ import { useQuery, unwrap } from '../../lib/useQuery';
 import { slugify } from '../../lib/slug';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, Button, EmptyState, Field, Modal, PageHeader, Select, Spinner, TextInput, useToast } from '../../components/ui/kit';
+import { CareersNav } from '../../components/CareersNav';
+import { LEVEL_LABEL, buildJd, employmentFor, type Level, type RoleTemplate } from '../../lib/offers';
 import { KIND_LABEL, MODE_LABEL, fmtDateTime, windowState, type JobKind, type WorkMode } from '../../lib/careers';
 
 interface JobRow {
@@ -41,7 +43,11 @@ export function AdminCareers() {
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState('');
   const [kind, setKind] = useState<JobKind>('internship');
+  const [tplId, setTplId] = useState('');
+  const [level, setLevel] = useState<Level>('intern');
   const [busy, setBusy] = useState(false);
+
+  const templates = useQuery(() => unwrap(supabase.from('careers_role_templates').select('*').eq('is_active', true).order('sort_order')) as Promise<RoleTemplate[]>, []);
 
   const q = useQuery(
     () =>
@@ -53,11 +59,18 @@ export function AdminCareers() {
 
   const create = async () => {
     if (title.trim().length < 3) return toast('Give the position a title', 'error');
+    const tpl = templates.data?.find((t) => t.id === tplId);
     setBusy(true);
     const slug = `${slugify(title).slice(0, 60) || 'position'}-${Math.random().toString(36).slice(2, 6)}`;
     const { data, error } = await supabase
       .from('careers_jobs')
-      .insert({ title: title.trim(), slug, kind, created_by: profile?.id })
+      .insert({
+        title: title.trim(),
+        slug,
+        kind,
+        created_by: profile?.id,
+        ...(tpl ? { department: tpl.department, summary: tpl.summary, jd: buildJd(tpl, level) } : {}),
+      })
       .select('id')
       .single();
     setBusy(false);
@@ -81,6 +94,7 @@ export function AdminCareers() {
           )
         }
       />
+      <CareersNav />
 
       {!jobs.length ? (
         <EmptyState
@@ -128,6 +142,46 @@ export function AdminCareers() {
       {creating && writable && (
         <Modal open onClose={() => setCreating(false)} title="New position">
           <div className="space-y-4">
+            <Field label="Start from a role template" hint="Fills in the department, summary and job description. You can edit all of it afterwards">
+              <Select
+                value={tplId}
+                onChange={(e) => {
+                  const t = templates.data?.find((x) => x.id === e.target.value);
+                  setTplId(e.target.value);
+                  if (t) {
+                    setTitle(`${t.title}${level === 'intern' ? ' Intern' : ''}`);
+                    setKind(employmentFor(level) === 'internship' ? 'internship' : 'full_time');
+                  }
+                }}
+              >
+                <option value="">Blank position</option>
+                {(templates.data ?? []).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.title}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            {tplId && (
+              <Field label="Level">
+                <Select
+                  value={level}
+                  onChange={(e) => {
+                    const l = e.target.value as Level;
+                    const t = templates.data?.find((x) => x.id === tplId);
+                    setLevel(l);
+                    setKind(employmentFor(l) === 'internship' ? 'internship' : 'full_time');
+                    if (t) setTitle(`${t.title}${l === 'intern' ? ' Intern' : ''}`);
+                  }}
+                >
+                  {(Object.keys(LEVEL_LABEL) as Level[]).map((l) => (
+                    <option key={l} value={l}>
+                      {LEVEL_LABEL[l]}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            )}
             <Field label="Position title">
               <TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. FPV Drone Pilot Intern" autoFocus />
             </Field>

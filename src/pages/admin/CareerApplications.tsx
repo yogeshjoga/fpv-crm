@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Download, ExternalLink, FileText, RefreshCw, Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Download, ExternalLink, FileSignature, FileText, RefreshCw, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useQuery, unwrap } from '../../lib/useQuery';
@@ -44,6 +45,7 @@ interface AppRow {
 interface JobLite {
   id: string;
   title: string;
+  kind?: string;
   form_fields: unknown;
 }
 
@@ -323,6 +325,7 @@ export function CareerApplications({ job, rounds, ro }: { job: JobLite; rounds: 
 /* ───────────────────────────── one applicant ───────────────────────────── */
 
 function ApplicationDetail({ app, job, rounds, ro, onClose, onChanged }: { app: AppRow; job: JobLite; rounds: RoundRow[]; ro: boolean; onClose: () => void; onChanged: () => void }) {
+  const nav = useNavigate();
   const toast = useToast();
   const fields = parseFields(job.form_fields);
   const [notes, setNotes] = useState('');
@@ -396,6 +399,18 @@ function ApplicationDetail({ app, job, rounds, ro, onClose, onChanged }: { app: 
             {app.resume_path && (
               <Button variant="secondary" onClick={openResume}>
                 <ExternalLink size={14} /> Resume
+              </Button>
+            )}
+            {!ro && (app.status === 'offered' || app.status === 'hired' || app.status === 'interviewing' || app.status === 'shortlisted') && (
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  nav(
+                    `/admin/careers/offers?${new URLSearchParams({ application: app.id, name: app.student?.full_name ?? '', email: app.student?.email ?? '', role: job.title, kind: job.kind ?? '' })}`,
+                  )
+                }
+              >
+                <FileSignature size={14} /> Offer letter
               </Button>
             )}
           </div>

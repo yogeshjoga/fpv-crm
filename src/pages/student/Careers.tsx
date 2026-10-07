@@ -6,6 +6,7 @@ import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, EmptyState, PageHeader, Spinner } from '../../components/ui/kit';
 import { formatRemaining, useNow } from '../../components/ExamCountdown';
+import { MyOffers } from './MyOffers';
 import {
   APP_STATUS_LABEL,
   APP_STATUS_TONE,
@@ -108,6 +109,8 @@ export function Careers() {
   return (
     <div>
       <PageHeader title="Careers" subtitle="Internships and jobs at EgireRobotics. Apply here and follow your application." />
+
+      <MyOffers uid={uid} />
 
       {apps.length > 0 && (
         <section className="mb-8">
