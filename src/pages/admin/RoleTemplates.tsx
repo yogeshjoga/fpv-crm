@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Rocket, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../auth/AuthProvider';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { slugify } from '../../lib/slug';
 import { GlassCard } from '../../components/ui/shared';
-import { Badge, Button, Checkbox, EmptyState, Field, PageHeader, Spinner, TextArea, TextInput, useToast } from '../../components/ui/kit';
+import { Badge, Button, Checkbox, EmptyState, Field, Modal, PageHeader, Select, Spinner, TextArea, TextInput, useToast } from '../../components/ui/kit';
 import { CareersNav } from '../../components/CareersNav';
 import { JobText } from '../../components/JobText';
-import { LEVEL_LABEL, buildJd, levelNotes, type Level, type RoleTemplate } from '../../lib/offers';
+import { LEVEL_LABEL, buildJd, employmentFor, levelNotes, type Level, type RoleTemplate } from '../../lib/offers';
 
 const LEVELS: Level[] = ['intern', 'fresher', 'experienced'];
 
@@ -80,6 +82,13 @@ export function RoleTemplates() {
 
 function RoleEditor({ role, ro, onSaved, onDeleted }: { role: RoleTemplate; ro: boolean; onSaved: () => void; onDeleted: () => void }) {
   const toast = useToast();
+  const nav = useNavigate();
+  const { profile } = useAuth();
+  const [opening, setOpening] = useState(false);
+  const [openLevel, setOpenLevel] = useState<Level>('intern');
+  const [startsAt, setStartsAt] = useState('');
+  const [endsAt, setEndsAt] = useState('');
+  const [openBusy, setOpenBusy] = useState(false);
   const [title, setTitle] = useState(role.title);
   const [department, setDepartment] = useState(role.department);
   const [summary, setSummary] = useState(role.summary);
@@ -101,6 +110,41 @@ function RoleEditor({ role, ro, onSaved, onDeleted }: { role: RoleTemplate; ro: 
     toast('Saved');
     onSaved();
   };
+
+  // Create a live position from this role. The students and the staff are notified by the database when it opens.
+  const openPosition = async () => {
+    const title = `${title0()}`;
+    if (endsAt && startsAt && new Date(endsAt) <= new Date(startsAt)) return toast('The closing time must be after the opening time', 'error');
+    if (endsAt && !startsAt && new Date(endsAt) <= new Date()) return toast('The closing time is already past', 'error');
+    setOpenBusy(true);
+    const { data: same } = await supabase.from('careers_jobs').select('id').eq('title', title).eq('status', 'open').limit(1);
+    if (same?.length && !window.confirm(`"${title}" is already open. Open another one?`)) {
+      setOpenBusy(false);
+      return;
+    }
+    const slug = `${slugify(title).slice(0, 60) || 'position'}-${Math.random().toString(36).slice(2, 6)}`;
+    const { data, error } = await supabase
+      .from('careers_jobs')
+      .insert({
+        title,
+        slug,
+        kind: employmentFor(openLevel) === 'internship' ? 'internship' : 'full_time',
+        department: department.trim(),
+        summary: summary.trim(),
+        jd: buildJd({ jd, level_notes: notes }, openLevel),
+        status: 'open',
+        apply_starts_at: startsAt ? new Date(startsAt).toISOString() : null,
+        apply_ends_at: endsAt ? new Date(endsAt).toISOString() : null,
+        created_by: profile?.id,
+      })
+      .select('id')
+      .single();
+    setOpenBusy(false);
+    if (error) return toast(error.message, 'error');
+    toast('Position opened. Students and staff have been notified');
+    nav(`/admin/careers/${data.id}`);
+  };
+  const title0 = () => `${title.trim() || role.title}${openLevel === 'intern' ? ' Intern' : ''}`;
 
   const remove = async () => {
     if (!window.confirm(`Delete the "${role.title}" template? Offer letters already made keep their text.`)) return;
@@ -153,14 +197,54 @@ function RoleEditor({ role, ro, onSaved, onDeleted }: { role: RoleTemplate; ro: 
       </div>
 
       {!ro && (
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <Button variant="ghost" className="text-red-600" onClick={remove}>
             <Trash2 size={15} /> Delete role
           </Button>
-          <Button onClick={save} loading={busy}>
-            Save changes
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={() => setOpening(true)}>
+              <Rocket size={15} /> Open in Careers
+            </Button>
+            <Button onClick={save} loading={busy}>
+              Save changes
+            </Button>
+          </div>
         </div>
+      )}
+
+      {opening && (
+        <Modal open onClose={() => setOpening(false)} title={`Open "${role.title}" in Careers`}>
+          <div className="space-y-4">
+            <Field label="Who is it for?">
+              <Select value={openLevel} onChange={(e) => setOpenLevel(e.target.value as Level)}>
+                {LEVELS.map((l) => (
+                  <option key={l} value={l}>
+                    {LEVEL_LABEL[l]} ({employmentFor(l) === 'internship' ? 'internship' : 'full-time job'})
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Applications open" hint="Leave empty to open right now">
+                <TextInput type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+              </Field>
+              <Field label="Applications close" hint="Leave empty to keep it open until you close it">
+                <TextInput type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
+              </Field>
+            </div>
+            <p className="rounded-xl bg-blue-50/80 px-3 py-2 text-xs text-blue-900">
+              The position goes live with this job description, and every active student and staff member gets a Careers notification. Students can apply from their dashboard. You can add the application form and interview rounds on the next screen.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setOpening(false)}>
+                Cancel
+              </Button>
+              <Button onClick={openPosition} loading={openBusy}>
+                <Rocket size={15} /> Open and notify everyone
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
     </GlassCard>
   );
