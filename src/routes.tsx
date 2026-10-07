@@ -26,6 +26,8 @@ import { Careers } from './pages/student/Careers';
 import { CareerJob } from './pages/student/CareerJob';
 import { AdminCareers } from './pages/admin/AdminCareers';
 import { AdminCareerJob } from './pages/admin/AdminCareerJob';
+import { AdminOffers } from './pages/admin/AdminOffers';
+import { RoleTemplates } from './pages/admin/RoleTemplates';
 import { StudentCertificates } from './pages/student/StudentCertificates';
 import { StudentProfile } from './pages/student/StudentProfile';
 import { Ask } from './pages/student/Ask';
@@ -160,6 +162,22 @@ export function AppRoutes() {
           element={
             <RequireModule moduleKey="careers">
               <AdminCareers />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="careers/offers"
+          element={
+            <RequireModule moduleKey="careers">
+              <AdminOffers />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="careers/roles"
+          element={
+            <RequireModule moduleKey="careers">
+              <RoleTemplates />
             </RequireModule>
           }
         />

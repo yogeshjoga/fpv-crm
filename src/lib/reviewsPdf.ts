@@ -45,7 +45,7 @@ const CARD_BORDER: [number, number, number] = [226, 232, 242];
 
 // The built-in PDF fonts only cover Latin text. Dashes and curly quotes become their plain look-alikes,
 // anything else outside Latin-1 becomes "?" (the CSV export keeps every character).
-const safe = (v: unknown) =>
+export const safe = (v: unknown) =>
   String(v ?? '')
     .replace(/₹/g, 'Rs. ')
     .replace(/[–—]/g, '-')
@@ -61,7 +61,7 @@ const blobToDataUrl = (blob: Blob) =>
     r.readAsDataURL(blob);
   });
 
-async function loadImage(url: string, trim: boolean, maxSide = 700): Promise<{ src: string; w: number; h: number } | null> {
+export async function loadImage(url: string, trim: boolean, maxSide = 700): Promise<{ src: string; w: number; h: number } | null> {
   try {
     let src = trim ? await trimmedImageUrl(url) : url;
     if (!src.startsWith('data:')) src = await blobToDataUrl(await (await fetch(url)).blob());
