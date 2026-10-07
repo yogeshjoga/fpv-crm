@@ -173,6 +173,330 @@ export type Database = {
           },
         ]
       }
+      careers_application_notes: {
+        Row: {
+          application_id: string
+          notes: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          application_id: string
+          notes?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          application_id?: string
+          notes?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "careers_application_notes_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: true
+            referencedRelation: "careers_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "careers_application_notes_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      careers_application_rounds: {
+        Row: {
+          application_id: string
+          feedback: string
+          id: string
+          interviewer: string
+          meet_link: string
+          round_id: string
+          scheduled_at: string | null
+          score: number | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          application_id: string
+          feedback?: string
+          id?: string
+          interviewer?: string
+          meet_link?: string
+          round_id: string
+          scheduled_at?: string | null
+          score?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string
+          feedback?: string
+          id?: string
+          interviewer?: string
+          meet_link?: string
+          round_id?: string
+          scheduled_at?: string | null
+          score?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "careers_application_rounds_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "careers_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "careers_application_rounds_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "careers_rounds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      careers_applications: {
+        Row: {
+          accepted_terms_at: string
+          answers: Json
+          created_at: string
+          current_round_id: string | null
+          id: string
+          job_id: string
+          offer_note: string
+          resume_path: string | null
+          status: string
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_terms_at: string
+          answers?: Json
+          created_at?: string
+          current_round_id?: string | null
+          id?: string
+          job_id: string
+          offer_note?: string
+          resume_path?: string | null
+          status?: string
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_terms_at?: string
+          answers?: Json
+          created_at?: string
+          current_round_id?: string | null
+          id?: string
+          job_id?: string
+          offer_note?: string
+          resume_path?: string | null
+          status?: string
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "careers_applications_current_round_id_fkey"
+            columns: ["current_round_id"]
+            isOneToOne: false
+            referencedRelation: "careers_rounds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "careers_applications_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "careers_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "careers_applications_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      careers_events: {
+        Row: {
+          actor: string | null
+          application_id: string
+          created_at: string
+          id: number
+          kind: string
+          note: string
+          visible_to_student: boolean
+        }
+        Insert: {
+          actor?: string | null
+          application_id: string
+          created_at?: string
+          id?: never
+          kind: string
+          note?: string
+          visible_to_student?: boolean
+        }
+        Update: {
+          actor?: string | null
+          application_id?: string
+          created_at?: string
+          id?: never
+          kind?: string
+          note?: string
+          visible_to_student?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "careers_events_actor_fkey"
+            columns: ["actor"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "careers_events_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "careers_applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      careers_jobs: {
+        Row: {
+          apply_ends_at: string | null
+          apply_starts_at: string | null
+          ask_resume: boolean
+          created_at: string
+          created_by: string | null
+          department: string
+          form_fields: Json
+          id: string
+          jd: string
+          kind: string
+          location: string
+          openings: number
+          pay: string
+          slug: string
+          status: string
+          summary: string
+          terms: string
+          title: string
+          updated_at: string
+          work_mode: string
+        }
+        Insert: {
+          apply_ends_at?: string | null
+          apply_starts_at?: string | null
+          ask_resume?: boolean
+          created_at?: string
+          created_by?: string | null
+          department?: string
+          form_fields?: Json
+          id?: string
+          jd?: string
+          kind?: string
+          location?: string
+          openings?: number
+          pay?: string
+          slug: string
+          status?: string
+          summary?: string
+          terms?: string
+          title: string
+          updated_at?: string
+          work_mode?: string
+        }
+        Update: {
+          apply_ends_at?: string | null
+          apply_starts_at?: string | null
+          ask_resume?: boolean
+          created_at?: string
+          created_by?: string | null
+          department?: string
+          form_fields?: Json
+          id?: string
+          jd?: string
+          kind?: string
+          location?: string
+          openings?: number
+          pay?: string
+          slug?: string
+          status?: string
+          summary?: string
+          terms?: string
+          title?: string
+          updated_at?: string
+          work_mode?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "careers_jobs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      careers_rounds: {
+        Row: {
+          description: string
+          exam_course_id: string | null
+          id: string
+          job_id: string
+          kind: string
+          name: string
+          pass_score: number | null
+          position: number
+        }
+        Insert: {
+          description?: string
+          exam_course_id?: string | null
+          id?: string
+          job_id: string
+          kind?: string
+          name: string
+          pass_score?: number | null
+          position?: number
+        }
+        Update: {
+          description?: string
+          exam_course_id?: string | null
+          id?: string
+          job_id?: string
+          kind?: string
+          name?: string
+          pass_score?: number | null
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "careers_rounds_exam_course_id_fkey"
+            columns: ["exam_course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "careers_rounds_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "careers_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cert_counters: {
         Row: {
           course_code: string
@@ -768,6 +1092,7 @@ export type Database = {
           course_id: string
           enrolled_at: string
           enrolled_by: string | null
+          extra_attempts: number
           id: string
           source_request_id: string | null
           status: Database["public"]["Enums"]["enrollment_status"]
@@ -777,6 +1102,7 @@ export type Database = {
           course_id: string
           enrolled_at?: string
           enrolled_by?: string | null
+          extra_attempts?: number
           id?: string
           source_request_id?: string | null
           status?: Database["public"]["Enums"]["enrollment_status"]
@@ -786,6 +1112,7 @@ export type Database = {
           course_id?: string
           enrolled_at?: string
           enrolled_by?: string | null
+          extra_attempts?: number
           id?: string
           source_request_id?: string | null
           status?: Database["public"]["Enums"]["enrollment_status"]
@@ -966,6 +1293,58 @@ export type Database = {
             columns: ["source_course_id"]
             isOneToOne: false
             referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exam_resets: {
+        Row: {
+          course_id: string
+          created_at: string
+          done_by: string | null
+          id: string
+          parts: string[]
+          result: Json
+          student_id: string | null
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          done_by?: string | null
+          id?: string
+          parts: string[]
+          result: Json
+          student_id?: string | null
+        }
+        Update: {
+          course_id?: string
+          created_at?: string
+          done_by?: string | null
+          id?: string
+          parts?: string[]
+          result?: Json
+          student_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exam_resets_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exam_resets_done_by_fkey"
+            columns: ["done_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exam_resets_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2147,12 +2526,56 @@ export type Database = {
           },
         ]
       }
+      verify_attempts: {
+        Row: {
+          at: string
+          caller: string
+          id: number
+        }
+        Insert: {
+          at?: string
+          caller: string
+          id?: never
+        }
+        Update: {
+          at?: string
+          caller?: string
+          id?: never
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
       can_view_course: { Args: { p_course: string }; Returns: boolean }
+      careers_ist: { Args: { p_at: string }; Returns: string }
+      careers_my_rounds: {
+        Args: never
+        Returns: {
+          application_id: string
+          description: string
+          exam_slug: string
+          interviewer: string
+          kind: string
+          meet_link: string
+          name: string
+          round_id: string
+          round_position: number
+          scheduled_at: string
+          status: string
+        }[]
+      }
+      careers_start_round: {
+        Args: {
+          p_application_id: string
+          p_round_id: string
+          p_scheduled_at?: string
+        }
+        Returns: Json
+      }
+      careers_sync_test_scores: { Args: { p_job_id: string }; Returns: number }
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
@@ -2161,16 +2584,26 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["user_status"]
       }
-      exam_lock_until: {
-        Args: never
-        Returns: string
-      }
       enrollment_form_course: {
         Args: { p_form_id: string }
         Returns: {
           slug: string
           title: string
         }[]
+      }
+      exam_lock_until: { Args: never; Returns: string }
+      grant_exam_attempts: {
+        Args: {
+          p_course_id: string
+          p_extra?: number
+          p_skip_wait?: boolean
+          p_student_id: string
+        }
+        Returns: Json
+      }
+      has_module_access: {
+        Args: { p_key: string; p_level: string }
+        Returns: boolean
       }
       increment_staff_activity: {
         Args: { p_seconds: number }
@@ -2180,31 +2613,27 @@ export type Database = {
         Args: { p_course_id: string; p_seconds: number }
         Returns: undefined
       }
-      reset_exam_data: {
-        Args: {
-          p_course_id: string
-          p_student_id?: string
-          p_online?: boolean
-          p_viva?: boolean
-          p_simulation?: boolean
-          p_piloting?: boolean
-          p_revoke_certs?: boolean
-          p_dry_run?: boolean
-        }
-        Returns: Json
-      }
-      grant_exam_attempts: {
-        Args: { p_student_id: string; p_course_id: string; p_extra?: number; p_skip_wait?: boolean }
-        Returns: Json
-      }
-      my_exam_review: { Args: { p_attempt_id: string }; Returns: Json }
-      has_module_access: { Args: { p_key: string; p_level: string }; Returns: boolean }
       is_active_user: { Args: never; Returns: boolean }
       is_enrolled: { Args: { course: string }; Returns: boolean }
       is_staff: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
+      my_exam_review: { Args: { p_attempt_id: string }; Returns: Json }
       next_cert_number: { Args: { p_course_code: string }; Returns: number }
       next_id_card_number: { Args: never; Returns: number }
+      reset_exam_data: {
+        Args: {
+          p_course_id: string
+          p_dry_run?: boolean
+          p_online?: boolean
+          p_piloting?: boolean
+          p_revoke_certs?: boolean
+          p_simulation?: boolean
+          p_student_id?: string
+          p_viva?: boolean
+        }
+        Returns: Json
+      }
+      safe_avatar_url: { Args: { p_url: string }; Returns: boolean }
       verify_certificate: {
         Args: { p_cert_id: string }
         Returns: {
@@ -2215,8 +2644,8 @@ export type Database = {
           course_title: string
           issued_at: string
           org_name: string
-          report_max: number
           report: Json
+          report_max: number
           report_total: number
           revoked: boolean
           score_pct: number
