@@ -69,6 +69,42 @@ export type Database = {
           },
         ]
       }
+      audit_log: {
+        Row: {
+          action: string
+          actor: string | null
+          actor_role: string | null
+          at: string
+          id: number
+          new_data: Json | null
+          old_data: Json | null
+          row_id: string | null
+          table_name: string
+        }
+        Insert: {
+          action: string
+          actor?: string | null
+          actor_role?: string | null
+          at?: string
+          id?: never
+          new_data?: Json | null
+          old_data?: Json | null
+          row_id?: string | null
+          table_name: string
+        }
+        Update: {
+          action?: string
+          actor?: string | null
+          actor_role?: string | null
+          at?: string
+          id?: never
+          new_data?: Json | null
+          old_data?: Json | null
+          row_id?: string | null
+          table_name?: string
+        }
+        Relationships: []
+      }
       broadcasts: {
         Row: {
           audience_ref: Json
@@ -2031,6 +2067,24 @@ export type Database = {
           },
         ]
       }
+      public_rate_limits: {
+        Row: {
+          hits: number
+          key: string
+          window_start: string
+        }
+        Insert: {
+          hits?: number
+          key: string
+          window_start?: string
+        }
+        Update: {
+          hits?: number
+          key?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       question_options: {
         Row: {
           id: string
@@ -2805,9 +2859,14 @@ export type Database = {
       is_enrolled: { Args: { course: string }; Returns: boolean }
       is_staff: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
+      mfa_ok: { Args: never; Returns: boolean }
       my_exam_review: { Args: { p_attempt_id: string }; Returns: Json }
       next_cert_number: { Args: { p_course_code: string }; Returns: number }
       next_id_card_number: { Args: never; Returns: number }
+      rate_limit_hit: {
+        Args: { p_key: string; p_max: number; p_window_seconds: number }
+        Returns: boolean
+      }
       reset_exam_data: {
         Args: {
           p_course_id: string
@@ -2822,6 +2881,7 @@ export type Database = {
         Returns: Json
       }
       safe_avatar_url: { Args: { p_url: string }; Returns: boolean }
+      user_has_mfa: { Args: { p_uid: string }; Returns: boolean }
       verify_certificate: {
         Args: { p_cert_id: string }
         Returns: {

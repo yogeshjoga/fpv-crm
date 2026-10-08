@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.47.10';
-import { adminClient, cors, HttpError, json, requireUser } from '../_shared/common.ts';
+import { adminClient, cors, HttpError, json, requireStrongUser } from '../_shared/common.ts';
 
 /**
  * Super-admin only: soft-delete (or restore) a user account.
@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
 
   try {
     const admin = adminClient();
-    const caller = await requireUser(req, admin);
+    const caller = await requireStrongUser(req, admin);
     const { data: me } = await admin.from('profiles').select('role, email').eq('id', caller.id).single();
     if (me?.role !== 'super_admin') throw new HttpError(403, 'Only a super admin can delete users.');
 

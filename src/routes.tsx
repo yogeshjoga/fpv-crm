@@ -27,6 +27,7 @@ import { CareerJob } from './pages/student/CareerJob';
 import { AdminCareers } from './pages/admin/AdminCareers';
 import { AdminCareerJob } from './pages/admin/AdminCareerJob';
 import { AdminOffers } from './pages/admin/AdminOffers';
+import { Security } from './pages/admin/Security';
 import { RoleTemplates } from './pages/admin/RoleTemplates';
 import { StudentCertificates } from './pages/student/StudentCertificates';
 import { StudentProfile } from './pages/student/StudentProfile';
@@ -346,6 +347,14 @@ export function AppRoutes() {
           element={
             <RequireRole roles={['super_admin']}>
               <Settings />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="security"
+          element={
+            <RequireRole roles={['instructor', 'coordinator', 'admin', 'super_admin']}>
+              <Security />
             </RequireRole>
           }
         />

@@ -7,7 +7,7 @@ import {
   HttpError,
   json,
   randomPassword,
-  requireUser,
+  requireStrongUser,
   sendEmail,
 } from '../_shared/common.ts';
 
@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
 
   try {
     const admin = adminClient();
-    const caller = await requireUser(req, admin);
+    const caller = await requireStrongUser(req, admin);
     const { data: me } = await admin.from('profiles').select('role').eq('id', caller.id).single();
     if (!me || !['instructor', 'coordinator', 'admin', 'super_admin'].includes(me.role)) throw new HttpError(403, 'Forbidden.');
     // Same rule as the app: everyone but a super admin needs Write on Course Groups.

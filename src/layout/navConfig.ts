@@ -2,7 +2,7 @@ import {
   LayoutDashboard, BookOpen, Award, UserCircle, CalendarDays,
   ClipboardCheck, Users, GraduationCap, Briefcase, Megaphone,
   FormInput, Inbox, ScrollText, Settings2, UserPlus, BarChart3,
-  MessageCircle, ImagePlus, Layers3, HelpCircle, IdCard, Activity, FolderOpen, MessageSquareHeart, ListChecks, ClipboardList, Handshake,
+  MessageCircle, ImagePlus, Layers3, HelpCircle, IdCard, Activity, FolderOpen, MessageSquareHeart, ListChecks, ClipboardList, Handshake, ShieldCheck,
 } from 'lucide-react';
 import type { NavItem } from './Shell';
 
@@ -49,10 +49,11 @@ export const adminNav: NavItem[] = [
   { to: '/admin/employees', label: 'Employees', icon: Briefcase, key: 'employees', superAdminOnly: true },
   { to: '/admin/users', label: 'Users', icon: Users, key: 'users', superAdminOnly: true },
   { to: '/admin/settings', label: 'Company Settings', icon: Settings2, key: 'settings', superAdminOnly: true },
+  { to: '/admin/security', label: 'Security', icon: ShieldCheck }, // no key: every staff member can reach it (two-step verification)
   { to: '/admin/help', label: 'Help', icon: HelpCircle, key: 'help' },
 ];
 
 /** Modules a super admin can toggle instructor visibility for — excludes super-admin-only items and Dashboard (always reachable). */
 export const CONFIGURABLE_MODULES = adminNav
-  .filter((i) => !i.superAdminOnly && i.key !== 'dashboard')
+  .filter((i) => i.key && !i.superAdminOnly && i.key !== 'dashboard')
   .map((i) => ({ key: i.key as string, label: i.label }));

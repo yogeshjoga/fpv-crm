@@ -289,3 +289,24 @@ export async function verifyCaptcha(token: unknown, ip: string) {
   const out = (await res.json().catch(() => ({}))) as { success?: boolean };
   if (!out.success) throw new HttpError(400, 'The human check failed. Please try again.');
 }
+
+/**
+ * Like requireUser, but for privileged actions: a person who turned on two-step verification must have passed it
+ * for this session (aal2). A stolen password alone then cannot create users, accept registrations and so on.
+ */
+export async function requireStrongUser(req: Request, admin = adminClient()) {
+  const user = await requireUser(req, admin);
+  let aal = 'aal1';
+  try {
+    const jwt = (req.headers.get('Authorization') ?? '').replace('Bearer ', '').trim();
+    const payload = JSON.parse(atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    aal = payload.aal ?? 'aal1';
+  } catch {
+    /* the token was already verified by requireUser; an unreadable aal counts as aal1 */
+  }
+  if (aal !== 'aal2') {
+    const { data } = await admin.rpc('user_has_mfa', { p_uid: user.id });
+    if (data === true) throw new HttpError(401, 'Two-step verification is required. Sign out, sign in again and enter your code.');
+  }
+  return user;
+}
