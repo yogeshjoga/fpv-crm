@@ -25,18 +25,26 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 /**
- * Mirrors the access token into a cookie so same-origin <iframe>, <img> and download requests
- * for protected course material (/api/private) can be authenticated — those cannot send an
- * Authorization header. It is the same token the Supabase client already keeps in localStorage.
+ * Hands the access token to the server, which keeps it in an HttpOnly cookie so same-origin <iframe>, <img> and
+ * download requests for protected course material (/api/private) can be authenticated — those cannot send an
+ * Authorization header. Page scripts cannot read an HttpOnly cookie, so this copy of the token is out of reach of
+ * injected code. The Supabase client's own session storage is separate.
  */
+let lastSynced = '';
 function syncAccessCookie(session: Session | null) {
-  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-  if (!session) {
-    document.cookie = `egr_at=; Path=/; Max-Age=0; SameSite=Lax${secure}`;
-    return;
-  }
-  const maxAge = Math.max(60, (session.expires_at ?? 0) - Math.floor(Date.now() / 1000));
-  document.cookie = `egr_at=${encodeURIComponent(session.access_token)}; Path=/; Max-Age=${maxAge}; SameSite=Lax${secure}`;
+  const token = session?.access_token ?? '';
+  if (token === lastSynced) return;
+  lastSynced = token;
+  // a stale readable cookie from earlier versions of the app
+  document.cookie = 'egr_at=; Path=/; Max-Age=0; SameSite=Lax';
+  void fetch('/api/session', {
+    method: token ? 'POST' : 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: token ? JSON.stringify({ access_token: token }) : undefined,
+  }).catch(() => {
+    /* protected files simply ask for a sign-in again */
+  });
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {

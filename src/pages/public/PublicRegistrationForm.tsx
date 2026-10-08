@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { invokeFn } from '../../lib/functions';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { Button, Checkbox, Field, Select, Spinner, TextArea, TextInput } from '../../components/ui/kit';
+import { TURNSTILE_SITE_KEY, Turnstile } from '../../components/Turnstile';
 
 interface FormField {
   id: string;
@@ -42,6 +43,9 @@ export function PublicRegistrationForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<'ok' | 'dup' | null>(null);
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaKey, setCaptchaKey] = useState(0);
+  const [website, setWebsite] = useState(''); // hidden trap field: people never see it, bots fill it
 
   const q = useQuery(
     () =>
@@ -78,10 +82,15 @@ export function PublicRegistrationForm() {
         email,
         phone,
         answers: values,
+        website,
+        captcha,
       });
       setDone(res.duplicate ? 'dup' : 'ok');
     } catch (err) {
       setError((err as Error).message);
+      // a human-check token works once; ask for a fresh one
+      setCaptcha(null);
+      setCaptchaKey((k) => k + 1);
     } finally {
       setSubmitting(false);
     }
@@ -142,8 +151,17 @@ export function PublicRegistrationForm() {
           </Field>
         ))}
 
+        <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, overflow: 'hidden' }}>
+          <label>
+            Leave this empty
+            <input type="text" name="website" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
+          </label>
+        </div>
+
+        <Turnstile key={captchaKey} onToken={setCaptcha} />
+
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <Button type="submit" loading={submitting} className="w-full">
+        <Button type="submit" loading={submitting} disabled={!!TURNSTILE_SITE_KEY && !captcha} className="w-full">
           Submit registration
         </Button>
       </form>

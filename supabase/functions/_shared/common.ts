@@ -254,3 +254,38 @@ export async function sendEmail(opts: {
   console.log(`[email skipped — no transport] to=${opts.to} subject="${opts.subject}"`);
   return { sent: false, skipped: 'no_transport' };
 }
+
+/** The caller's IP as seen by the platform proxy (first hop of x-forwarded-for). */
+export function clientIp(req: Request): string {
+  const fwd = req.headers.get('cf-connecting-ip') ?? req.headers.get('x-real-ip') ?? (req.headers.get('x-forwarded-for') ?? '').split(',')[0];
+  return (fwd ?? '').trim() || 'unknown';
+}
+
+async function sha256Hex(s: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Fixed-window rate limit kept in the database, so it holds across every function instance.
+ * Throws 429 once `max` calls have been made with the same key inside `windowSec` seconds.
+ * The key is hashed, so no IP address or email is stored in the limiter.
+ */
+export async function rateLimit(admin: ReturnType<typeof adminClient>, scope: string, subject: string, max: number, windowSec: number) {
+  const key = `${scope}:${await sha256Hex(subject)}`;
+  const { data, error } = await admin.rpc('rate_limit_hit', { p_key: key, p_max: max, p_window_seconds: windowSec });
+  if (error) throw new HttpError(503, 'Please try again in a moment.'); // fail closed
+  if (data === false) throw new HttpError(429, 'Too many attempts. Please wait a few minutes and try again.');
+}
+
+/** Cloudflare Turnstile check. Active only when TURNSTILE_SECRET_KEY is configured for the function. */
+export async function verifyCaptcha(token: unknown, ip: string) {
+  const secret = Deno.env.get('TURNSTILE_SECRET_KEY');
+  if (!secret) return;
+  if (typeof token !== 'string' || !token || token.length > 4096) throw new HttpError(400, 'Please complete the human check and try again.');
+  const body = new URLSearchParams({ secret, response: token });
+  if (ip && ip !== 'unknown') body.set('remoteip', ip);
+  const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body });
+  const out = (await res.json().catch(() => ({}))) as { success?: boolean };
+  if (!out.success) throw new HttpError(400, 'The human check failed. Please try again.');
+}

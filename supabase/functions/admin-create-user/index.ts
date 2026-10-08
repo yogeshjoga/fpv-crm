@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
     const { data: created, error: cErr } = await admin.auth.admin.createUser({
       email: email.trim(),
       email_confirm: true,
-      user_metadata: { full_name: full_name ?? '' },
+      app_metadata: { provisioned: true }, user_metadata: { full_name: full_name ?? '' },
     });
     if (cErr || !created.user) throw new HttpError(400, cErr?.message ?? 'Could not create the user.');
     const uid = created.user.id;

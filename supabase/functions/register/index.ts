@@ -1,4 +1,4 @@
-import { adminClient, cors, HttpError, json, requireUser } from '../_shared/common.ts';
+import { adminClient, clientIp, cors, HttpError, json, rateLimit, requireUser, verifyCaptcha } from '../_shared/common.ts';
 
 const STAFF_ROLES = ['instructor', 'coordinator', 'admin', 'super_admin'];
 
@@ -53,6 +53,16 @@ Deno.serve(async (req) => {
 
     // ---- single public form submission ---------------------------------
     const { form_slug, full_name, email, phone, answers } = payload;
+
+    // Bots fill every field; the hidden "website" box is never shown to people. Pretend it worked.
+    if (typeof payload.website === 'string' && payload.website.trim()) return json({ ok: true });
+
+    // Slow a single caller down: a few submissions per address and per email, then HTTP 429.
+    const ip = clientIp(req);
+    await rateLimit(admin, 'register-ip', ip, 8, 10 * 60);
+    await rateLimit(admin, 'register-email', String(email ?? '').trim().toLowerCase(), 3, 60 * 60);
+    await verifyCaptcha(payload.captcha, ip);
+
     const cleanEmail = String(email ?? '').trim().toLowerCase();
     if (!cleanEmail || cleanEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) throw new HttpError(400, 'A valid email is required.');
     if (!String(full_name ?? '').trim()) throw new HttpError(400, 'Your name is required.');

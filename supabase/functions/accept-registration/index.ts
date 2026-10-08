@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
         email,
         password: tempPassword,
         email_confirm: true,
-        user_metadata: { full_name: reg.full_name ?? '' },
+        app_metadata: { provisioned: true }, user_metadata: { full_name: reg.full_name ?? '' },
       });
       if (cErr || !created.user) throw new HttpError(400, cErr?.message ?? 'Could not create the account.');
       profileId = created.user.id;
