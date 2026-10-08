@@ -11,6 +11,11 @@ import { GlassCard } from '../../components/ui/shared';
 import { Badge, Button, PageHeader, Spinner, useToast } from '../../components/ui/kit';
 
 /** Convert common video URLs to an embeddable src; null if we can't. */
+/** Only web links (or an in-app path) are ever put in an href or iframe; anything else, such as javascript:, is dropped. */
+function safeUrl(url: string | null | undefined): string | undefined {
+  return url && /^(https?:\/\/|\/(?!\/))/i.test(url.trim()) ? url.trim() : undefined;
+}
+
 function embedSrc(url: string): string | null {
   try {
     const u = new URL(url);
@@ -334,7 +339,7 @@ export function CourseViewer() {
                             <iframe src={embedSrc(l.video_url)!} className="h-full w-full" allowFullScreen title={l.title} />
                           </div>
                         ) : (
-                          <a href={l.video_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline">
+                          <a href={safeUrl(l.video_url)} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline">
                             <PlayCircle size={15} /> Watch video
                           </a>
                         )
@@ -343,7 +348,7 @@ export function CourseViewer() {
                       {l.kind === 'embed' && l.embed_url && (
                         <div className="mt-3 h-[75vh] min-h-[520px] overflow-hidden rounded-xl border border-white/60">
                           <iframe
-                            src={l.embed_url}
+                            src={safeUrl(l.embed_url)}
                             className="h-full w-full"
                             allowFullScreen
                             title={l.title}
@@ -354,7 +359,7 @@ export function CourseViewer() {
 
                       {(l.kind === 'embed' || l.kind === 'download') && l.embed_url && /\.(pdf|docx?|xlsx?|pptx?)$/i.test(l.embed_url) && (
                         <a
-                          href={l.embed_url}
+                          href={safeUrl(l.embed_url)}
                           download
                           target="_blank"
                           rel="noreferrer"

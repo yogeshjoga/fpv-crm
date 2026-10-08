@@ -29,7 +29,7 @@ const roleLabel: Record<string, string> = {
 };
 
 export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin' }) {
-  const { profile, signOut, isStaff } = useAuth();
+  const { profile, signOut, isStaff, mfa } = useAuth();
   const navigate = useNavigate();
   const [openMobile, setOpenMobile] = useState(false);
   // A super admin can preview the app as any other role (what that role sees and can edit).
@@ -162,6 +162,11 @@ export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin'
           <div className="flex shrink-0 items-center justify-center gap-2 bg-amber-100 px-4 py-2 text-center text-xs font-medium text-amber-800">
             <Eye size={13} /> Previewing as {roleLabel[previewRole]} — the sidebar and write access match your Company Settings for that role.
           </div>
+        )}
+        {(profile?.role === 'admin' || profile?.role === 'super_admin') && mfa.checked && !mfa.enrolled && (
+          <Link to="/admin/security" className="flex shrink-0 items-center justify-center gap-2 bg-blue-50 px-4 py-2 text-center text-xs font-medium text-blue-800 hover:bg-blue-100">
+            Protect this account: turn on two-step verification →
+          </Link>
         )}
         <main className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-4 py-8 md:px-8">
           <AdminAccessProvider value={accessValue}>

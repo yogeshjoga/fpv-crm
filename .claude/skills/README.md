@@ -28,6 +28,7 @@ scan the whole tree from scratch.
 | `fpv-crm-orientation` | The big picture — what this project is, the stack, folder layout, domain model, and the hard rules. **Start here.** |
 | `fpv-crm-database-schema` | Every table, the RLS pattern, storage buckets, how to write/apply a migration. |
 | `fpv-crm-exam-engine` | How exams/grading/question-banks/certificates actually work under the hood. |
+| `fpv-crm-security-guidelines` | **Mandatory** OWASP-aligned security checklist for every change: RLS, SECURITY DEFINER, edge functions, public endpoints, uploads, admin protection. |
 | `fpv-crm-admin-panel` | The `/admin` pages, the role/permission system, Course Groups. |
 | `fpv-crm-git-deploy-workflow` | Which branch to use, the exact merge-to-main sequence, how deploys work and how to verify one succeeded. |
 | `fpv-crm-ui-conventions` | The design-system components and data-fetching pattern to reuse instead of reinventing. |

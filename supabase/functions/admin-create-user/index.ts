@@ -1,4 +1,4 @@
-import { adminClient, cors, emailButton, emailShell, HttpError, json, requireUser, sendEmail } from '../_shared/common.ts';
+import { adminClient, cors, emailButton, emailShell, HttpError, json, requireStrongUser, sendEmail } from '../_shared/common.ts';
 
 const esc = (s: unknown) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -8,7 +8,7 @@ Deno.serve(async (req) => {
 
   try {
     const admin = adminClient();
-    const caller = await requireUser(req, admin);
+    const caller = await requireStrongUser(req, admin);
     const { data: me } = await admin.from('profiles').select('role').eq('id', caller.id).single();
     if (me?.role !== 'super_admin') throw new HttpError(403, 'Only a super admin can add users.');
 
@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
     const { data: created, error: cErr } = await admin.auth.admin.createUser({
       email: email.trim(),
       email_confirm: true,
-      user_metadata: { full_name: full_name ?? '' },
+      app_metadata: { provisioned: true }, user_metadata: { full_name: full_name ?? '' },
     });
     if (cErr || !created.user) throw new HttpError(400, cErr?.message ?? 'Could not create the user.');
     const uid = created.user.id;

@@ -1,4 +1,4 @@
-import { adminClient, cors, HttpError, json } from '../_shared/common.ts';
+import { adminClient, clientIp, cors, HttpError, json, rateLimit } from '../_shared/common.ts';
 import { decodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
 
 /**
@@ -14,17 +14,21 @@ Deno.serve(async (req) => {
   try {
     const admin = adminClient();
     const url = new URL(req.url);
-    const provided = url.searchParams.get('secret') ?? req.headers.get('x-webhook-secret') ?? '';
+    const provided = req.headers.get('x-webhook-secret') ?? url.searchParams.get('secret') ?? '';
 
+    // Guessing the secret is limited per caller, and the comparison does not leak how many characters matched.
+    await rateLimit(admin, 'form-intake-ip', clientIp(req), 30, 10 * 60);
     const { data: org } = await admin.from('org_secrets').select('google_form_secret').single();
-    if (!org || !provided || provided !== org.google_form_secret) throw new HttpError(401, 'Invalid webhook secret.');
+    if (!org || !provided || !safeEqual(provided, org.google_form_secret)) throw new HttpError(401, 'Invalid webhook secret.');
 
-    const body = await req.json();
+    const raw = await req.text();
+    if (raw.length > 25_000_000) throw new HttpError(413, 'That submission is too large.');
+    const body = JSON.parse(raw);
     const email = String(body.email ?? '').trim().toLowerCase();
     if (!email || !email.includes('@')) throw new HttpError(400, 'A valid email is required.');
 
     const answers: Record<string, unknown> = { ...(body.answers ?? {}) };
-    const files: { q: string; name: string; mime?: string; data: string }[] = Array.isArray(body.files) ? body.files : [];
+    const files: { q: string; name: string; mime?: string; data: string }[] = (Array.isArray(body.files) ? body.files : []).slice(0, 10);
 
     const { data: dup } = await admin
       .from('registrations')
@@ -66,6 +70,7 @@ Deno.serve(async (req) => {
       if (!f?.data || !f?.name) continue;
       try {
         const bytes = decodeBase64(f.data);
+        if (bytes.length > 15 * 1024 * 1024) continue; // matches the bucket limit
         const safeName = String(f.name).replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120);
         const path = `google-form/${regId}/${Date.now()}-${safeName}`;
         const up = await admin.storage
@@ -89,3 +94,11 @@ Deno.serve(async (req) => {
     return json({ error: (e as Error).message }, status);
   }
 });
+
+function safeEqual(a: string, b: string): boolean {
+  const x = new TextEncoder().encode(a);
+  const y = new TextEncoder().encode(b);
+  let diff = x.length ^ y.length;
+  for (let i = 0; i < Math.max(x.length, y.length); i++) diff |= (x[i] ?? 0) ^ (y[i] ?? 0);
+  return diff === 0;
+}

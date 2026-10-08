@@ -3,21 +3,24 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
 import { isModuleVisible, useModuleAccess } from '../lib/moduleAccess';
 import { Spinner } from '../components/ui/kit';
+import { MfaChallenge } from '../components/MfaChallenge';
 
 /** Requires a signed-in user. Sends unauthenticated visitors to /login. */
 export function RequireAuth({ children }: { children: ReactElement }) {
-  const { loading, isAuthed } = useAuth();
+  const { loading, isAuthed, mfa } = useAuth();
   const location = useLocation();
   if (loading) return <Spinner label="Checking your session…" />;
   if (!isAuthed) return <Navigate to="/login" replace state={{ from: location }} />;
+  if (mfa.needsChallenge) return <MfaChallenge />;
   return children;
 }
 
 /** Requires an activated account. Pending/suspended users land on the status page. */
 export function RequireActive({ children }: { children: ReactElement }) {
-  const { loading, isAuthed, profile } = useAuth();
+  const { loading, isAuthed, profile, mfa } = useAuth();
   if (loading) return <Spinner />;
   if (!isAuthed) return <Navigate to="/login" replace />;
+  if (mfa.needsChallenge) return <MfaChallenge />;
   if (!profile) return <Spinner label="Loading your profile…" />;
   if (profile.must_change_password) return <Navigate to="/set-password" replace />;
   if (profile.status !== 'active') return <Navigate to="/awaiting-activation" replace />;
@@ -32,9 +35,10 @@ export function RequireRole({
   roles: Array<'super_admin' | 'admin' | 'instructor' | 'coordinator' | 'student'>;
   children: ReactElement;
 }) {
-  const { loading, isAuthed, profile } = useAuth();
+  const { loading, isAuthed, profile, mfa } = useAuth();
   if (loading) return <Spinner />;
   if (!isAuthed) return <Navigate to="/login" replace />;
+  if (mfa.needsChallenge) return <MfaChallenge />;
   if (!profile) return <Spinner label="Loading your profile…" />;
   if (!roles.includes(profile.role)) return <Navigate to="/app" replace />;
   return children;
@@ -48,10 +52,11 @@ export function RequireRole({
  * redirect target is itself, which would loop.
  */
 export function RequireModule({ moduleKey, children }: { moduleKey: string; children: ReactElement }) {
-  const { loading, isAuthed, profile } = useAuth();
+  const { loading, isAuthed, profile, mfa } = useAuth();
   const access = useModuleAccess(profile?.role);
   if (loading) return <Spinner />;
   if (!isAuthed) return <Navigate to="/login" replace />;
+  if (mfa.needsChallenge) return <MfaChallenge />;
   if (!profile) return <Spinner label="Loading your profile…" />;
   if (!['instructor', 'coordinator', 'admin', 'super_admin'].includes(profile.role)) return <Navigate to="/app" replace />;
   if (profile.role !== 'super_admin') {
