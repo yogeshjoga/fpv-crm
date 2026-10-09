@@ -25,6 +25,7 @@ interface FeaturedRow {
   review_id: string;
   display_name: string;
   subtitle: string;
+  hidden: boolean;
 }
 interface EditRequestRow {
   id: string;
@@ -92,7 +93,7 @@ export function AdminReviews() {
   const mq = useQuery(() => unwrap(supabase.from('course_group_members').select('group_id')) as Promise<{ group_id: string }[]>, []);
   // Reviews an admin has chosen to show on the public website.
   const fq = useQuery(
-    () => unwrap(supabase.from('site_featured_reviews').select('review_id, display_name, subtitle')) as Promise<FeaturedRow[]>,
+    () => unwrap(supabase.from('site_featured_reviews').select('review_id, display_name, subtitle, hidden')) as Promise<FeaturedRow[]>,
     [],
   );
   const featuredBy = useMemo(() => new Map((fq.data ?? []).map((f) => [f.review_id, f] as const)), [fq.data]);
@@ -104,6 +105,12 @@ export function AdminReviews() {
   );
   const consentBy = useMemo(() => new Map((cq.data ?? []).map((c) => [c.review_id, c.allowed] as const)), [cq.data]);
   const [site, setSite] = useState<'all' | 'agreed' | 'live'>('all');
+  // On the website: the student agreed (shown automatically) or staff featured it, unless staff hid it or the student declined.
+  const isLive = (r: ReviewRow) => {
+    const row = featuredBy.get(r.id);
+    const consent = consentBy.get(r.id);
+    return !!r.comment.trim() && !row?.hidden && consent !== false && (consent === true || !!row);
+  };
   const requests = rq.data ?? [];
   const pending = requests.filter((r) => r.status === 'pending');
   const approved = requests.filter((r) => r.status === 'approved');
@@ -134,7 +141,7 @@ export function AdminReviews() {
         (r) =>
           (group === 'all' || r.group_id === group) &&
           (stars === 'all' || r.rating === Number(stars)) &&
-          (site === 'all' || (site === 'agreed' ? consentBy.get(r.id) === true : featuredBy.has(r.id))),
+          (site === 'all' || (site === 'agreed' ? consentBy.get(r.id) === true : isLive(r))),
       ),
     [all, group, stars, site, consentBy, featuredBy],
   );
@@ -476,8 +483,9 @@ export function AdminReviews() {
                         <span className="font-medium text-neutral-900">{showNames ? r.student?.full_name || r.student?.email || 'Student' : `Anonymous #${anonNo.get(r.id) ?? ''}`}</span>
                         <Badge tone="amber">{r.group?.name ?? 'Group'}</Badge>
                         {new Date(r.updated_at).getTime() - new Date(r.created_at).getTime() > 60_000 && <Badge tone="blue">Edited</Badge>}
-                        {featuredBy.has(r.id) && <Badge tone="green">On website</Badge>}
-                        {consentBy.get(r.id) === true && !featuredBy.has(r.id) && <Badge tone="blue">Agreed to publish</Badge>}
+                        {isLive(r) && <Badge tone="green">On website</Badge>}
+                        {featuredBy.get(r.id)?.hidden && <Badge tone="amber">Hidden from website</Badge>}
+                        {consentBy.get(r.id) === true && !isLive(r) && !featuredBy.get(r.id)?.hidden && <Badge tone="blue">Agreed to publish</Badge>}
                         {consentBy.get(r.id) === false && <Badge tone="red">Declined website</Badge>}
                       </div>
                       <div className="mt-1 flex items-center gap-2">
@@ -493,7 +501,7 @@ export function AdminReviews() {
                           disabled={!showNames || !r.comment.trim() || consentBy.get(r.id) === false}
                           title={consentBy.get(r.id) === false ? 'This student chose not to be shown on the website' : !r.comment.trim() ? 'Only reviews with a comment can be shown' : !showNames ? 'Unlock names first (eye button)' : 'Choose how this review appears on the website'}
                         >
-                          <Globe size={14} /> {featuredBy.has(r.id) ? 'On website' : 'Show on website'}
+                          <Globe size={14} /> {isLive(r) ? 'On website' : featuredBy.get(r.id)?.hidden ? 'Hidden' : 'Show on website'}
                         </Button>
                       )}
                       {writable && (
@@ -516,6 +524,7 @@ export function AdminReviews() {
           review={featuring}
           existing={featuredBy.get(featuring.id) ?? null}
           studentAgreed={consentBy.get(featuring.id) === true}
+          live={isLive(featuring)}
           onClose={() => setFeaturing(null)}
           onSaved={() => {
             setFeaturing(null);
@@ -635,7 +644,7 @@ function suggestName(full: string) {
   return `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;
 }
 
-function FeatureModal({ review, existing, studentAgreed, onClose, onSaved }: { review: ReviewRow; existing: FeaturedRow | null; studentAgreed: boolean; onClose: () => void; onSaved: () => void }) {
+function FeatureModal({ review, existing, studentAgreed, live, onClose, onSaved }: { review: ReviewRow; existing: FeaturedRow | null; studentAgreed: boolean; live: boolean; onClose: () => void; onSaved: () => void }) {
   const toast = useToast();
   const [name, setName] = useState(existing?.display_name ?? suggestName(review.student?.full_name ?? ''));
   const [subtitle, setSubtitle] = useState(existing?.subtitle ?? '');
@@ -660,6 +669,23 @@ function FeatureModal({ review, existing, studentAgreed, onClose, onSaved }: { r
     onSaved();
   };
 
+  // Keeps a review off the website without touching the student's choice or the review itself.
+  const setHidden = async (hidden: boolean) => {
+    if (hidden && !confirm('Hide this review from the website? It stays in the CRM.')) return;
+    setBusy(true);
+    const { error } = await supabase.from('site_featured_reviews').upsert({
+      review_id: review.id,
+      display_name: name.trim() || suggestName(review.student?.full_name ?? '') || 'Student',
+      subtitle: subtitle.trim(),
+      hidden,
+      ...(existing ? {} : { consent: studentAgreed ? 'student-opt-in' : 'staff-confirmed' }),
+    });
+    setBusy(false);
+    if (error) return toast(error.message, 'error');
+    toast(hidden ? 'Hidden from the website' : 'Back on the website');
+    onSaved();
+  };
+
   const unfeature = async () => {
     if (!confirm('Remove this review from the website? It stays in the CRM.')) return;
     setBusy(true);
@@ -671,7 +697,7 @@ function FeatureModal({ review, existing, studentAgreed, onClose, onSaved }: { r
   };
 
   return (
-    <Modal open onClose={onClose} title={existing ? 'Review on the website' : 'Show this review on the website'}>
+    <Modal open onClose={onClose} title={existing || live ? 'Review on the website' : 'Show this review on the website'}>
       <div className="space-y-4">
         <div className="rounded-2xl border border-white/60 bg-white/50 p-4">
           <StarRating value={review.rating} size={15} />
@@ -685,7 +711,7 @@ function FeatureModal({ review, existing, studentAgreed, onClose, onSaved }: { r
         </Field>
         {!existing && studentAgreed && (
           <p className="rounded-xl border border-green-200 bg-green-50/80 px-4 py-3 text-sm text-green-800">
-            The student agreed to this review being shown on the website when they wrote it.
+            The student agreed to this review being shown on the website, so it appears there automatically. Change the name below only if needed.
           </p>
         )}
         {!existing && !studentAgreed && (
@@ -698,10 +724,20 @@ function FeatureModal({ review, existing, studentAgreed, onClose, onSaved }: { r
         <p className="text-xs text-neutral-500">The website shows only the rating, the comment, this name and the description. Nothing else about the student is shared.</p>
         <div className="flex justify-between gap-2">
           <div>
-            {existing && (
-              <Button variant="secondary" onClick={unfeature} disabled={busy}>
-                Remove from website
+            {existing?.hidden ? (
+              <Button variant="secondary" onClick={() => setHidden(false)} disabled={busy}>
+                Show again
               </Button>
+            ) : studentAgreed && (live || existing) ? (
+              <Button variant="secondary" onClick={() => setHidden(true)} disabled={busy}>
+                Hide from website
+              </Button>
+            ) : (
+              existing && (
+                <Button variant="secondary" onClick={unfeature} disabled={busy}>
+                  Remove from website
+                </Button>
+              )
             )}
           </div>
           <div className="flex gap-2">

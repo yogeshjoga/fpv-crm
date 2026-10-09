@@ -2667,6 +2667,7 @@ export type Database = {
           display_name: string
           featured_at: string
           featured_by: string | null
+          hidden: boolean
           review_id: string
           subtitle: string
         }
@@ -2675,6 +2676,7 @@ export type Database = {
           display_name: string
           featured_at?: string
           featured_by?: string | null
+          hidden?: boolean
           review_id: string
           subtitle?: string
         }
@@ -2683,6 +2685,7 @@ export type Database = {
           display_name?: string
           featured_at?: string
           featured_by?: string | null
+          hidden?: boolean
           review_id?: string
           subtitle?: string
         }

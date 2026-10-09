@@ -174,7 +174,8 @@ const SECTIONS: Section[] = [
     points: [
       'Unlock names (admins only), then use "Show on website" on a review with a comment to publish it on the public site. You choose the name shown (first name and last initial by default) and an optional one-line description.',
       'Students are asked, when they write a review, whether it may be shown on the website. "Agreed to publish" marks those who said yes, and they can withdraw at any time, which takes the review off the website straight away. "Declined website" means the student said no and the review cannot be featured.',
-      'If a student has not chosen either way, tick the confirmation only after they have agreed some other way. Nothing is published automatically.',
+      'Reviews from students who agreed appear on the website on their own, newest first, with their first name and last initial. Open one and choose "Hide from website" to keep it off, for example if the comment should not be public.',
+      'If a student has not chosen either way, a review is shown only when you feature it, after confirming they agreed some other way.',
       'The website also shows the overall average rating and review count across all reviews, with no names. Use "On website" to edit or remove a published review at any time.',
     ],
   },
