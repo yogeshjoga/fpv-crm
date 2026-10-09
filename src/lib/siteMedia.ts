@@ -1,9 +1,12 @@
 import { supabase } from './supabase';
 
 const BUCKET = 'site-media';
-const FULL_EDGE = 2400;
+// Three sizes of every photo so the website can fetch the smallest file that still looks sharp on the visitor's screen.
+const FULL_EDGE = 2560;
+const MEDIUM_EDGE = 1280;
 const THUMB_EDGE = 800;
-const FULL_TARGET_BYTES = 600_000;
+const FULL_TARGET_BYTES = 850_000;
+const MEDIUM_TARGET_BYTES = 280_000;
 
 export const publicUrl = (path: string) => supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
 
@@ -52,28 +55,34 @@ async function put(path: string, blob: Blob) {
 
 export interface UploadedGalleryImage {
   full_path: string;
+  medium_path: string;
   thumb_path: string;
   width: number;
   height: number;
 }
 
-/** Resize a photo to a full-size and a thumbnail WebP and upload both under gallery/<albumId>/. */
+/** Resize a photo to a full, a medium and a thumbnail WebP and upload all three under gallery/<albumId>/. Files never change, so they are cached for a year. */
 export async function uploadGalleryImage(albumId: string, file: File): Promise<UploadedGalleryImage> {
   const bitmap = await open(file);
   try {
     const id = crypto.randomUUID();
-    const full = await encode(bitmap, FULL_EDGE, 0.85, FULL_TARGET_BYTES);
+    const full = await encode(bitmap, FULL_EDGE, 0.88, FULL_TARGET_BYTES);
+    const medium = await encode(bitmap, MEDIUM_EDGE, 0.85, MEDIUM_TARGET_BYTES);
     const thumb = await encode(bitmap, THUMB_EDGE, 0.8);
     const full_path = `gallery/${albumId}/${id}.webp`;
+    const medium_path = `gallery/${albumId}/${id}_m.webp`;
     const thumb_path = `gallery/${albumId}/${id}_t.webp`;
-    await put(full_path, full.blob);
+    const done: string[] = [];
     try {
-      await put(thumb_path, thumb.blob);
+      for (const [p, b] of [[full_path, full.blob], [medium_path, medium.blob], [thumb_path, thumb.blob]] as const) {
+        await put(p, b);
+        done.push(p);
+      }
     } catch (e) {
-      await supabase.storage.from(BUCKET).remove([full_path]);
+      if (done.length) await supabase.storage.from(BUCKET).remove(done);
       throw e;
     }
-    return { full_path, thumb_path, width: full.width, height: full.height };
+    return { full_path, medium_path, thumb_path, width: full.width, height: full.height };
   } finally {
     bitmap.close();
   }

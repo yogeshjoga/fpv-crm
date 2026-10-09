@@ -1,22 +1,17 @@
 import { useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Eye, EyeOff, Images, Pencil, Plus, Tags, Trash2, Upload } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Eye, EyeOff, FolderUp, Images, Pencil, Plus, Tags, Trash2, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { slugify } from '../../lib/slug';
 import { publicUrl, removeMedia, uploadGalleryImage } from '../../lib/siteMedia';
 import { GlassCard } from '../../components/ui/shared';
+import { AllPhotos } from './gallery/AllPhotos';
+import { ImportPhotos } from './gallery/ImportPhotos';
+import { PhotoEditor } from './gallery/PhotoEditor';
+import type { Album, Category, ImageRow } from './gallery/galleryTypes';
 import { Badge, Button, EmptyState, Field, Modal, PageHeader, Select, Spinner, TextArea, TextInput, useToast } from '../../components/ui/kit';
 
-interface Category { id: string; name: string; slug: string; sort_order: number }
-interface Album {
-  id: string; category_id: string; title: string; slug: string; description: string;
-  event_date: string | null; is_published: boolean; created_at: string;
-}
-interface ImageRow {
-  id: string; album_id: string; full_path: string; thumb_path: string;
-  width: number; height: number; is_published: boolean; created_at: string;
-}
 interface ImageStub { album_id: string; thumb_path: string }
 
 const randomSuffix = () => crypto.randomUUID().slice(0, 6);
@@ -30,6 +25,8 @@ export function AdminSiteGallery() {
   const [albumId, setAlbumId] = useState<string | null>(null);
   const [albumModal, setAlbumModal] = useState<Album | 'new' | null>(null);
   const [catModal, setCatModal] = useState(false);
+  const [tab, setTab] = useState<'albums' | 'photos'>('albums');
+  const [importing, setImporting] = useState(false);
 
   const cats = useQuery(
     () => unwrap(supabase.from('site_gallery_categories').select('*').order('sort_order').order('name')) as Promise<Category[]>,
@@ -40,7 +37,7 @@ export function AdminSiteGallery() {
     const fetchImageStubs = async () => {
       const all: ImageStub[] = [];
       for (let from = 0; ; from += 1000) {
-        const page = await unwrap<ImageStub[]>(supabase.from('site_gallery_images').select('album_id, thumb_path').order('created_at').order('id').range(from, from + 999));
+        const page = await unwrap<ImageStub[]>(supabase.from('site_gallery_images').select('album_id, thumb_path').order('sort_order').order('id').range(from, from + 999));
         all.push(...page);
         if (page.length < 1000) return all;
       }
@@ -101,6 +98,7 @@ export function AdminSiteGallery() {
         actions={
           writable && (
             <>
+              <Button variant="secondary" onClick={() => setImporting(true)}><FolderUp size={15} /> Import photos</Button>
               <Button variant="secondary" onClick={() => setCatModal(true)}><Tags size={15} /> Categories</Button>
               <Button onClick={() => setAlbumModal('new')} disabled={!cats.data?.length}><Plus size={15} /> New album</Button>
             </>
@@ -108,7 +106,17 @@ export function AdminSiteGallery() {
         }
       />
 
-      {!cats.data?.length ? (
+      <div className="mb-5 inline-flex rounded-full border border-white/60 bg-white/50 p-1 text-sm">
+        {([['albums', 'Albums by category'], ['photos', 'All photos']] as const).map(([k, label]) => (
+          <button key={k} onClick={() => setTab(k)} className={`rounded-full px-4 py-1.5 font-medium transition-colors ${tab === k ? 'bg-[#1a1a1a] text-white' : 'text-neutral-600 hover:text-neutral-900'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'photos' ? (
+        <AllPhotos albums={albums.data?.rows ?? []} categories={cats.data ?? []} writable={writable} onChanged={refresh} />
+      ) : !cats.data?.length ? (
         <EmptyState icon={<Images size={22} />} title="No categories yet" description="Create a category (for example Team, Workshops or Flying) to start." />
       ) : (
         <>
@@ -163,6 +171,7 @@ export function AdminSiteGallery() {
         onClose={() => setAlbumModal(null)}
         onSaved={(a) => { setAlbumModal(null); if (a) { setCategoryId(a.category_id); setAlbumId(a.id); } refresh(); }}
       />
+      {importing && <ImportPhotos categories={cats.data ?? []} albums={albums.data?.rows ?? []} onClose={() => setImporting(false)} onDone={refresh} />}
       <CategoriesModal
         open={catModal}
         categories={cats.data ?? []}
@@ -182,11 +191,19 @@ function AlbumDetail({ album, category, writable, onBack, onChanged, onEdit, onD
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [editing, setEditing] = useState<ImageRow | null>(null);
 
   const images = useQuery(
-    () => unwrap(supabase.from('site_gallery_images').select('*').eq('album_id', album.id).order('created_at')) as Promise<ImageRow[]>,
+    () => unwrap(supabase.from('site_gallery_images').select('*').eq('album_id', album.id).order('sort_order').order('created_at')) as Promise<ImageRow[]>,
     [album.id],
   );
+  const everything = useQuery(async () => {
+    const [a, c] = await Promise.all([
+      unwrap(supabase.from('site_gallery_albums').select('*')) as Promise<Album[]>,
+      unwrap(supabase.from('site_gallery_categories').select('*').order('sort_order')) as Promise<Category[]>,
+    ]);
+    return { albums: a, categories: c };
+  }, []);
 
   const upload = async (files: FileList | null) => {
     const list = files ? Array.from(files) : [];
@@ -197,9 +214,9 @@ function AlbumDetail({ album, category, writable, onBack, onChanged, onEdit, onD
       const file = list[n];
       try {
         const up = await uploadGalleryImage(album.id, file);
-        const { error } = await supabase.from('site_gallery_images').insert({ album_id: album.id, ...up });
+        const { error } = await supabase.from('site_gallery_images').insert({ album_id: album.id, ...up, source_name: file.name.slice(0, 200) });
         if (error) {
-          await removeMedia([up.full_path, up.thumb_path]);
+          await removeMedia([up.full_path, up.medium_path, up.thumb_path]);
           throw new Error(error.message);
         }
       } catch (e) {
@@ -225,7 +242,7 @@ function AlbumDetail({ album, category, writable, onBack, onChanged, onEdit, onD
     if (!confirm('Delete this photo from the website? This cannot be undone.')) return;
     const { error } = await supabase.from('site_gallery_images').delete().eq('id', img.id);
     if (error) return toast(error.message, 'error');
-    await removeMedia([img.full_path, img.thumb_path]);
+    await removeMedia([img.full_path, img.medium_path, img.thumb_path]);
     images.refetch();
     onChanged();
   };
@@ -238,7 +255,7 @@ function AlbumDetail({ album, category, writable, onBack, onChanged, onEdit, onD
   };
 
   const removeAlbum = async () => {
-    const paths = (images.data ?? []).flatMap((i) => [i.full_path, i.thumb_path]);
+    const paths = (images.data ?? []).flatMap((i) => [i.full_path, i.medium_path, i.thumb_path]);
     if (!confirm(`Delete the album "${album.title}" and its ${images.data?.length ?? 0} photos? This cannot be undone.`)) return;
     const { error } = await supabase.from('site_gallery_albums').delete().eq('id', album.id);
     if (error) return toast(error.message, 'error');
@@ -299,7 +316,9 @@ function AlbumDetail({ album, category, writable, onBack, onChanged, onEdit, onD
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {images.data.map((img) => (
             <div key={img.id} className="group relative overflow-hidden rounded-xl bg-neutral-100">
-              <img src={publicUrl(img.thumb_path)} alt="" loading="lazy" className={`aspect-square w-full object-cover ${img.is_published ? '' : 'opacity-40'}`} />
+              <button type="button" onClick={() => setEditing(img)} className="block w-full" title="Edit this photo">
+                <img src={publicUrl(img.thumb_path)} alt={img.caption} loading="lazy" decoding="async" width={img.width} height={img.height} className={`aspect-square w-full object-cover ${img.is_published ? '' : 'opacity-40'}`} />
+              </button>
               {writable && (
                 <div className="absolute inset-x-0 bottom-0 flex justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
                   <button onClick={() => toggleImage(img)} title={img.is_published ? 'Hide this photo' : 'Show this photo'} className="rounded-full bg-white/90 p-1.5 text-neutral-800">
@@ -315,6 +334,9 @@ function AlbumDetail({ album, category, writable, onBack, onChanged, onEdit, onD
         </div>
       )}
       {editModal}
+      {editing && everything.data && (
+        <PhotoEditor image={editing} albums={everything.data.albums} categories={everything.data.categories} writable={writable} onClose={() => setEditing(null)} onChanged={() => { images.refetch(); onChanged(); }} />
+      )}
     </div>
   );
 }
@@ -416,6 +438,16 @@ function CategoriesModal({ open, categories, albumCounts, onClose, onChanged }: 
     onChanged();
   };
 
+  const move = async (c: Category, dir: -1 | 1) => {
+    const i = categories.findIndex((x) => x.id === c.id);
+    const other = categories[i + dir];
+    if (!other) return;
+    const a = await supabase.from('site_gallery_categories').update({ sort_order: other.sort_order }).eq('id', c.id);
+    const b = await supabase.from('site_gallery_categories').update({ sort_order: c.sort_order }).eq('id', other.id);
+    if (a.error || b.error) return toast((a.error ?? b.error)!.message, 'error');
+    onChanged();
+  };
+
   const remove = async (c: Category) => {
     if (!confirm(`Delete the category "${c.name}"?`)) return;
     const { error } = await supabase.from('site_gallery_categories').delete().eq('id', c.id);
@@ -426,10 +458,14 @@ function CategoriesModal({ open, categories, albumCounts, onClose, onChanged }: 
   return (
     <Modal open={open} onClose={onClose} title="Gallery categories">
       <div className="space-y-2">
-        {categories.map((c) => {
+        {categories.map((c, idx) => {
           const used = albumCounts.get(c.id) ?? 0;
           return (
             <div key={c.id} className="flex items-center gap-2">
+              <div className="flex flex-col">
+                <button type="button" disabled={idx === 0} onClick={() => move(c, -1)} className="text-neutral-400 hover:text-neutral-800 disabled:opacity-30" aria-label="Move up"><ArrowUp size={14} /></button>
+                <button type="button" disabled={idx === categories.length - 1} onClick={() => move(c, 1)} className="text-neutral-400 hover:text-neutral-800 disabled:opacity-30" aria-label="Move down"><ArrowDown size={14} /></button>
+              </div>
               <TextInput defaultValue={c.name} onBlur={(e) => rename(c, e.target.value)} />
               <span className="w-20 shrink-0 text-xs text-neutral-500">{used} album{used === 1 ? '' : 's'}</span>
               <Button variant="ghost" onClick={() => remove(c)} disabled={used > 0} title={used > 0 ? 'Delete or move its albums first' : 'Delete category'}>
