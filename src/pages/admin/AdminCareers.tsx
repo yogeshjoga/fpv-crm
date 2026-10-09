@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Briefcase, CalendarClock, Plus, Users } from 'lucide-react';
+import { Briefcase, CalendarClock, CalendarPlus, Plus, Users } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
@@ -9,6 +9,7 @@ import { slugify } from '../../lib/slug';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, Button, EmptyState, Field, Modal, PageHeader, Select, Spinner, TextInput, useToast } from '../../components/ui/kit';
 import { CareersNav } from '../../components/CareersNav';
+import { ExtendApplyModal } from '../../components/ExtendApplyModal';
 import { LEVEL_LABEL, buildJd, employmentFor, type Level, type RoleTemplate } from '../../lib/offers';
 import { KIND_LABEL, MODE_LABEL, fmtDateTime, windowState, type JobKind, type WorkMode } from '../../lib/careers';
 
@@ -41,6 +42,7 @@ export function AdminCareers() {
   const { canWrite } = useAdminAccess();
   const writable = canWrite('careers');
   const [creating, setCreating] = useState(false);
+  const [extending, setExtending] = useState<JobRow | null>(null);
   const [title, setTitle] = useState('');
   const [kind, setKind] = useState<JobKind>('internship');
   const [tplId, setTplId] = useState('');
@@ -109,7 +111,14 @@ export function AdminCareers() {
             const badge = STATE_BADGE[state];
             const applicants = j.careers_applications?.[0]?.count ?? 0;
             return (
-              <button key={j.id} onClick={() => nav(`/admin/careers/${j.id}`)} className="text-left">
+              <div
+                key={j.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => nav(`/admin/careers/${j.id}`)}
+                onKeyDown={(e) => e.key === 'Enter' && nav(`/admin/careers/${j.id}`)}
+                className="cursor-pointer text-left"
+              >
                 <GlassCard className="h-full p-5 transition-transform hover:-translate-y-0.5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -132,12 +141,27 @@ export function AdminCareers() {
                       {j.apply_starts_at || j.apply_ends_at ? `${fmtDateTime(j.apply_starts_at)} → ${fmtDateTime(j.apply_ends_at)}` : 'No apply dates set'}
                     </span>
                   </div>
+                  {writable && (state === 'live' || state === 'closed') && (
+                    <div className="mt-3">
+                      <Button
+                        variant="secondary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExtending(j);
+                        }}
+                      >
+                        <CalendarPlus size={15} /> {state === 'closed' ? 'Reopen and extend' : 'Extend time'}
+                      </Button>
+                    </div>
+                  )}
                 </GlassCard>
-              </button>
+              </div>
             );
           })}
         </div>
       )}
+
+      {extending && writable && <ExtendApplyModal job={extending} onClose={() => setExtending(null)} onDone={() => q.refetch()} />}
 
       {creating && writable && (
         <Modal open onClose={() => setCreating(false)} title="New position">

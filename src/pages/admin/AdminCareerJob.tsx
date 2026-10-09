@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowDown, ArrowLeft, ArrowUp, ClipboardList, FileText, ListChecks, Plus, Rocket, Trash2, Users } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, CalendarPlus, ClipboardList, FileText, ListChecks, Plus, Rocket, Trash2, Users } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
@@ -22,6 +22,7 @@ import {
   type WorkMode,
 } from '../../lib/careers';
 import { CareerApplications } from './CareerApplications';
+import { ExtendApplyModal } from '../../components/ExtendApplyModal';
 
 interface Job {
   id: string;
@@ -62,6 +63,7 @@ export function AdminCareerJob() {
   const { canWrite } = useAdminAccess();
   const ro = !canWrite('careers');
   const [tab, setTab] = useState<Tab>('applications');
+  const [extending, setExtending] = useState(false);
 
   const q = useQuery(async () => {
     const [job, rounds, courses] = await Promise.all([
@@ -100,11 +102,20 @@ export function AdminCareerJob() {
         title={job.title}
         subtitle={`${KIND_LABEL[job.kind]} · ${MODE_LABEL[job.work_mode]}${job.department ? ` · ${job.department}` : ''}`}
         actions={
+          <>
+            {!ro && (state === 'live' || state === 'closed') && (
+              <Button variant="secondary" onClick={() => setExtending(true)}>
+                <CalendarPlus size={15} /> {state === 'closed' ? 'Reopen and extend' : 'Extend time'}
+              </Button>
+            )}
           <Badge tone={state === 'live' ? 'green' : state === 'upcoming' ? 'blue' : state === 'closed' ? 'red' : 'neutral'}>
             {state === 'live' ? 'Accepting applications' : state === 'upcoming' ? 'Opens soon' : state === 'closed' ? 'Closed' : 'Draft'}
           </Badge>
+          </>
         }
       />
+
+      {extending && <ExtendApplyModal job={job} onClose={() => setExtending(false)} onDone={() => q.refetch()} />}
 
       <div className="mb-5 inline-flex flex-wrap rounded-full border border-white/60 bg-white/50 p-1 text-sm">
         {tabs.map(([key, label, Icon]) => (
