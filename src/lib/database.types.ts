@@ -2635,6 +2635,38 @@ export type Database = {
         }
         Relationships: []
       }
+      site_featured_reviews: {
+        Row: {
+          display_name: string
+          featured_at: string
+          featured_by: string | null
+          review_id: string
+          subtitle: string
+        }
+        Insert: {
+          display_name: string
+          featured_at?: string
+          featured_by?: string | null
+          review_id: string
+          subtitle?: string
+        }
+        Update: {
+          display_name?: string
+          featured_at?: string
+          featured_by?: string | null
+          review_id?: string
+          subtitle?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_featured_reviews_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: true
+            referencedRelation: "reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       site_gallery_albums: {
         Row: {
           category_id: string
