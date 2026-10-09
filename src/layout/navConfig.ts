@@ -2,7 +2,7 @@ import {
   LayoutDashboard, BookOpen, Award, UserCircle, CalendarDays,
   ClipboardCheck, Users, GraduationCap, Briefcase, Megaphone,
   FormInput, Inbox, ScrollText, Settings2, UserPlus, BarChart3,
-  MessageCircle, ImagePlus, Layers3, HelpCircle, IdCard, Activity, FolderOpen, MessageSquareHeart, ListChecks, ClipboardList, Handshake, ShieldCheck, Images, Newspaper, Building2,
+  MessageCircle, ImagePlus, Layers3, HelpCircle, IdCard, Activity, FolderOpen, MessageSquareHeart, ListChecks, ClipboardList, Handshake, ShieldCheck, CalendarRange, Images, Newspaper, Building2,
 } from 'lucide-react';
 import type { NavItem } from './Shell';
 
@@ -33,6 +33,7 @@ export const adminNav: NavItem[] = [
   { to: '/admin/enrollments', label: 'Enrollment Requests', icon: Inbox, key: 'enrollments' },
   { to: '/admin/approvals', label: 'Account Approvals', icon: ClipboardCheck, key: 'approvals' },
   { to: '/admin/courses', label: 'Courses', icon: GraduationCap, key: 'courses' },
+  { to: '/admin/workshops', label: 'Workshops & Events', icon: CalendarRange, key: 'workshops' },
   { to: '/admin/course-groups', label: 'Course Groups', icon: Layers3, key: 'course-groups' },
   { to: '/admin/exams', label: 'Exams', icon: ListChecks, key: 'exams' },
   { to: '/admin/resources', label: 'Resources', icon: FolderOpen, key: 'resources' },
