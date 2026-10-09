@@ -2675,16 +2675,19 @@ export type Database = {
           allowed: boolean
           decided_at: string
           review_id: string
+          scope: string
         }
         Insert: {
           allowed: boolean
           decided_at?: string
           review_id: string
+          scope?: string
         }
         Update: {
           allowed?: boolean
           decided_at?: string
           review_id?: string
+          scope?: string
         }
         Relationships: [
           {
@@ -2940,36 +2943,6 @@ export type Database = {
         }
         Relationships: []
       }
-      site_partners: {
-        Row: {
-          created_at: string
-          id: string
-          is_published: boolean
-          logo_path: string
-          name: string
-          sort_order: number
-          website_url: string | null
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          is_published?: boolean
-          logo_path: string
-          name: string
-          sort_order?: number
-          website_url?: string | null
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          is_published?: boolean
-          logo_path?: string
-          name?: string
-          sort_order?: number
-          website_url?: string | null
-        }
-        Relationships: []
-      }
       site_featured_reviews: {
         Row: {
           consent: string
@@ -3122,6 +3095,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      site_partners: {
+        Row: {
+          created_at: string
+          id: string
+          is_published: boolean
+          logo_path: string
+          name: string
+          sort_order: number
+          website_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          logo_path: string
+          name: string
+          sort_order?: number
+          website_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          logo_path?: string
+          name?: string
+          sort_order?: number
+          website_url?: string | null
+        }
+        Relationships: []
       }
       staff_activity_time: {
         Row: {
@@ -3420,6 +3423,13 @@ export type Database = {
       my_exam_review: { Args: { p_attempt_id: string }; Returns: Json }
       next_cert_number: { Args: { p_course_code: string }; Returns: number }
       next_id_card_number: { Args: never; Returns: number }
+      public_branding: {
+        Args: never
+        Returns: {
+          logo_url: string
+          org_name: string
+        }[]
+      }
       rate_limit_hit: {
         Args: { p_key: string; p_max: number; p_window_seconds: number }
         Returns: boolean
@@ -3439,9 +3449,10 @@ export type Database = {
       }
       safe_avatar_url: { Args: { p_url: string }; Returns: boolean }
       set_review_website_consent: {
-        Args: { p_allow: boolean; p_review: string }
+        Args: { p_allow: boolean; p_full?: boolean; p_review: string }
         Returns: undefined
       }
+      tidy_person_name: { Args: { p: string }; Returns: string }
       user_has_mfa: { Args: { p_uid: string }; Returns: boolean }
       verify_certificate: {
         Args: { p_cert_id: string }

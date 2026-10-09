@@ -1,17 +1,16 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, Award, BookOpen, PlaneTakeoff } from 'lucide-react';
-import { LogoMark } from '../../components/Brand';
+import { Logo } from '../../components/Brand';
 
 export function Landing() {
   return (
     <div className="w-full max-w-3xl text-center">
-      <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#1a1a1a] text-white">
-        <LogoMark size={34} />
+      <div className="mx-auto mb-6 flex justify-center">
+        <Logo height={72} />
       </div>
       <h1 className="font-display text-4xl font-semibold text-neutral-900 md:text-5xl">
         EgireRobotics FPV &amp; Drone Training
       </h1>
-      <p className="mt-2 text-xs font-medium tracking-[0.25em] text-neutral-400">EXPLORE · ENGINEER · EXCEL</p>
       <p className="mx-auto mt-4 max-w-xl text-lg text-neutral-600">
         Learn to build and fly FPV drones, pass your certification exam, and earn a verifiable EgireRobotics certificate.
       </p>

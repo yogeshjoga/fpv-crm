@@ -637,17 +637,21 @@ export function AdminReviews() {
   );
 }
 
-/** First name plus the last initial, e.g. "Priya S." */
+/** The full name, tidied the same way the website tidies it: "MENTI HEMASAGAR" and "menti hemasagar" become "Menti Hemasagar". */
 function suggestName(full: string) {
-  const parts = full.trim().split(/\s+/).filter(Boolean);
-  if (parts.length < 2) return parts[0] ?? '';
-  return `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;
+  return full
+    .replace(/([A-Za-z]{2,})\.([A-Za-z])/g, '$1 $2')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => (w === w.toUpperCase() || w === w.toLowerCase() ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : w))
+    .join(' ');
 }
 
 function FeatureModal({ review, existing, studentAgreed, live, onClose, onSaved }: { review: ReviewRow; existing: FeaturedRow | null; studentAgreed: boolean; live: boolean; onClose: () => void; onSaved: () => void }) {
   const toast = useToast();
   const [name, setName] = useState(existing?.display_name ?? suggestName(review.student?.full_name ?? ''));
-  const [subtitle, setSubtitle] = useState(existing?.subtitle ?? '');
+  const [subtitle, setSubtitle] = useState(existing?.subtitle ?? review.group?.name ?? '');
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -703,10 +707,18 @@ function FeatureModal({ review, existing, studentAgreed, live, onClose, onSaved 
           <StarRating value={review.rating} size={15} />
           <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-neutral-700">{review.comment}</p>
         </div>
-        <Field label="Name shown on the website" hint="First name and last initial by default. Use a full name only if the student is happy with that." required>
+        <Field label="Name shown on the website" hint="The full name by default, because named reviews are more believable. Shorten it if the student asks." required>
           <TextInput value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
         </Field>
-        <Field label="Short description (optional)" hint="For example: B.Tech student. Leave blank to show only the name.">
+        <div className="-mt-2 flex flex-wrap gap-3 text-xs">
+          <button type="button" className="font-medium text-blue-600 hover:underline" onClick={() => setName(suggestName(review.student?.full_name ?? ''))}>
+            Use the full name
+          </button>
+          <button type="button" className="font-medium text-blue-600 hover:underline" onClick={() => setSubtitle(review.group?.name ?? '')}>
+            Use the course group as the tag
+          </button>
+        </div>
+        <Field label="Tag under the name (course or college)" hint="The course group by default, for example: Sivani FPV course. You can add the college or year too.">
           <TextInput value={subtitle} onChange={(e) => setSubtitle(e.target.value)} maxLength={120} />
         </Field>
         {!existing && studentAgreed && (
