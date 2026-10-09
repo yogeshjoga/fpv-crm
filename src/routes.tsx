@@ -28,6 +28,10 @@ import { AdminCareers } from './pages/admin/AdminCareers';
 import { AdminCareerJob } from './pages/admin/AdminCareerJob';
 import { AdminOffers } from './pages/admin/AdminOffers';
 import { Security } from './pages/admin/Security';
+import { AdminApplicants } from './pages/admin/AdminApplicants';
+import { HrEmployees } from './pages/admin/HrEmployees';
+import { HrAssets } from './pages/admin/HrAssets';
+import { HrAttendance } from './pages/admin/HrAttendance';
 import { RoleTemplates } from './pages/admin/RoleTemplates';
 import { StudentCertificates } from './pages/student/StudentCertificates';
 import { StudentProfile } from './pages/student/StudentProfile';
@@ -165,6 +169,38 @@ export function AppRoutes() {
           element={
             <RequireModule moduleKey="careers">
               <AdminCareers />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="careers/applicants"
+          element={
+            <RequireModule moduleKey="careers">
+              <AdminApplicants />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="careers/employees"
+          element={
+            <RequireModule moduleKey="careers">
+              <HrEmployees />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="careers/assets"
+          element={
+            <RequireModule moduleKey="careers">
+              <HrAssets />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="careers/attendance"
+          element={
+            <RequireModule moduleKey="careers">
+              <HrAttendance />
             </RequireModule>
           }
         />

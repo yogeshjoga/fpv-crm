@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, ExternalLink, FileSignature, FileText, RefreshCw, Search } from 'lucide-react';
+import { Download, ExternalLink, FileSignature, FileText, Mail, RefreshCw, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useQuery, unwrap } from '../../lib/useQuery';
@@ -19,6 +19,9 @@ import {
   type RoundStatus,
 } from '../../lib/careers';
 import type { RoundRow } from './AdminCareerJob';
+import { CareerEmailModal } from '../../components/CareerEmailModal';
+import { useOrgBrand } from '../../lib/useOrgBrand';
+import type { EmailTemplateKey } from '../../lib/careerEmails';
 
 interface AppRound {
   id: string;
@@ -30,8 +33,9 @@ interface AppRound {
   score: number | null;
   feedback: string;
 }
-interface AppRow {
+export interface AppRow {
   id: string;
+  job_id?: string;
   student_id: string;
   status: AppStatus;
   answers: Record<string, unknown>;
@@ -42,10 +46,11 @@ interface AppRow {
   student: { full_name: string; email: string; phone: string | null } | null;
   careers_application_rounds: AppRound[];
 }
-interface JobLite {
+export interface JobLite {
   id: string;
   title: string;
   kind?: string;
+  jd?: string;
   form_fields: unknown;
 }
 
@@ -324,7 +329,7 @@ export function CareerApplications({ job, rounds, ro }: { job: JobLite; rounds: 
 
 /* ───────────────────────────── one applicant ───────────────────────────── */
 
-function ApplicationDetail({ app, job, rounds, ro, onClose, onChanged }: { app: AppRow; job: JobLite; rounds: RoundRow[]; ro: boolean; onClose: () => void; onChanged: () => void }) {
+export function ApplicationDetail({ app, job, rounds, ro, onClose, onChanged }: { app: AppRow; job: JobLite; rounds: RoundRow[]; ro: boolean; onClose: () => void; onChanged: () => void }) {
   const nav = useNavigate();
   const toast = useToast();
   const fields = parseFields(job.form_fields);
@@ -332,6 +337,8 @@ function ApplicationDetail({ app, job, rounds, ro, onClose, onChanged }: { app: 
   const [notesLoaded, setNotesLoaded] = useState(false);
   const [offer, setOffer] = useState(app.offer_note);
   const [busy, setBusy] = useState<string | null>(null);
+  const brand = useOrgBrand();
+  const [email, setEmail] = useState<{ round?: RoundRow; when?: string; who?: string; link?: string } | null>(null);
 
   useEffect(() => {
     supabase
@@ -385,7 +392,10 @@ function ApplicationDetail({ app, job, rounds, ro, onClose, onChanged }: { app: 
     onChanged();
   };
 
+  const emailStart: EmailTemplateKey = email?.round ? 'interview' : app.status === 'shortlisted' ? 'shortlisted' : app.status === 'rejected' ? 'not_selected' : app.status === 'offered' ? 'offer' : 'custom';
+
   return (
+    <>
     <Modal open onClose={onClose} title={app.student?.full_name || 'Applicant'} wide>
       <div className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -399,6 +409,11 @@ function ApplicationDetail({ app, job, rounds, ro, onClose, onChanged }: { app: 
             {app.resume_path && (
               <Button variant="secondary" onClick={openResume}>
                 <ExternalLink size={14} /> Resume
+              </Button>
+            )}
+            {!ro && app.student?.email && (
+              <Button variant="secondary" onClick={() => setEmail({})}>
+                <Mail size={14} /> Email
               </Button>
             )}
             {!ro && (app.status === 'offered' || app.status === 'hired' || app.status === 'interviewing' || app.status === 'shortlisted') && (
@@ -467,6 +482,7 @@ function ApplicationDetail({ app, job, rounds, ro, onClose, onChanged }: { app: 
                   starting={busy === r.id}
                   onStart={(when) => startRound(r.id, when)}
                   onChanged={onChanged}
+                  onEmail={(v) => setEmail({ round: r, ...v })}
                 />
               ))}
             </ol>
@@ -486,6 +502,28 @@ function ApplicationDetail({ app, job, rounds, ro, onClose, onChanged }: { app: 
         </section>
       </div>
     </Modal>
+    {email && app.student?.email && (
+      <CareerEmailModal
+        key={email.round?.id ?? 'general'}
+        applicationId={app.id}
+        toName={app.student.full_name || 'the candidate'}
+        toEmail={app.student.email}
+        initial={emailStart}
+        context={{
+          orgName: brand.data?.orgName ?? 'EgireRobotics',
+          candidate: app.student.full_name || '',
+          jobTitle: job.title,
+          jd: job.jd ?? '',
+          round: email.round ? { name: email.round.name, kind: email.round.kind } : null,
+          when: email.when ? new Date(email.when).toISOString() : null,
+          interviewer: email.who,
+          link: email.link,
+        }}
+        onClose={() => setEmail(null)}
+        onSent={onChanged}
+      />
+    )}
+    </>
   );
 }
 
@@ -498,6 +536,7 @@ function RoundCard({
   starting,
   onStart,
   onChanged,
+  onEmail,
 }: {
   index: number;
   round: RoundRow;
@@ -507,6 +546,7 @@ function RoundCard({
   starting: boolean;
   onStart: (when: string) => void;
   onChanged: () => void;
+  onEmail: (v: { when: string; who: string; link: string }) => void;
 }) {
   const toast = useToast();
   const [when, setWhen] = useState(toLocalInput(ar?.scheduled_at ?? null));
@@ -592,6 +632,11 @@ function RoundCard({
               <Button variant="secondary" onClick={() => save()} loading={busy}>
                 Save
               </Button>
+              {round.kind !== 'online_test' && (
+                <Button variant="secondary" onClick={() => onEmail({ when, who, link })}>
+                  <Mail size={14} /> Email schedule
+                </Button>
+              )}
               <span className="mx-1 text-xs text-neutral-400">Result:</span>
               <Button variant="secondary" onClick={() => save('passed')} disabled={busy}>
                 Passed

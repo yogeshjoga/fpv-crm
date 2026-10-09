@@ -1,10 +1,14 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Briefcase, FileSignature, LayoutTemplate } from 'lucide-react';
+import { Briefcase, CalendarCheck, FileSignature, LayoutTemplate, Package, UserCheck, Users } from 'lucide-react';
 
 const TABS = [
   { to: '/admin/careers', label: 'Positions', icon: Briefcase },
+  { to: '/admin/careers/applicants', label: 'Applicants', icon: Users },
   { to: '/admin/careers/offers', label: 'Offer letters', icon: FileSignature },
   { to: '/admin/careers/roles', label: 'Role templates', icon: LayoutTemplate },
+  { to: '/admin/careers/employees', label: 'Employees', icon: UserCheck },
+  { to: '/admin/careers/assets', label: 'Assets', icon: Package },
+  { to: '/admin/careers/attendance', label: 'Attendance', icon: CalendarCheck },
 ];
 
 /** Switches between the three Careers areas for HR. */
