@@ -173,7 +173,8 @@ const SECTIONS: Section[] = [
     summary: 'What each course group says about the program. Reviews are private by default; names stay hidden until an admin unlocks them with the eye button.',
     points: [
       'Unlock names (admins only), then use "Show on website" on a review with a comment to publish it on the public site. You choose the name shown (first name and last initial by default) and an optional one-line description.',
-      'Tick the confirmation only after the student has agreed to their review being shown publicly with that name. Nothing is published automatically.',
+      'Students are asked, when they write a review, whether it may be shown on the website. "Agreed to publish" marks those who said yes, and they can withdraw at any time, which takes the review off the website straight away. "Declined website" means the student said no and the review cannot be featured.',
+      'If a student has not chosen either way, tick the confirmation only after they have agreed some other way. Nothing is published automatically.',
       'The website also shows the overall average rating and review count across all reviews, with no names. Use "On website" to edit or remove a published review at any time.',
     ],
   },

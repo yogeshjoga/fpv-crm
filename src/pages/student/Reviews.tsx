@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Clock, MessageSquareHeart, Pencil, Send } from 'lucide-react';
+import { CheckCircle2, Clock, Globe, MessageSquareHeart, Pencil, Send } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
 import { StarRating } from '../../components/StarRating';
-import { Button, EmptyState, Field, PageHeader, Select, Spinner, TextArea, useToast } from '../../components/ui/kit';
+import { Button, Checkbox, EmptyState, Field, PageHeader, Select, Spinner, TextArea, useToast } from '../../components/ui/kit';
 
 interface MyReview {
   id: string;
@@ -40,9 +40,10 @@ export function Reviews() {
   const [busy, setBusy] = useState(false);
   const [asking, setAsking] = useState(false);
   const [reason, setReason] = useState('');
+  const [share, setShare] = useState(false);
 
   const q = useQuery(async () => {
-    const [reviews, memberships, requests] = await Promise.all([
+    const [reviews, memberships, requests, consents] = await Promise.all([
       unwrap(
         supabase.from('reviews').select('id, group_id, rating, comment, updated_at').eq('student_id', profile!.id).not('group_id', 'is', null).order('updated_at', { ascending: false }),
       ) as Promise<MyReview[]>,
@@ -51,19 +52,22 @@ export function Reviews() {
         ? (unwrap(supabase.from('course_groups').select('id, name').order('name')) as Promise<{ id: string; name: string }[]>)
         : (unwrap(supabase.from('course_group_members').select('group:course_groups(id, name)').eq('student_id', profile!.id)) as unknown as Promise<Membership[]>),
       unwrap(supabase.from('review_edit_requests').select('id, review_id, status, created_at').eq('student_id', profile!.id).order('created_at', { ascending: false })) as Promise<EditRequest[]>,
+      unwrap(supabase.from('review_website_consent').select('review_id, allowed')) as Promise<{ review_id: string; allowed: boolean }[]>,
     ]);
     const groups = (memberships as (Membership | { id: string; name: string })[])
       .map((m) => ('group' in m ? m.group : m))
       .filter((g): g is { id: string; name: string } => !!g);
-    return { reviews, groups, requests };
+    return { reviews, groups, requests, consents };
   }, [profile?.id, isStaff]);
 
   const reviews = useMemo(() => q.data?.reviews ?? [], [q.data]);
   const groups = useMemo(() => q.data?.groups ?? [], [q.data]);
   const requests = useMemo(() => q.data?.requests ?? [], [q.data]);
+  const consents = useMemo(() => new Map((q.data?.consents ?? []).map((c) => [c.review_id, c.allowed] as const)), [q.data]);
   const current = target ?? groups[0]?.id ?? '';
   const nameFor = (groupId: string | null) => groups.find((g) => g.id === groupId)?.name ?? 'Group';
   const existing = reviews.find((r) => r.group_id === current);
+  const sharing = existing ? consents.get(existing.id) === true : false;
 
   const mine = existing ? requests.filter((r) => r.review_id === existing.id) : [];
   const open = mine.find((r) => r.status === 'pending' || r.status === 'approved');
@@ -89,12 +93,33 @@ export function Reviews() {
     if (!rating) return toast('Pick a star rating first', 'error');
     if (!confirm('Submit your review? You can only review this group once. To change it later you will need an admin to approve an edit request.')) return;
     setBusy(true);
-    const { error } = await supabase.from('reviews').insert({ rating, comment: comment.trim(), student_id: profile!.id, group_id: current });
+    const { data, error } = await supabase
+      .from('reviews')
+      .insert({ rating, comment: comment.trim(), student_id: profile!.id, group_id: current })
+      .select('id')
+      .single();
+    if (error) {
+      setBusy(false);
+      return toast(error.code === '23505' ? 'You have already reviewed this group.' : error.message, 'error');
+    }
+    if (share && data) {
+      const { error: consentError } = await supabase.rpc('set_review_website_consent', { p_review: data.id, p_allow: true });
+      if (consentError) toast('Your review was saved, but we could not record your website choice. You can set it from your review.', 'error');
+    }
     setBusy(false);
-    if (error) return toast(error.code === '23505' ? 'You have already reviewed this group.' : error.message, 'error');
     toast('Thanks for your review!');
     setRating(0);
     setComment('');
+    setShare(false);
+    q.refetch();
+  };
+
+  const setConsent = async (reviewId: string, allow: boolean) => {
+    setBusy(true);
+    const { error } = await supabase.rpc('set_review_website_consent', { p_review: reviewId, p_allow: allow });
+    setBusy(false);
+    if (error) return toast(error.message, 'error');
+    toast(allow ? 'Thank you. An admin may now show your review on the website.' : 'Done. Your review will not be shown on the website.');
     q.refetch();
   };
 
@@ -195,6 +220,20 @@ export function Reviews() {
                     <p className="mt-3 text-xs text-neutral-500">Submitted {new Date(existing.updated_at).toLocaleDateString()}. Your review is locked.</p>
                   </div>
 
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/60 bg-white/50 p-4">
+                    <div className="flex items-start gap-2 text-sm text-neutral-700">
+                      <Globe size={16} className="mt-0.5 shrink-0 text-neutral-400" />
+                      <span>
+                        {sharing
+                          ? 'You allowed this review to appear on the EGIRE Robotics website with your first name and last initial. An admin chooses which reviews are shown.'
+                          : 'Your review is private. You can allow it to appear on the EGIRE Robotics website with your first name and last initial. An admin chooses which reviews are shown.'}
+                      </span>
+                    </div>
+                    <Button variant="secondary" onClick={() => setConsent(existing.id, !sharing)} loading={busy} disabled={isStaff}>
+                      {sharing ? 'Withdraw' : 'Allow'}
+                    </Button>
+                  </div>
+
                   {open ? (
                     <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-800">
                       <Clock size={16} className="mt-0.5 shrink-0" />
@@ -234,6 +273,11 @@ export function Reviews() {
                   <Field label="Your feedback" hint="What was useful, what was confusing, what should we improve? (optional)">
                     <TextArea rows={5} maxLength={2000} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Tell us in your own words…" />
                   </Field>
+                  <Checkbox
+                    label="You may show my review on the EGIRE Robotics website with my first name and last initial. I can change this later."
+                    checked={share}
+                    onChange={(e) => setShare(e.target.checked)}
+                  />
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-xs text-neutral-400">One review per group. Changes later need an admin's approval.</span>
                     <Button type="submit" loading={busy} disabled={isStaff}>

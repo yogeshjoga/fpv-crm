@@ -97,6 +97,13 @@ export function AdminReviews() {
   );
   const featuredBy = useMemo(() => new Map((fq.data ?? []).map((f) => [f.review_id, f] as const)), [fq.data]);
   const [featuring, setFeaturing] = useState<ReviewRow | null>(null);
+  // What each student chose about website display: true (agreed), false (declined) or nothing yet.
+  const cq = useQuery(
+    () => unwrap(supabase.from('review_website_consent').select('review_id, allowed')) as Promise<{ review_id: string; allowed: boolean }[]>,
+    [],
+  );
+  const consentBy = useMemo(() => new Map((cq.data ?? []).map((c) => [c.review_id, c.allowed] as const)), [cq.data]);
+  const [site, setSite] = useState<'all' | 'agreed' | 'live'>('all');
   const requests = rq.data ?? [];
   const pending = requests.filter((r) => r.status === 'pending');
   const approved = requests.filter((r) => r.status === 'approved');
@@ -122,8 +129,14 @@ export function AdminReviews() {
   }, [all]);
 
   const rows = useMemo(
-    () => all.filter((r) => (group === 'all' || r.group_id === group) && (stars === 'all' || r.rating === Number(stars))),
-    [all, group, stars],
+    () =>
+      all.filter(
+        (r) =>
+          (group === 'all' || r.group_id === group) &&
+          (stars === 'all' || r.rating === Number(stars)) &&
+          (site === 'all' || (site === 'agreed' ? consentBy.get(r.id) === true : featuredBy.has(r.id))),
+      ),
+    [all, group, stars, site, consentBy, featuredBy],
   );
 
   // The dashboard follows the group filter only; the star filter just narrows the list below.
@@ -269,6 +282,13 @@ export function AdminReviews() {
                     {n} star{n > 1 ? 's' : ''}
                   </option>
                 ))}
+              </Select>
+            </div>
+            <div className="w-44">
+              <Select value={site} onChange={(e) => setSite(e.target.value as 'all' | 'agreed' | 'live')}>
+                <option value="all">All reviews</option>
+                <option value="agreed">Agreed to publish</option>
+                <option value="live">On website</option>
               </Select>
             </div>
             {canExport && (
@@ -457,6 +477,8 @@ export function AdminReviews() {
                         <Badge tone="amber">{r.group?.name ?? 'Group'}</Badge>
                         {new Date(r.updated_at).getTime() - new Date(r.created_at).getTime() > 60_000 && <Badge tone="blue">Edited</Badge>}
                         {featuredBy.has(r.id) && <Badge tone="green">On website</Badge>}
+                        {consentBy.get(r.id) === true && !featuredBy.has(r.id) && <Badge tone="blue">Agreed to publish</Badge>}
+                        {consentBy.get(r.id) === false && <Badge tone="red">Declined website</Badge>}
                       </div>
                       <div className="mt-1 flex items-center gap-2">
                         <StarRating value={r.rating} size={15} />
@@ -468,8 +490,8 @@ export function AdminReviews() {
                         <Button
                           variant="secondary"
                           onClick={() => setFeaturing(r)}
-                          disabled={!showNames || !r.comment.trim()}
-                          title={!r.comment.trim() ? 'Only reviews with a comment can be shown' : !showNames ? 'Unlock names first (eye button)' : 'Choose how this review appears on the website'}
+                          disabled={!showNames || !r.comment.trim() || consentBy.get(r.id) === false}
+                          title={consentBy.get(r.id) === false ? 'This student chose not to be shown on the website' : !r.comment.trim() ? 'Only reviews with a comment can be shown' : !showNames ? 'Unlock names first (eye button)' : 'Choose how this review appears on the website'}
                         >
                           <Globe size={14} /> {featuredBy.has(r.id) ? 'On website' : 'Show on website'}
                         </Button>
@@ -493,6 +515,7 @@ export function AdminReviews() {
         <FeatureModal
           review={featuring}
           existing={featuredBy.get(featuring.id) ?? null}
+          studentAgreed={consentBy.get(featuring.id) === true}
           onClose={() => setFeaturing(null)}
           onSaved={() => {
             setFeaturing(null);
@@ -612,7 +635,7 @@ function suggestName(full: string) {
   return `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;
 }
 
-function FeatureModal({ review, existing, onClose, onSaved }: { review: ReviewRow; existing: FeaturedRow | null; onClose: () => void; onSaved: () => void }) {
+function FeatureModal({ review, existing, studentAgreed, onClose, onSaved }: { review: ReviewRow; existing: FeaturedRow | null; studentAgreed: boolean; onClose: () => void; onSaved: () => void }) {
   const toast = useToast();
   const [name, setName] = useState(existing?.display_name ?? suggestName(review.student?.full_name ?? ''));
   const [subtitle, setSubtitle] = useState(existing?.subtitle ?? '');
@@ -621,11 +644,16 @@ function FeatureModal({ review, existing, onClose, onSaved }: { review: ReviewRo
 
   const save = async () => {
     if (!name.trim()) return toast('Add the name to show on the website', 'error');
-    if (!existing && !agreed) return toast('Confirm the student agreed before publishing', 'error');
+    if (!existing && !studentAgreed && !agreed) return toast('Confirm the student agreed before publishing', 'error');
     setBusy(true);
     const { error } = await supabase
       .from('site_featured_reviews')
-      .upsert({ review_id: review.id, display_name: name.trim(), subtitle: subtitle.trim() });
+      .upsert({
+        review_id: review.id,
+        display_name: name.trim(),
+        subtitle: subtitle.trim(),
+        ...(existing ? {} : { consent: studentAgreed ? 'student-opt-in' : 'staff-confirmed' }),
+      });
     setBusy(false);
     if (error) return toast(error.message, 'error');
     toast(existing ? 'Website review updated' : 'Review is now on the website');
@@ -655,7 +683,12 @@ function FeatureModal({ review, existing, onClose, onSaved }: { review: ReviewRo
         <Field label="Short description (optional)" hint="For example: B.Tech student. Leave blank to show only the name.">
           <TextInput value={subtitle} onChange={(e) => setSubtitle(e.target.value)} maxLength={120} />
         </Field>
-        {!existing && (
+        {!existing && studentAgreed && (
+          <p className="rounded-xl border border-green-200 bg-green-50/80 px-4 py-3 text-sm text-green-800">
+            The student agreed to this review being shown on the website when they wrote it.
+          </p>
+        )}
+        {!existing && !studentAgreed && (
           <Checkbox
             label="The student agreed to this review being shown publicly with this name."
             checked={agreed}
