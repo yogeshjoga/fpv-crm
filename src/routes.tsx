@@ -28,6 +28,8 @@ import { AdminCareers } from './pages/admin/AdminCareers';
 import { AdminCareerJob } from './pages/admin/AdminCareerJob';
 import { AdminOffers } from './pages/admin/AdminOffers';
 import { Security } from './pages/admin/Security';
+import { AdminWorkshops } from './pages/admin/AdminWorkshops';
+import { AdminWorkshopDetail } from './pages/admin/AdminWorkshopDetail';
 import { AdminApplicants } from './pages/admin/AdminApplicants';
 import { HrEmployees } from './pages/admin/HrEmployees';
 import { HrAssets } from './pages/admin/HrAssets';
@@ -411,6 +413,22 @@ export function AppRoutes() {
             <RequireRole roles={['super_admin']}>
               <Settings />
             </RequireRole>
+          }
+        />
+        <Route
+          path="workshops"
+          element={
+            <RequireModule moduleKey="workshops">
+              <AdminWorkshops />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="workshops/:id"
+          element={
+            <RequireModule moduleKey="workshops">
+              <AdminWorkshopDetail />
+            </RequireModule>
           }
         />
         <Route

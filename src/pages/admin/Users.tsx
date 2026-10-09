@@ -6,6 +6,7 @@ import { invokeFn } from '../../lib/functions';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { AnswerValue } from '../../components/FormAnswerValue';
 import { GlassCard } from '../../components/ui/shared';
+import { STUDENT_KIND_LABEL, STUDENT_KIND_TONE } from '../../lib/workshops';
 import { Badge, Button, Checkbox, Field, Modal, PageHeader, PasswordInput, Select, Spinner, TextInput, useToast } from '../../components/ui/kit';
 import type { Tables } from '../../lib/database.types';
 
@@ -56,24 +57,29 @@ export function Users() {
   const [deleting, setDeleting] = useState<Profile | null>(null);
   const [viewing, setViewing] = useState<Profile | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [kindFilter, setKindFilter] = useState<'all' | 'workshop' | 'event' | 'normal'>('all');
 
   const q = useQuery(async () => {
-    const [profiles, courses, enrollments] = await Promise.all([
+    const [profiles, courses, enrollments, kinds] = await Promise.all([
       unwrap(
         supabase.from('profiles').select('*').in('role', ['student', 'coordinator']).order('created_at', { ascending: false }),
       ) as Promise<Profile[]>,
       unwrap(supabase.from('courses').select('id, title').eq('status', 'published').order('title')) as Promise<CourseRow[]>,
       unwrap(supabase.from('enrollments').select('student_id, course_id, status')) as Promise<EnrollmentRow[]>,
+      supabase.rpc('student_kinds').then((r) => (r.data ?? []) as unknown as { student_id: string; kind: 'workshop' | 'event' | 'normal'; workshops: string }[]),
     ]);
-    return { profiles, courses, enrollments };
+    return { profiles, courses, enrollments, kinds };
   }, []);
+
+  const kindOf = useMemo(() => new Map((q.data?.kinds ?? []).map((k) => [k.student_id, k] as const)), [q.data]);
 
   const rows = useMemo(() => {
     const s = search.toLowerCase();
     return (q.data?.profiles ?? [])
       .filter((p) => showArchived || !p.archived_at)
-      .filter((p) => p.full_name.toLowerCase().includes(s) || p.email.toLowerCase().includes(s));
-  }, [q.data, search, showArchived]);
+      .filter((p) => p.full_name.toLowerCase().includes(s) || p.email.toLowerCase().includes(s))
+      .filter((p) => kindFilter === 'all' || (p.role === 'student' && (kindOf.get(p.id)?.kind ?? 'normal') === kindFilter));
+  }, [q.data, search, showArchived, kindFilter, kindOf]);
 
   const update = async (id: string, patch: Partial<Profile>) => {
     const { error } = await supabase.from('profiles').update(patch).eq('id', id);
@@ -106,6 +112,12 @@ export function Users() {
         actions={
           <div className="flex items-center gap-3">
             <Checkbox label="Show deleted" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+            <Select value={kindFilter} onChange={(e) => setKindFilter(e.target.value as typeof kindFilter)} className="!w-44 !py-2 text-sm">
+              <option value="all">All student types</option>
+              <option value="workshop">Workshop students</option>
+              <option value="event">Event students</option>
+              <option value="normal">Normal students</option>
+            </Select>
             <TextInput placeholder="Search name or email…" value={search} onChange={(e) => setSearch(e.target.value)} className="w-64" />
           </div>
         }
@@ -119,6 +131,7 @@ export function Users() {
               <tr className="text-left text-xs uppercase tracking-wide text-neutral-400">
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Email</th>
+                <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Role</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Courses</th>
@@ -135,6 +148,15 @@ export function Users() {
                   <tr key={p.id} className={archived ? 'opacity-50' : ''}>
                     <td className="px-4 py-3 font-medium text-neutral-900">{p.full_name || '—'}</td>
                     <td className="px-4 py-3 text-neutral-500">{p.email}</td>
+                    <td className="px-4 py-3">
+                      {p.role === 'student' ? (
+                        <span title={kindOf.get(p.id)?.workshops || undefined}>
+                          <Badge tone={STUDENT_KIND_TONE[kindOf.get(p.id)?.kind ?? 'normal']}>{STUDENT_KIND_LABEL[kindOf.get(p.id)?.kind ?? 'normal']}</Badge>
+                        </span>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <Select
                         value={p.role}

@@ -926,31 +926,49 @@ export type Database = {
       }
       course_groups: {
         Row: {
+          code: string | null
           created_at: string
           created_by: string | null
           description: string | null
+          ends_on: string | null
           id: string
+          kind: string
           name: string
+          organizer: string
           slug: string
+          starts_on: string | null
           updated_at: string
+          venue: string
         }
         Insert: {
+          code?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
+          ends_on?: string | null
           id?: string
+          kind?: string
           name: string
+          organizer?: string
           slug: string
+          starts_on?: string | null
           updated_at?: string
+          venue?: string
         }
         Update: {
+          code?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
+          ends_on?: string | null
           id?: string
+          kind?: string
           name?: string
+          organizer?: string
           slug?: string
+          starts_on?: string | null
           updated_at?: string
+          venue?: string
         }
         Relationships: [
           {
@@ -3462,6 +3480,14 @@ export type Database = {
         Args: { p_allow: boolean; p_full?: boolean; p_review: string }
         Returns: undefined
       }
+      student_kinds: {
+        Args: never
+        Returns: {
+          kind: string
+          student_id: string
+          workshops: string
+        }[]
+      }
       tidy_person_name: { Args: { p: string }; Returns: string }
       user_has_mfa: { Args: { p_uid: string }; Returns: boolean }
       verify_certificate: {
@@ -3484,6 +3510,42 @@ export type Database = {
           valid: boolean
           verify_base_url: string
         }[]
+      }
+      workshop_overview: {
+        Args: never
+        Returns: {
+          avg_best_score: number
+          avg_rating: number
+          certificates: number
+          exam_takers: number
+          group_id: string
+          passed_students: number
+          reviews: number
+          students: number
+        }[]
+      }
+      workshop_roster: {
+        Args: { p_group: string }
+        Returns: {
+          attempts: number
+          best_score: number
+          certificates: number
+          courses_enrolled: number
+          courses_passed: number
+          email: string
+          full_name: string
+          joined_at: string
+          marks_total: number
+          phone: string
+          review_rating: number
+          status: string
+          student_id: string
+          study_seconds: number
+        }[]
+      }
+      workshop_student_report: {
+        Args: { p_group: string; p_student: string }
+        Returns: Json
       }
     }
     Enums: {
