@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   LayoutDashboard, UserPlus, Inbox, ClipboardCheck, GraduationCap, Layers3, FileQuestion,
   FormInput, CalendarDays, Megaphone, ScrollText, MessageCircle, BarChart3, Briefcase,
-  Users, Settings2, Workflow, ChevronRight, Lock, IdCard, Activity,
+  Users, Settings2, Workflow, ChevronRight, Lock, IdCard, Activity, Images, Newspaper,
 } from 'lucide-react';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, PageHeader } from '../../components/ui/kit';
@@ -164,6 +164,31 @@ const SECTIONS: Section[] = [
     points: [
       'Filter by Open/Answered/Closed; open a thread to see the full back-and-forth and reply.',
       'Replying emails/notifies the student; Close ends the thread (they can still be reopened by asking again).',
+    ],
+  },
+  {
+    id: 'site-gallery',
+    icon: Images,
+    title: 'Site Gallery',
+    summary: 'The photo gallery on the public website. Photos are organised into categories (Team, Workshops, Flying, Events…) and, inside each, named event albums.',
+    points: [
+      'Create an album under a category, upload photos into it, then press Publish. Drafts and unpublished albums never appear on the website.',
+      'Upload as many photos at once as you like — they are resized and compressed in your browser, so camera originals are fine. Hover a photo to hide or delete it.',
+      'Changes appear on the website straight away; nothing needs to be redeployed.',
+      'Deleting an album or photo removes the files permanently. Use Unpublish or the eye icon to hide something instead.',
+      'Who can upload is set per role in Company Settings → module access ("Site Gallery"). Super Admins always can.',
+    ],
+  },
+  {
+    id: 'site-blog',
+    icon: Newspaper,
+    who: 'Super Admin only',
+    title: 'Site Blog',
+    summary: "The articles on the public website's Journal page, written in Markdown with a live preview.",
+    points: [
+      'A post is only visible on the website once "Published" is ticked; drafts stay private.',
+      'The web address (slug) is created from the title — change it before publishing if you want a different link. Each slug must be unique.',
+      'Add an optional cover image; the summary is what appears on the article card.',
     ],
   },
   {

@@ -60,6 +60,8 @@ import { AdminExams } from './pages/admin/AdminExams';
 import { IdCards } from './pages/admin/IdCards';
 import { AdminAnalytics } from './pages/admin/AdminAnalytics';
 import { AdminAsk } from './pages/admin/AdminAsk';
+import { AdminSiteGallery } from './pages/admin/AdminSiteGallery';
+import { AdminSiteBlog } from './pages/admin/AdminSiteBlog';
 import { Settings } from './pages/admin/Settings';
 import { Employees } from './pages/admin/Employees';
 import { AdminCalendar } from './pages/admin/AdminCalendar';
@@ -324,6 +326,22 @@ export function AppRoutes() {
             <RequireModule moduleKey="ask">
               <AdminAsk />
             </RequireModule>
+          }
+        />
+        <Route
+          path="site-gallery"
+          element={
+            <RequireModule moduleKey="site-gallery">
+              <AdminSiteGallery />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="site-blog"
+          element={
+            <RequireRole roles={['super_admin']}>
+              <AdminSiteBlog />
+            </RequireRole>
           }
         />
         <Route
