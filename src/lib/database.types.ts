@@ -2940,6 +2940,36 @@ export type Database = {
         }
         Relationships: []
       }
+      site_partners: {
+        Row: {
+          created_at: string
+          id: string
+          is_published: boolean
+          logo_path: string
+          name: string
+          sort_order: number
+          website_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          logo_path: string
+          name: string
+          sort_order?: number
+          website_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          logo_path?: string
+          name?: string
+          sort_order?: number
+          website_url?: string | null
+        }
+        Relationships: []
+      }
       site_featured_reviews: {
         Row: {
           consent: string

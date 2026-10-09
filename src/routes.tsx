@@ -65,6 +65,7 @@ import { IdCards } from './pages/admin/IdCards';
 import { AdminAnalytics } from './pages/admin/AdminAnalytics';
 import { AdminAsk } from './pages/admin/AdminAsk';
 import { AdminSiteGallery } from './pages/admin/AdminSiteGallery';
+import { AdminSitePartners } from './pages/admin/AdminSitePartners';
 import { AdminSiteBlog } from './pages/admin/AdminSiteBlog';
 import { Settings } from './pages/admin/Settings';
 import { Employees } from './pages/admin/Employees';
@@ -369,6 +370,14 @@ export function AppRoutes() {
           element={
             <RequireModule moduleKey="site-gallery">
               <AdminSiteGallery />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="site-partners"
+          element={
+            <RequireModule moduleKey="site-partners">
+              <AdminSitePartners />
             </RequireModule>
           }
         />

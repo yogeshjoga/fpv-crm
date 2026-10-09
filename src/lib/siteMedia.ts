@@ -92,6 +92,19 @@ export async function uploadBlogCover(file: File): Promise<string> {
   }
 }
 
+/** Upload a partner logo (longest edge 800px, transparency kept) under partners/ and return its storage path. */
+export async function uploadPartnerLogo(file: File): Promise<string> {
+  const bitmap = await open(file);
+  try {
+    const { blob } = await encode(bitmap, 800, 0.9, 200_000);
+    const path = `partners/${crypto.randomUUID()}.webp`;
+    await put(path, blob);
+    return path;
+  } finally {
+    bitmap.close();
+  }
+}
+
 export async function removeMedia(paths: Array<string | null | undefined>) {
   const list = paths.filter((p): p is string => !!p);
   if (list.length) await supabase.storage.from(BUCKET).remove(list);

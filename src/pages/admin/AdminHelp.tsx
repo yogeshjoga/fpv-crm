@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   LayoutDashboard, UserPlus, Inbox, ClipboardCheck, GraduationCap, Layers3, FileQuestion,
   FormInput, CalendarDays, Megaphone, ScrollText, MessageCircle, BarChart3, Briefcase,
-  Users, Settings2, Workflow, ChevronRight, Lock, IdCard, Activity, Images, Newspaper, MessageSquareHeart,
+  Users, Settings2, Workflow, ChevronRight, Lock, IdCard, Activity, Images, Newspaper, Building2, MessageSquareHeart,
 } from 'lucide-react';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, PageHeader } from '../../components/ui/kit';
@@ -190,6 +190,20 @@ const SECTIONS: Section[] = [
       'Changes appear on the website straight away; nothing needs to be redeployed.',
       'Deleting an album or photo removes the files permanently. Use Unpublish or the eye icon to hide something instead.',
       'Who can upload is set per role in Company Settings → module access ("Site Gallery"). Super Admins always can.',
+    ],
+  },
+  {
+    id: 'site-partners',
+    icon: Building2,
+    title: 'Site Partners',
+    summary: 'The partners and collaborations section on the public Workshops page. The EGIRE Robotics logo is always first; the rest are the logos you add here.',
+    points: [
+      'Add a partner with its name, its logo and, if you like, a website link. The logo links to that site. Without a link it is just shown.',
+      'Use the arrows to change the order, the eye icon to hide a partner without deleting it, and the pencil to change the name, link or logo.',
+      'Logos are resized in your browser. A transparent PNG on a wide, simple background looks best. They always sit on a white tile on the website.',
+      'The section appears on the website once at least one partner is published, and changes show up straight away with no redeploy.',
+      'Deleting a partner removes its logo file permanently. Use hide instead if you may want it back.',
+      'Who can manage this is set per role in Company Settings → module access ("Site Partners"). Super Admins always can.',
     ],
   },
   {
