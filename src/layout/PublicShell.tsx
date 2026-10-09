@@ -6,7 +6,7 @@ export function PublicShell() {
     <div className="flex min-h-screen flex-col">
       <header className="flex h-16 items-center justify-between px-6 md:px-10">
         <Link to="/" className="text-neutral-900">
-          <Logo markSize={26} />
+          <Logo height={38} />
         </Link>
         <nav className="flex items-center gap-4 text-sm text-neutral-600">
           <Link to="/verify" className="hover:text-neutral-900">Verify a certificate</Link>

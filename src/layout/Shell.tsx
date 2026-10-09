@@ -81,7 +81,7 @@ export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin'
         }`}
       >
         <div className="flex h-16 items-center gap-2 px-6 text-neutral-900">
-          <Logo markSize={26} />
+          <Logo height={34} />
           <span className="ml-1 text-[11px] text-neutral-500">{area}</span>
         </div>
         <nav className="flex flex-col gap-1 px-3 py-4">
