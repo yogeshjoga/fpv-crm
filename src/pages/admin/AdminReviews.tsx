@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CalendarDays, Check, Download, Eye, EyeOff, FileText, MessageSquareHeart, MessageSquareText, Pencil, ThumbsUp, Trash2, Users, X } from 'lucide-react';
+import { CalendarDays, Check, Download, Eye, EyeOff, FileText, Globe, MessageSquareHeart, MessageSquareText, Pencil, ThumbsUp, Trash2, Users, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
@@ -9,7 +9,7 @@ import { downloadReviewsPdf } from '../../lib/reviewsPdf';
 import { slugify } from '../../lib/slug';
 import { GlassCard } from '../../components/ui/shared';
 import { StarRating } from '../../components/StarRating';
-import { Badge, Button, EmptyState, Modal, PageHeader, Select, Spinner, useToast } from '../../components/ui/kit';
+import { Badge, Button, Checkbox, EmptyState, Field, Modal, PageHeader, Select, Spinner, TextInput, useToast } from '../../components/ui/kit';
 
 interface ReviewRow {
   id: string;
@@ -20,6 +20,11 @@ interface ReviewRow {
   updated_at: string;
   student: { full_name: string; email: string } | null;
   group: { name: string } | null;
+}
+interface FeaturedRow {
+  review_id: string;
+  display_name: string;
+  subtitle: string;
 }
 interface EditRequestRow {
   id: string;
@@ -85,6 +90,13 @@ export function AdminReviews() {
   );
   // Group sizes, so the dashboard can show how many students have actually reviewed.
   const mq = useQuery(() => unwrap(supabase.from('course_group_members').select('group_id')) as Promise<{ group_id: string }[]>, []);
+  // Reviews an admin has chosen to show on the public website.
+  const fq = useQuery(
+    () => unwrap(supabase.from('site_featured_reviews').select('review_id, display_name, subtitle')) as Promise<FeaturedRow[]>,
+    [],
+  );
+  const featuredBy = useMemo(() => new Map((fq.data ?? []).map((f) => [f.review_id, f] as const)), [fq.data]);
+  const [featuring, setFeaturing] = useState<ReviewRow | null>(null);
   const requests = rq.data ?? [];
   const pending = requests.filter((r) => r.status === 'pending');
   const approved = requests.filter((r) => r.status === 'approved');
@@ -444,17 +456,30 @@ export function AdminReviews() {
                         <span className="font-medium text-neutral-900">{showNames ? r.student?.full_name || r.student?.email || 'Student' : `Anonymous #${anonNo.get(r.id) ?? ''}`}</span>
                         <Badge tone="amber">{r.group?.name ?? 'Group'}</Badge>
                         {new Date(r.updated_at).getTime() - new Date(r.created_at).getTime() > 60_000 && <Badge tone="blue">Edited</Badge>}
+                        {featuredBy.has(r.id) && <Badge tone="green">On website</Badge>}
                       </div>
                       <div className="mt-1 flex items-center gap-2">
                         <StarRating value={r.rating} size={15} />
                         <span className="text-xs text-neutral-400">{new Date(r.updated_at).toLocaleDateString()}</span>
                       </div>
                     </div>
-                    {writable && (
-                      <Button variant="ghost" onClick={() => remove(r)} title="Remove review">
-                        <Trash2 size={15} />
-                      </Button>
-                    )}
+                    <div className="flex shrink-0 items-center gap-1">
+                      {writable && canExport && (
+                        <Button
+                          variant="secondary"
+                          onClick={() => setFeaturing(r)}
+                          disabled={!showNames || !r.comment.trim()}
+                          title={!r.comment.trim() ? 'Only reviews with a comment can be shown' : !showNames ? 'Unlock names first (eye button)' : 'Choose how this review appears on the website'}
+                        >
+                          <Globe size={14} /> {featuredBy.has(r.id) ? 'On website' : 'Show on website'}
+                        </Button>
+                      )}
+                      {writable && (
+                        <Button variant="ghost" onClick={() => remove(r)} title="Remove review">
+                          <Trash2 size={15} />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                   {r.comment && <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-neutral-700">{r.comment}</p>}
                 </GlassCard>
@@ -462,6 +487,18 @@ export function AdminReviews() {
             </div>
           )}
         </>
+      )}
+
+      {featuring && (
+        <FeatureModal
+          review={featuring}
+          existing={featuredBy.get(featuring.id) ?? null}
+          onClose={() => setFeaturing(null)}
+          onSaved={() => {
+            setFeaturing(null);
+            fq.refetch();
+          }}
+        />
       )}
 
       {canExport && exporting && (
@@ -565,6 +602,86 @@ export function AdminReviews() {
         </Modal>
       )}
     </div>
+  );
+}
+
+/** First name plus the last initial, e.g. "Priya S." */
+function suggestName(full: string) {
+  const parts = full.trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return parts[0] ?? '';
+  return `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;
+}
+
+function FeatureModal({ review, existing, onClose, onSaved }: { review: ReviewRow; existing: FeaturedRow | null; onClose: () => void; onSaved: () => void }) {
+  const toast = useToast();
+  const [name, setName] = useState(existing?.display_name ?? suggestName(review.student?.full_name ?? ''));
+  const [subtitle, setSubtitle] = useState(existing?.subtitle ?? '');
+  const [agreed, setAgreed] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    if (!name.trim()) return toast('Add the name to show on the website', 'error');
+    if (!existing && !agreed) return toast('Confirm the student agreed before publishing', 'error');
+    setBusy(true);
+    const { error } = await supabase
+      .from('site_featured_reviews')
+      .upsert({ review_id: review.id, display_name: name.trim(), subtitle: subtitle.trim() });
+    setBusy(false);
+    if (error) return toast(error.message, 'error');
+    toast(existing ? 'Website review updated' : 'Review is now on the website');
+    onSaved();
+  };
+
+  const unfeature = async () => {
+    if (!confirm('Remove this review from the website? It stays in the CRM.')) return;
+    setBusy(true);
+    const { error } = await supabase.from('site_featured_reviews').delete().eq('review_id', review.id);
+    setBusy(false);
+    if (error) return toast(error.message, 'error');
+    toast('Removed from the website');
+    onSaved();
+  };
+
+  return (
+    <Modal open onClose={onClose} title={existing ? 'Review on the website' : 'Show this review on the website'}>
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-white/60 bg-white/50 p-4">
+          <StarRating value={review.rating} size={15} />
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-neutral-700">{review.comment}</p>
+        </div>
+        <Field label="Name shown on the website" hint="First name and last initial by default. Use a full name only if the student is happy with that." required>
+          <TextInput value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
+        </Field>
+        <Field label="Short description (optional)" hint="For example: B.Tech student. Leave blank to show only the name.">
+          <TextInput value={subtitle} onChange={(e) => setSubtitle(e.target.value)} maxLength={120} />
+        </Field>
+        {!existing && (
+          <Checkbox
+            label="The student agreed to this review being shown publicly with this name."
+            checked={agreed}
+            onChange={(e) => setAgreed(e.target.checked)}
+          />
+        )}
+        <p className="text-xs text-neutral-500">The website shows only the rating, the comment, this name and the description. Nothing else about the student is shared.</p>
+        <div className="flex justify-between gap-2">
+          <div>
+            {existing && (
+              <Button variant="secondary" onClick={unfeature} disabled={busy}>
+                Remove from website
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button onClick={save} loading={busy}>
+              {existing ? 'Save' : 'Show on website'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
