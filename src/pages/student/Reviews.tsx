@@ -52,7 +52,7 @@ export function Reviews() {
         ? (unwrap(supabase.from('course_groups').select('id, name').order('name')) as Promise<{ id: string; name: string }[]>)
         : (unwrap(supabase.from('course_group_members').select('group:course_groups(id, name)').eq('student_id', profile!.id)) as unknown as Promise<Membership[]>),
       unwrap(supabase.from('review_edit_requests').select('id, review_id, status, created_at').eq('student_id', profile!.id).order('created_at', { ascending: false })) as Promise<EditRequest[]>,
-      unwrap(supabase.from('review_website_consent').select('review_id, allowed')) as Promise<{ review_id: string; allowed: boolean }[]>,
+      unwrap(supabase.from('review_website_consent').select('review_id, allowed, scope')) as Promise<{ review_id: string; allowed: boolean; scope: string }[]>,
     ]);
     const groups = (memberships as (Membership | { id: string; name: string })[])
       .map((m) => ('group' in m ? m.group : m))
@@ -64,6 +64,7 @@ export function Reviews() {
   const groups = useMemo(() => q.data?.groups ?? [], [q.data]);
   const requests = useMemo(() => q.data?.requests ?? [], [q.data]);
   const consents = useMemo(() => new Map((q.data?.consents ?? []).map((c) => [c.review_id, c.allowed] as const)), [q.data]);
+  const fullName = useMemo(() => new Map((q.data?.consents ?? []).map((c) => [c.review_id, c.scope === 'full'] as const)), [q.data]);
   const current = target ?? groups[0]?.id ?? '';
   const nameFor = (groupId: string | null) => groups.find((g) => g.id === groupId)?.name ?? 'Group';
   const existing = reviews.find((r) => r.group_id === current);
@@ -114,12 +115,12 @@ export function Reviews() {
     q.refetch();
   };
 
-  const setConsent = async (reviewId: string, allow: boolean) => {
+  const setConsent = async (reviewId: string, allow: boolean, full = true) => {
     setBusy(true);
-    const { error } = await supabase.rpc('set_review_website_consent', { p_review: reviewId, p_allow: allow });
+    const { error } = await supabase.rpc('set_review_website_consent', { p_review: reviewId, p_allow: allow, p_full: full });
     setBusy(false);
     if (error) return toast(error.message, 'error');
-    toast(allow ? 'Thank you. An admin may now show your review on the website.' : 'Done. Your review will not be shown on the website.');
+    toast(allow ? 'Thank you. Your review can now appear on the website with your name and course.' : 'Done. Your review will not be shown on the website.');
     q.refetch();
   };
 
@@ -225,13 +226,22 @@ export function Reviews() {
                       <Globe size={16} className="mt-0.5 shrink-0 text-neutral-400" />
                       <span>
                         {sharing
-                          ? 'You allowed this review to appear on the EGIRE Robotics website with your first name and last initial. An admin chooses which reviews are shown.'
-                          : 'Your review is private. You can allow it to appear on the EGIRE Robotics website with your first name and last initial. An admin chooses which reviews are shown.'}
+                          ? fullName.get(existing.id)
+                            ? `You allowed this review to appear on the EGIRE Robotics website with your full name and your course (${nameFor(existing.group_id)}). An admin chooses which reviews are shown.`
+                            : 'You allowed this review to appear on the EGIRE Robotics website with your first name and last initial. You can also let it show your full name and course, which makes it more believable to visitors.'
+                          : `Your review is private. You can allow it to appear on the EGIRE Robotics website with your full name and your course (${nameFor(existing.group_id)}). An admin chooses which reviews are shown.`}
                       </span>
                     </div>
-                    <Button variant="secondary" onClick={() => setConsent(existing.id, !sharing)} loading={busy} disabled={isStaff}>
-                      {sharing ? 'Withdraw' : 'Allow'}
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      {sharing && !fullName.get(existing.id) && (
+                        <Button variant="secondary" onClick={() => setConsent(existing.id, true, true)} loading={busy} disabled={isStaff}>
+                          Show my full name and course
+                        </Button>
+                      )}
+                      <Button variant="secondary" onClick={() => setConsent(existing.id, !sharing)} loading={busy} disabled={isStaff}>
+                        {sharing ? 'Withdraw' : 'Allow'}
+                      </Button>
+                    </div>
                   </div>
 
                   {open ? (
@@ -274,7 +284,7 @@ export function Reviews() {
                     <TextArea rows={5} maxLength={2000} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Tell us in your own words…" />
                   </Field>
                   <Checkbox
-                    label="You may show my review on the EGIRE Robotics website with my first name and last initial. I can change this later."
+                    label="You may show my review on the EGIRE Robotics website with my full name and my course (for example, Sivani FPV course). I can change this later."
                     checked={share}
                     onChange={(e) => setShare(e.target.checked)}
                   />

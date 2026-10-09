@@ -1569,6 +1569,285 @@ export type Database = {
           },
         ]
       }
+      hr_asset_assignments: {
+        Row: {
+          asset_id: string
+          assigned_by: string | null
+          assigned_on: string
+          condition_in: string
+          condition_out: string
+          employee_id: string
+          id: string
+          returned_on: string | null
+        }
+        Insert: {
+          asset_id: string
+          assigned_by?: string | null
+          assigned_on?: string
+          condition_in?: string
+          condition_out?: string
+          employee_id: string
+          id?: string
+          returned_on?: string | null
+        }
+        Update: {
+          asset_id?: string
+          assigned_by?: string | null
+          assigned_on?: string
+          condition_in?: string
+          condition_out?: string
+          employee_id?: string
+          id?: string
+          returned_on?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_asset_assignments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "hr_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_asset_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_asset_assignments_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_assets: {
+        Row: {
+          asset_tag: string
+          category: string
+          created_at: string
+          id: string
+          name: string
+          notes: string
+          purchased_on: string | null
+          serial_no: string
+          status: string
+        }
+        Insert: {
+          asset_tag: string
+          category?: string
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string
+          purchased_on?: string | null
+          serial_no?: string
+          status?: string
+        }
+        Update: {
+          asset_tag?: string
+          category?: string
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string
+          purchased_on?: string | null
+          serial_no?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      hr_attendance: {
+        Row: {
+          check_in: string | null
+          check_out: string | null
+          day: string
+          employee_id: string
+          id: string
+          marked_by: string | null
+          note: string
+          status: string
+        }
+        Insert: {
+          check_in?: string | null
+          check_out?: string | null
+          day: string
+          employee_id: string
+          id?: string
+          marked_by?: string | null
+          note?: string
+          status: string
+        }
+        Update: {
+          check_in?: string | null
+          check_out?: string | null
+          day?: string
+          employee_id?: string
+          id?: string
+          marked_by?: string | null
+          note?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_attendance_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_attendance_marked_by_fkey"
+            columns: ["marked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_employees: {
+        Row: {
+          application_id: string | null
+          created_at: string
+          created_by: string | null
+          department: string
+          designation: string
+          email: string
+          employee_code: string | null
+          employment_type: string
+          exited_on: string | null
+          full_name: string
+          id: string
+          id_card_issued_at: string | null
+          joined_on: string | null
+          notes: string
+          offer_id: string | null
+          phone: string
+          profile_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          application_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          department?: string
+          designation?: string
+          email?: string
+          employee_code?: string | null
+          employment_type?: string
+          exited_on?: string | null
+          full_name: string
+          id?: string
+          id_card_issued_at?: string | null
+          joined_on?: string | null
+          notes?: string
+          offer_id?: string | null
+          phone?: string
+          profile_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          department?: string
+          designation?: string
+          email?: string
+          employee_code?: string | null
+          employment_type?: string
+          exited_on?: string | null
+          full_name?: string
+          id?: string
+          id_card_issued_at?: string | null
+          joined_on?: string | null
+          notes?: string
+          offer_id?: string | null
+          phone?: string
+          profile_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_employees_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: true
+            referencedRelation: "careers_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_employees_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_employees_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "careers_offers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_employees_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_onboarding_tasks: {
+        Row: {
+          done: boolean
+          done_at: string | null
+          done_by: string | null
+          employee_id: string
+          id: string
+          position: number
+          title: string
+        }
+        Insert: {
+          done?: boolean
+          done_at?: string | null
+          done_by?: string | null
+          employee_id: string
+          id?: string
+          position?: number
+          title: string
+        }
+        Update: {
+          done?: boolean
+          done_at?: string | null
+          done_by?: string | null
+          employee_id?: string
+          id?: string
+          position?: number
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_onboarding_tasks_done_by_fkey"
+            columns: ["done_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_onboarding_tasks_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       id_card_counters: {
         Row: {
           key: string
@@ -2396,16 +2675,19 @@ export type Database = {
           allowed: boolean
           decided_at: string
           review_id: string
+          scope: string
         }
         Insert: {
           allowed: boolean
           decided_at?: string
           review_id: string
+          scope?: string
         }
         Update: {
           allowed?: boolean
           decided_at?: string
           review_id?: string
+          scope?: string
         }
         Relationships: [
           {
@@ -2667,6 +2949,7 @@ export type Database = {
           display_name: string
           featured_at: string
           featured_by: string | null
+          hidden: boolean
           review_id: string
           subtitle: string
         }
@@ -2675,6 +2958,7 @@ export type Database = {
           display_name: string
           featured_at?: string
           featured_by?: string | null
+          hidden?: boolean
           review_id: string
           subtitle?: string
         }
@@ -2683,6 +2967,7 @@ export type Database = {
           display_name?: string
           featured_at?: string
           featured_by?: string | null
+          hidden?: boolean
           review_id?: string
           subtitle?: string
         }
@@ -2810,6 +3095,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      site_partners: {
+        Row: {
+          created_at: string
+          id: string
+          is_published: boolean
+          logo_path: string
+          name: string
+          sort_order: number
+          website_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          logo_path: string
+          name: string
+          sort_order?: number
+          website_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          logo_path?: string
+          name?: string
+          sort_order?: number
+          website_url?: string | null
+        }
+        Relationships: []
       }
       staff_activity_time: {
         Row: {
@@ -3061,6 +3376,24 @@ export type Database = {
         }[]
       }
       exam_lock_until: { Args: never; Returns: string }
+      get_public_review_stats: {
+        Args: never
+        Returns: {
+          avg_rating: number
+          review_count: number
+        }[]
+      }
+      get_public_reviews: {
+        Args: never
+        Returns: {
+          comment: string
+          display_name: string
+          id: string
+          rating: number
+          reviewed_at: string
+          subtitle: string
+        }[]
+      }
       grant_exam_attempts: {
         Args: {
           p_course_id: string
@@ -3073,10 +3406,6 @@ export type Database = {
       has_module_access: {
         Args: { p_key: string; p_level: string }
         Returns: boolean
-      }
-      set_review_website_consent: {
-        Args: { p_allow: boolean; p_review: string }
-        Returns: undefined
       }
       increment_staff_activity: {
         Args: { p_seconds: number }
@@ -3094,6 +3423,13 @@ export type Database = {
       my_exam_review: { Args: { p_attempt_id: string }; Returns: Json }
       next_cert_number: { Args: { p_course_code: string }; Returns: number }
       next_id_card_number: { Args: never; Returns: number }
+      public_branding: {
+        Args: never
+        Returns: {
+          logo_url: string
+          org_name: string
+        }[]
+      }
       rate_limit_hit: {
         Args: { p_key: string; p_max: number; p_window_seconds: number }
         Returns: boolean
@@ -3112,6 +3448,11 @@ export type Database = {
         Returns: Json
       }
       safe_avatar_url: { Args: { p_url: string }; Returns: boolean }
+      set_review_website_consent: {
+        Args: { p_allow: boolean; p_full?: boolean; p_review: string }
+        Returns: undefined
+      }
+      tidy_person_name: { Args: { p: string }; Returns: string }
       user_has_mfa: { Args: { p_uid: string }; Returns: boolean }
       verify_certificate: {
         Args: { p_cert_id: string }
