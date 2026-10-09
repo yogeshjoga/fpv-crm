@@ -3059,6 +3059,9 @@ export type Database = {
           height: number
           id: string
           is_published: boolean
+          medium_path: string | null
+          sort_order: number
+          source_name: string | null
           thumb_path: string
           width: number
         }
@@ -3071,6 +3074,9 @@ export type Database = {
           height: number
           id?: string
           is_published?: boolean
+          medium_path?: string | null
+          sort_order?: number
+          source_name?: string | null
           thumb_path: string
           width: number
         }
@@ -3083,6 +3089,9 @@ export type Database = {
           height?: number
           id?: string
           is_published?: boolean
+          medium_path?: string | null
+          sort_order?: number
+          source_name?: string | null
           thumb_path?: string
           width?: number
         }
@@ -3376,6 +3385,7 @@ export type Database = {
         }[]
       }
       exam_lock_until: { Args: never; Returns: string }
+      get_public_gallery: { Args: never; Returns: Json }
       get_public_review_stats: {
         Args: never
         Returns: {
