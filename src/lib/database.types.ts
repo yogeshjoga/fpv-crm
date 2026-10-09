@@ -2391,6 +2391,32 @@ export type Database = {
           },
         ]
       }
+      review_website_consent: {
+        Row: {
+          allowed: boolean
+          decided_at: string
+          review_id: string
+        }
+        Insert: {
+          allowed: boolean
+          decided_at?: string
+          review_id: string
+        }
+        Update: {
+          allowed?: boolean
+          decided_at?: string
+          review_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_website_consent_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: true
+            referencedRelation: "reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reviews: {
         Row: {
           comment: string
@@ -2637,6 +2663,7 @@ export type Database = {
       }
       site_featured_reviews: {
         Row: {
+          consent: string
           display_name: string
           featured_at: string
           featured_by: string | null
@@ -2644,6 +2671,7 @@ export type Database = {
           subtitle: string
         }
         Insert: {
+          consent?: string
           display_name: string
           featured_at?: string
           featured_by?: string | null
@@ -2651,6 +2679,7 @@ export type Database = {
           subtitle?: string
         }
         Update: {
+          consent?: string
           display_name?: string
           featured_at?: string
           featured_by?: string | null
@@ -3044,6 +3073,10 @@ export type Database = {
       has_module_access: {
         Args: { p_key: string; p_level: string }
         Returns: boolean
+      }
+      set_review_website_consent: {
+        Args: { p_allow: boolean; p_review: string }
+        Returns: undefined
       }
       increment_staff_activity: {
         Args: { p_seconds: number }
