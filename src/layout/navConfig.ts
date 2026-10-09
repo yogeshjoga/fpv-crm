@@ -2,7 +2,7 @@ import {
   LayoutDashboard, BookOpen, Award, UserCircle, CalendarDays,
   ClipboardCheck, Users, GraduationCap, Briefcase, Megaphone,
   FormInput, Inbox, ScrollText, Settings2, UserPlus, BarChart3,
-  MessageCircle, ImagePlus, Layers3, HelpCircle, IdCard, Activity, FolderOpen, MessageSquareHeart, ListChecks, ClipboardList, Handshake, ShieldCheck,
+  MessageCircle, ImagePlus, Layers3, HelpCircle, IdCard, Activity, FolderOpen, MessageSquareHeart, ListChecks, ClipboardList, Handshake, ShieldCheck, Images, Newspaper,
 } from 'lucide-react';
 import type { NavItem } from './Shell';
 
@@ -45,6 +45,8 @@ export const adminNav: NavItem[] = [
   { to: '/admin/ask', label: 'Questions', icon: MessageCircle, key: 'ask' },
   { to: '/admin/careers', label: 'Careers', icon: Handshake, key: 'careers' },
   { to: '/admin/reviews', label: 'Reviews', icon: MessageSquareHeart, key: 'reviews' },
+  { to: '/admin/site-gallery', label: 'Site Gallery', icon: Images, key: 'site-gallery' },
+  { to: '/admin/site-blog', label: 'Site Blog', icon: Newspaper, key: 'site-blog', superAdminOnly: true },
   { to: '/admin/analytics', label: 'Analytics', icon: BarChart3, key: 'analytics', superAdminOnly: true },
   { to: '/admin/employees', label: 'Employees', icon: Briefcase, key: 'employees', superAdminOnly: true },
   { to: '/admin/users', label: 'Users', icon: Users, key: 'users', superAdminOnly: true },

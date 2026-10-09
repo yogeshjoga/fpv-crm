@@ -2584,6 +2584,172 @@ export type Database = {
           },
         ]
       }
+      site_blog_posts: {
+        Row: {
+          author: string
+          category: string
+          content_md: string
+          cover_path: string | null
+          created_at: string
+          created_by: string | null
+          excerpt: string
+          id: string
+          is_published: boolean
+          published_at: string | null
+          read_minutes: number
+          slug: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          author?: string
+          category?: string
+          content_md?: string
+          cover_path?: string | null
+          created_at?: string
+          created_by?: string | null
+          excerpt?: string
+          id?: string
+          is_published?: boolean
+          published_at?: string | null
+          read_minutes?: number
+          slug: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          author?: string
+          category?: string
+          content_md?: string
+          cover_path?: string | null
+          created_at?: string
+          created_by?: string | null
+          excerpt?: string
+          id?: string
+          is_published?: boolean
+          published_at?: string | null
+          read_minutes?: number
+          slug?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      site_gallery_albums: {
+        Row: {
+          category_id: string
+          created_at: string
+          created_by: string | null
+          description: string
+          event_date: string | null
+          id: string
+          is_published: boolean
+          slug: string
+          title: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          event_date?: string | null
+          id?: string
+          is_published?: boolean
+          slug: string
+          title: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          event_date?: string | null
+          id?: string
+          is_published?: boolean
+          slug?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_gallery_albums_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "site_gallery_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_gallery_categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          slug: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          slug: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      site_gallery_images: {
+        Row: {
+          album_id: string
+          caption: string
+          created_at: string
+          created_by: string | null
+          full_path: string
+          height: number
+          id: string
+          is_published: boolean
+          thumb_path: string
+          width: number
+        }
+        Insert: {
+          album_id: string
+          caption?: string
+          created_at?: string
+          created_by?: string | null
+          full_path: string
+          height: number
+          id?: string
+          is_published?: boolean
+          thumb_path: string
+          width: number
+        }
+        Update: {
+          album_id?: string
+          caption?: string
+          created_at?: string
+          created_by?: string | null
+          full_path?: string
+          height?: number
+          id?: string
+          is_published?: boolean
+          thumb_path?: string
+          width?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_gallery_images_album_id_fkey"
+            columns: ["album_id"]
+            isOneToOne: false
+            referencedRelation: "site_gallery_albums"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_activity_time: {
         Row: {
           day: string
