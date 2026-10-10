@@ -3,13 +3,15 @@ import { ShieldCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import { GlassCard } from './ui/shared';
-import { Button, Field, TextInput } from './ui/kit';
+import { Button, Checkbox, Field, TextInput } from './ui/kit';
+import { trustThisDevice } from '../lib/trustedDevice';
 
 /** Asks for the 6-digit code from the authenticator app. Shown instead of the app until it is entered. */
 export function MfaChallenge() {
   const { refreshMfa, signOut } = useAuth();
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const submit = async (e: React.FormEvent) => {
@@ -24,6 +26,10 @@ export function MfaChallenge() {
       if (!factor) throw new Error('No authenticator is set up for this account.');
       const { error: vErr } = await supabase.auth.mfa.challengeAndVerify({ factorId: factor.id, code: code.trim() });
       if (vErr) throw vErr;
+      if (remember) {
+        const { data: s } = await supabase.auth.getSession();
+        if (s.session) await trustThisDevice(s.session.access_token);
+      }
       await refreshMfa();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'That code did not work. Try again.');
@@ -53,6 +59,7 @@ export function MfaChallenge() {
               placeholder="123456"
             />
           </Field>
+          <Checkbox label="Don't ask again on this device for 30 days" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
           <Button type="submit" loading={busy} className="w-full">
             Verify and continue
           </Button>

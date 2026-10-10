@@ -3266,6 +3266,57 @@ export type Database = {
         }
         Relationships: []
       }
+      site_videos: {
+        Row: {
+          caption: string
+          created_at: string
+          id: string
+          is_published: boolean
+          kind: string
+          poster_path: string | null
+          poster_url: string
+          sort_order: number
+          title: string
+          video_low_path: string | null
+          video_path: string | null
+          video_url: string | null
+          video_url_low: string | null
+          youtube_id: string | null
+        }
+        Insert: {
+          caption?: string
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          kind: string
+          poster_path?: string | null
+          poster_url: string
+          sort_order?: number
+          title: string
+          video_low_path?: string | null
+          video_path?: string | null
+          video_url?: string | null
+          video_url_low?: string | null
+          youtube_id?: string | null
+        }
+        Update: {
+          caption?: string
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          kind?: string
+          poster_path?: string | null
+          poster_url?: string
+          sort_order?: number
+          title?: string
+          video_low_path?: string | null
+          video_path?: string | null
+          video_url?: string | null
+          video_url_low?: string | null
+          youtube_id?: string | null
+        }
+        Relationships: []
+      }
       staff_activity_time: {
         Row: {
           day: string
@@ -3446,6 +3497,68 @@ export type Database = {
           },
         ]
       }
+      trusted_devices: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          label: string
+          last_used_at: string
+          token_hash: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          label?: string
+          last_used_at?: string
+          token_hash: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          label?: string
+          last_used_at?: string
+          token_hash?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      trusted_sessions: {
+        Row: {
+          created_at: string
+          device_id: string
+          expires_at: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_id: string
+          expires_at: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          expires_at?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trusted_sessions_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "trusted_devices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       verify_attempts: {
         Row: {
           at: string
@@ -3560,6 +3673,7 @@ export type Database = {
       is_enrolled: { Args: { course: string }; Returns: boolean }
       is_staff: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
+      jwt_session_id: { Args: never; Returns: string }
       mfa_ok: { Args: never; Returns: boolean }
       my_exam_review: { Args: { p_attempt_id: string }; Returns: Json }
       next_cert_number: { Args: { p_course_code: string }; Returns: number }
@@ -3588,7 +3702,9 @@ export type Database = {
         }
         Returns: Json
       }
+      revoke_trusted_device: { Args: { p_id?: string }; Returns: number }
       safe_avatar_url: { Args: { p_url: string }; Returns: boolean }
+      session_is_trusted: { Args: never; Returns: boolean }
       set_review_website_consent: {
         Args: { p_allow: boolean; p_full?: boolean; p_review: string }
         Returns: undefined
@@ -3602,6 +3718,12 @@ export type Database = {
         }[]
       }
       tidy_person_name: { Args: { p: string }; Returns: string }
+      trust_session: { Args: { p_token: string }; Returns: boolean }
+      trust_this_device: { Args: { p_label?: string }; Returns: string }
+      trusted_session_valid: {
+        Args: { p_session: string; p_uid: string }
+        Returns: boolean
+      }
       user_has_mfa: { Args: { p_uid: string }; Returns: boolean }
       verify_certificate: {
         Args: { p_cert_id: string }

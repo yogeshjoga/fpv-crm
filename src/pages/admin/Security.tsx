@@ -6,6 +6,7 @@ import { useQuery, unwrap } from '../../lib/useQuery';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, EmptyState, PageHeader, Select, Spinner } from '../../components/ui/kit';
 import { MfaSetup } from '../../components/MfaSetup';
+import { TrustedDevices } from '../../components/TrustedDevices';
 
 interface AuditRow {
   id: number;
@@ -59,6 +60,7 @@ export function Security() {
     <div className="space-y-6">
       <PageHeader title="Security" subtitle="Protect your account, and review privileged changes made in the system" />
       <MfaSetup />
+      <TrustedDevices />
 
       {isSuperAdmin && (
         <section>

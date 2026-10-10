@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import { GlassCard } from './ui/shared';
 import { Badge, Button, Field, TextInput, useToast } from './ui/kit';
+import { trustThisDevice } from '../lib/trustedDevice';
 
 interface Enrolling {
   factorId: string;
@@ -55,7 +56,10 @@ export function MfaSetup() {
       const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: enrolling.factorId, code: code.trim() });
       if (error) throw error;
       setEnrolling(null);
-      toast('Two-step verification is on');
+      // they just proved they hold the authenticator on this computer, so it is trusted for 30 days
+      const { data: s } = await supabase.auth.getSession();
+      const trusted = s.session ? await trustThisDevice(s.session.access_token) : false;
+      toast(trusted ? 'Two-step verification is on. This device will not ask for the code for 30 days.' : 'Two-step verification is on');
       await load();
       await refreshMfa();
     } catch (e) {
