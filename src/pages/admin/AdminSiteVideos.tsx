@@ -271,7 +271,7 @@ function VideoModal({ value, nextOrder, onClose, onSaved }: { value: SiteVideo |
         </div>
 
         <Field label="Title" required>
-          <TextInput value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} placeholder="Workshop at Sri Sivani College of Engineering" />
+          <TextInput value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} placeholder="Workshop at Sri Sivani Engineering College Etcherla" />
         </Field>
         <Field label="Short description (optional)" hint="One line shown under the video.">
           <TextArea value={caption} onChange={(e) => setCaption(e.target.value)} rows={2} maxLength={300} />

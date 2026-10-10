@@ -41,7 +41,7 @@ const STATUSES: { key: Status; label: string; tone: 'blue' | 'amber' | 'green' |
 const KINDS: Record<Kind, { label: string; icon: React.ReactNode }> = {
   student: { label: 'Student / parent', icon: <GraduationCap size={14} /> },
   college: { label: 'College / university', icon: <Building2 size={14} /> },
-  demo: { label: 'Free demo', icon: <PlayCircle size={14} /> },
+  demo: { label: 'Demo session', icon: <PlayCircle size={14} /> },
   general: { label: 'General', icon: <MessageCircle size={14} /> },
 };
 const statusTone = (s: Status) => STATUSES.find((x) => x.key === s)?.tone ?? 'neutral';

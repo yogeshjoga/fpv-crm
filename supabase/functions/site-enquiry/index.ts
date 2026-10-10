@@ -6,7 +6,7 @@ const oneLine = (s: unknown) => String(s ?? '').replace(/[\r\n]+/g, ' ').trim();
 const KINDS: Record<string, string> = {
   student: 'Student or parent',
   college: 'College or university',
-  demo: 'Free demo session',
+  demo: 'Demo session',
   general: 'General enquiry',
 };
 
@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
         .select('org_name, logo_url, verify_base_url, signatory_name, signatory_title, signatory_image_url, support_email')
         .single();
       const appUrl = String(org?.verify_base_url ?? '').replace(/\/+$/, '');
-      const { data: staff } = await admin.from('profiles').select('id, email').in('role', ['admin', 'super_admin']).eq('status', 'active').is('archived_at', null);
+      const { data: staff } = await admin.from('profiles').select('id, email').in('role', ['admin', 'super_admin', 'instructor']).eq('status', 'active').is('archived_at', null);
 
       const title = `New enquiry: ${fullName}`;
       const summary = [KINDS[kind], interest, organisation].filter(Boolean).join(' · ');
