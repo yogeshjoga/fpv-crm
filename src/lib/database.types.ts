@@ -3185,6 +3185,57 @@ export type Database = {
           },
         ]
       }
+      site_videos: {
+        Row: {
+          caption: string
+          created_at: string
+          id: string
+          is_published: boolean
+          kind: string
+          poster_path: string | null
+          poster_url: string
+          sort_order: number
+          title: string
+          video_low_path: string | null
+          video_path: string | null
+          video_url: string | null
+          video_url_low: string | null
+          youtube_id: string | null
+        }
+        Insert: {
+          caption?: string
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          kind: string
+          poster_path?: string | null
+          poster_url: string
+          sort_order?: number
+          title: string
+          video_low_path?: string | null
+          video_path?: string | null
+          video_url?: string | null
+          video_url_low?: string | null
+          youtube_id?: string | null
+        }
+        Update: {
+          caption?: string
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          kind?: string
+          poster_path?: string | null
+          poster_url?: string
+          sort_order?: number
+          title?: string
+          video_low_path?: string | null
+          video_path?: string | null
+          video_url?: string | null
+          video_url_low?: string | null
+          youtube_id?: string | null
+        }
+        Relationships: []
+      }
       site_partners: {
         Row: {
           created_at: string

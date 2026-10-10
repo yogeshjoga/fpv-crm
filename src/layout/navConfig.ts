@@ -2,7 +2,7 @@ import {
   LayoutDashboard, BookOpen, Award, UserCircle, CalendarDays,
   ClipboardCheck, Users, GraduationCap, Briefcase, Megaphone,
   FormInput, Inbox, ScrollText, Settings2, UserPlus, BarChart3,
-  MessageCircle, ImagePlus, Layers3, HelpCircle, IdCard, Activity, FolderOpen, MessageSquareHeart, ListChecks, ClipboardList, Handshake, ShieldCheck, CalendarRange, Images, Newspaper, Building2,
+  MessageCircle, ImagePlus, Layers3, HelpCircle, IdCard, Activity, FolderOpen, MessageSquareHeart, ListChecks, ClipboardList, Handshake, ShieldCheck, CalendarRange, Images, Newspaper, Building2, Video,
 } from 'lucide-react';
 import type { NavItem } from './Shell';
 
@@ -48,6 +48,7 @@ export const adminNav: NavItem[] = [
   { to: '/admin/reviews', label: 'Reviews', icon: MessageSquareHeart, key: 'reviews' },
   { to: '/admin/enquiries', label: 'Enquiries', icon: Inbox, key: 'enquiries' },
   { to: '/admin/site-gallery', label: 'Site Gallery', icon: Images, key: 'site-gallery' },
+  { to: '/admin/site-videos', label: 'Site Videos', icon: Video, key: 'site-videos' },
   { to: '/admin/site-partners', label: 'Site Partners', icon: Building2, key: 'site-partners' },
   { to: '/admin/site-blog', label: 'Site Blog', icon: Newspaper, key: 'site-blog', superAdminOnly: true },
   { to: '/admin/analytics', label: 'Analytics', icon: BarChart3, key: 'analytics', superAdminOnly: true },

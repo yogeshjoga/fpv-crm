@@ -68,6 +68,7 @@ import { AdminAnalytics } from './pages/admin/AdminAnalytics';
 import { AdminAsk } from './pages/admin/AdminAsk';
 import { AdminSiteGallery } from './pages/admin/AdminSiteGallery';
 import { AdminSitePartners } from './pages/admin/AdminSitePartners';
+import { AdminSiteVideos } from './pages/admin/AdminSiteVideos';
 import { AdminEnquiries } from './pages/admin/AdminEnquiries';
 import { AdminSiteBlog } from './pages/admin/AdminSiteBlog';
 import { Settings } from './pages/admin/Settings';
@@ -381,6 +382,14 @@ export function AppRoutes() {
           element={
             <RequireModule moduleKey="enquiries">
               <AdminEnquiries />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="site-videos"
+          element={
+            <RequireModule moduleKey="site-videos">
+              <AdminSiteVideos />
             </RequireModule>
           }
         />

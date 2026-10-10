@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   LayoutDashboard, UserPlus, Inbox, ClipboardCheck, GraduationCap, Layers3, FileQuestion,
   FormInput, CalendarDays, Megaphone, ScrollText, MessageCircle, BarChart3, Briefcase,
-  Users, Settings2, Workflow, ChevronRight, Lock, IdCard, Activity, Images, Newspaper, Building2, MessageSquareHeart,
+  Users, Settings2, Workflow, ChevronRight, Lock, IdCard, Activity, Images, Newspaper, Building2, Video, MessageSquareHeart,
 } from 'lucide-react';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, PageHeader } from '../../components/ui/kit';
@@ -203,6 +203,20 @@ const SECTIONS: Section[] = [
       'Use the phone and mail icons on a card to contact the person. The filters and search narrow the list, and admins can export it as a CSV.',
       'Enquiries hold phone numbers and emails, so by default only admins can see them. A super admin can change this per role in Company Settings → module access (\"Enquiries\").',
       'Delete spam or test entries from the enquiry itself. Deleting is permanent.',
+    ],
+  },
+  {
+    id: 'site-videos',
+    icon: Video,
+    title: 'Site Videos',
+    summary: 'The video carousel on the Home and Workshops pages. Add videos you upload, or YouTube links, and arrange them in the order you want.',
+    points: [
+      'Choose "Upload a video file" for an MP4 or WebM of up to 50 MB (a 720p MP4 is usually 5 to 10 MB per minute, so compress long videos first), or "YouTube link" and paste any YouTube address.',
+      'The poster image is taken automatically from the first second of an uploaded video, or from YouTube\'s own thumbnail. Choose an image only if you want a different one.',
+      'Uploaded videos play without sound. You can add a lighter copy (for example 480p) that phones and slow connections use. YouTube videos play in YouTube\'s privacy-enhanced player, only when a visitor presses play.',
+      'Use the arrows to change the order, the eye to hide a video without deleting it, and the pencil to change its title, description, file or link.',
+      'Changes appear on the website straight away. Deleting a video also deletes its uploaded files, so hide it instead if you may want it back.',
+      'Until you add a video here, the website shows its built-in workshop film. Who can manage this is set per role in Company Settings → module access ("Site Videos"). Super Admins always can.',
     ],
   },
   {
