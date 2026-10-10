@@ -193,6 +193,19 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    id: 'enquiries',
+    icon: Inbox,
+    title: 'Enquiries',
+    summary: 'Everyone who filled in the enquiry form on the public website: students, parents, colleges and universities.',
+    points: [
+      'When someone sends the form, it appears here straight away and admins get a notification and an email with their details.',
+      'Open an enquiry to see the full message. Set its status (New, Contacted, Qualified, Won or Lost), assign it to a team member and keep notes on calls and next steps.',
+      'Use the phone and mail icons on a card to contact the person. The filters and search narrow the list, and admins can export it as a CSV.',
+      'Enquiries hold phone numbers and emails, so by default only admins can see them. A super admin can change this per role in Company Settings → module access (\"Enquiries\").',
+      'Delete spam or test entries from the enquiry itself. Deleting is permanent.',
+    ],
+  },
+  {
     id: 'site-partners',
     icon: Building2,
     title: 'Site Partners',

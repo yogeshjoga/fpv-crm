@@ -2961,6 +2961,68 @@ export type Database = {
         }
         Relationships: []
       }
+      site_enquiries: {
+        Row: {
+          assigned_to: string | null
+          consent_at: string
+          created_at: string
+          email: string | null
+          full_name: string
+          id: string
+          interest: string
+          kind: string
+          message: string
+          notes: string
+          organisation: string
+          phone: string | null
+          source_page: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          consent_at?: string
+          created_at?: string
+          email?: string | null
+          full_name: string
+          id?: string
+          interest?: string
+          kind: string
+          message?: string
+          notes?: string
+          organisation?: string
+          phone?: string | null
+          source_page?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          consent_at?: string
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          id?: string
+          interest?: string
+          kind?: string
+          message?: string
+          notes?: string
+          organisation?: string
+          phone?: string | null
+          source_page?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_enquiries_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       site_featured_reviews: {
         Row: {
           consent: string

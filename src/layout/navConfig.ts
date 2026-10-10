@@ -46,6 +46,7 @@ export const adminNav: NavItem[] = [
   { to: '/admin/ask', label: 'Questions', icon: MessageCircle, key: 'ask' },
   { to: '/admin/careers', label: 'Careers', icon: Handshake, key: 'careers' },
   { to: '/admin/reviews', label: 'Reviews', icon: MessageSquareHeart, key: 'reviews' },
+  { to: '/admin/enquiries', label: 'Enquiries', icon: Inbox, key: 'enquiries' },
   { to: '/admin/site-gallery', label: 'Site Gallery', icon: Images, key: 'site-gallery' },
   { to: '/admin/site-partners', label: 'Site Partners', icon: Building2, key: 'site-partners' },
   { to: '/admin/site-blog', label: 'Site Blog', icon: Newspaper, key: 'site-blog', superAdminOnly: true },
