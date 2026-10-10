@@ -297,16 +297,22 @@ export async function verifyCaptcha(token: unknown, ip: string) {
 export async function requireStrongUser(req: Request, admin = adminClient()) {
   const user = await requireUser(req, admin);
   let aal = 'aal1';
+  let sessionId = '';
   try {
     const jwt = (req.headers.get('Authorization') ?? '').replace('Bearer ', '').trim();
     const payload = JSON.parse(atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
     aal = payload.aal ?? 'aal1';
+    sessionId = payload.session_id ?? '';
   } catch {
     /* the token was already verified by requireUser; an unreadable aal counts as aal1 */
   }
   if (aal !== 'aal2') {
     const { data } = await admin.rpc('user_has_mfa', { p_uid: user.id });
-    if (data === true) throw new HttpError(401, 'Two-step verification is required. Sign out, sign in again and enter your code.');
+    if (data === true) {
+      // a session let in on a trusted device (the person chose "don't ask again here") counts as having passed the code
+      const trusted = sessionId ? (await admin.rpc('trusted_session_valid', { p_uid: user.id, p_session: sessionId })).data === true : false;
+      if (!trusted) throw new HttpError(401, 'Two-step verification is required. Sign out, sign in again and enter your code.');
+    }
   }
   return user;
 }

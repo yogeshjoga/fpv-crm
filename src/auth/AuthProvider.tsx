@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import type { Session } from '@supabase/supabase-js';
 import { supabase, APP_URL } from '../lib/supabase';
 import type { Tables } from '../lib/database.types';
+import { restoreTrust } from '../lib/trustedDevice';
 
 export type Profile = Tables<'profiles'>;
 
@@ -20,7 +21,7 @@ interface AuthContextValue {
   updatePassword: (password: string) => Promise<{ error?: string }>;
   refreshProfile: () => Promise<void>;
   /** Two-step verification: `needsChallenge` is true for a signed-in person who has it on but has not entered a code this session. */
-  mfa: { checked: boolean; enrolled: boolean; needsChallenge: boolean };
+  mfa: { checked: boolean; enrolled: boolean; needsChallenge: boolean; trusted: boolean };
   refreshMfa: () => Promise<void>;
 }
 
@@ -53,13 +54,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [mfa, setMfa] = useState({ checked: false, enrolled: false, needsChallenge: false });
+  const [mfa, setMfa] = useState({ checked: false, enrolled: false, needsChallenge: false, trusted: false });
 
   const refreshMfa = useCallback(async () => {
     const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     // if this cannot be read we do not lock the person out here; the database still enforces it on every request
-    if (error || !data) return setMfa({ checked: true, enrolled: false, needsChallenge: false });
-    setMfa({ checked: true, enrolled: data.nextLevel === 'aal2', needsChallenge: data.nextLevel === 'aal2' && data.currentLevel !== 'aal2' });
+    if (error || !data) return setMfa({ checked: true, enrolled: false, needsChallenge: false, trusted: false });
+    const enrolled = data.nextLevel === 'aal2';
+    let needsChallenge = enrolled && data.currentLevel !== 'aal2';
+    let trusted = false;
+    if (needsChallenge) {
+      // a computer the person marked "don't ask again" does not need the code: this session may already be trusted,
+      // or the browser's device cookie can make it so
+      const { data: already } = await supabase.rpc('session_is_trusted');
+      trusted = already === true;
+      if (!trusted) {
+        const { data: sess } = await supabase.auth.getSession();
+        if (sess.session) trusted = await restoreTrust(sess.session.access_token);
+      }
+      if (trusted) needsChallenge = false;
+    }
+    setMfa({ checked: true, enrolled, needsChallenge, trusted });
   }, []);
 
   const loadProfile = useCallback(async (userId: string) => {
@@ -80,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.session?.user) {
         await loadProfile(data.session.user.id);
         await refreshMfa();
-      } else setMfa({ checked: true, enrolled: false, needsChallenge: false });
+      } else setMfa({ checked: true, enrolled: false, needsChallenge: false, trusted: false });
       setLoading(false);
     });
 
@@ -93,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setTimeout(() => void refreshMfa(), 0);
       } else {
         setProfile(null);
-        setMfa({ checked: true, enrolled: false, needsChallenge: false });
+        setMfa({ checked: true, enrolled: false, needsChallenge: false, trusted: false });
       }
     });
     return () => {
@@ -106,7 +121,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const staffRole = profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.role === 'instructor' || profile?.role === 'coordinator';
   useEffect(() => {
     if (!session || !staffRole) return;
-    const LIMIT_MS = 30 * 60 * 1000;
+    // a trusted computer stays signed in; elsewhere a staff session ends after 2 hours without use
+    if (mfa.trusted) return;
+    const LIMIT_MS = 2 * 60 * 60 * 1000;
     let last = Date.now();
     const touch = () => {
       last = Date.now();
@@ -123,7 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       events.forEach((e) => window.removeEventListener(e, touch));
       window.clearInterval(timer);
     };
-  }, [session, staffRole]);
+  }, [session, staffRole, mfa.trusted]);
 
   const signIn: AuthContextValue['signIn'] = async (email, password) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
