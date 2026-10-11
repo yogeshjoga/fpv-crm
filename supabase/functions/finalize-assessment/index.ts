@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
     const { data: me } = await admin.from('profiles').select('role, status').eq('id', user.id).single();
     if (!me || me.status !== 'active' || !STAFF_ROLES.includes(me.role)) throw new HttpError(403, 'Only staff can finalise results.');
 
-    const { course_id, student_ids } = (await req.json().catch(() => ({}))) as { course_id?: string; student_ids?: string[] };
+    const { course_id, student_ids, resend } = (await req.json().catch(() => ({}))) as { course_id?: string; student_ids?: string[]; resend?: boolean };
     if (!course_id) throw new HttpError(400, 'course_id is required.');
     if (!Array.isArray(student_ids) || student_ids.length < 1 || student_ids.length > 8) {
       throw new HttpError(400, 'Send between 1 and 8 student_ids per request.');
@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
     const results = [];
     for (const studentId of student_ids) {
       try {
-        results.push({ student_id: studentId, ...(await (composite ? finalizeOne(admin, course, studentId) : issueOnPass(admin, course, studentId))) });
+        results.push({ student_id: studentId, ...(await (resend ? resendOne(admin, course, studentId) : composite ? finalizeOne(admin, course, studentId) : issueOnPass(admin, course, studentId))) });
       } catch (e) {
         results.push({ student_id: studentId, status: 'error', message: (e as Error).message });
       }
@@ -47,6 +47,31 @@ Deno.serve(async (req) => {
     return json({ error: (e as Error).message }, status);
   }
 });
+
+/**
+ * Emails a certificate that was already issued to the student again (they say it never arrived). The same PDF and report card
+ * are sent; nothing new is created, so the certificate number and date stay as they were.
+ */
+async function resendOne(admin: Admin, course: Course, studentId: string) {
+  const { data: existing } = await admin
+    .from('certificates')
+    .select('cert_id_string')
+    .eq('student_id', studentId)
+    .eq('course_id', course.id)
+    .eq('revoked', false)
+    .maybeSingle();
+  if (!existing) return { status: 'no_certificate' };
+
+  const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-certificate`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ student_id: studentId, course_id: course.id, resend: true }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error ?? `Could not resend (${res.status})`);
+  if (!body.resent) return { status: 'not_sent', cert_id_string: existing.cert_id_string, message: body.skipped ?? 'The email service did not accept the message.' };
+  return { status: 'resent', cert_id_string: existing.cert_id_string };
+}
 
 /**
  * Ordinary (single exam) courses: the admin issues the certificate for a student who has passed. Nothing is

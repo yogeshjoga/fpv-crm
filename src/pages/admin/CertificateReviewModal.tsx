@@ -30,13 +30,16 @@ export function CertificateReviewModal({
   candidates,
   onSend,
   onClose,
+  initialPicked,
 }: {
   courseTitle: string;
   candidates: ReviewCandidate[];
+  /** Students already ticked when the window opens (e.g. chosen in the marks table). */
+  initialPicked?: string[];
   onSend: (ids: string[]) => Promise<void>;
   onClose: () => void;
 }) {
-  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [picked, setPicked] = useState<Set<string>>(new Set(initialPicked ?? []));
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'qualified' | 'not'>('all');
   const [busy, setBusy] = useState(false);

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Award, ClipboardCheck, Download, Eye, FileSpreadsheet, FileText, RotateCcw, Search, Settings2, Trash2 } from 'lucide-react';
+import { Award, ClipboardCheck, Download, Eye, FileSpreadsheet, FileText, Mail, RotateCcw, Search, Settings2, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { invokeFn } from '../../lib/functions';
 import { useAuth } from '../../auth/AuthProvider';
@@ -404,12 +404,15 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
   const toast = useToast();
   const [search, setSearch] = useState('');
   const [issuing, setIssuing] = useState<string | null>(null);
+  const [resending, setResending] = useState<string | null>(null);
   // Printable / Excel mark sheets for rounds examined offline (pen and paper first).
   const [sheetOpen, setSheetOpen] = useState(false);
   // Shows what a student will see on their report card, before the certificate is issued.
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set()); // students ticked in the table, to send certificates to
+  const [reviewIds, setReviewIds] = useState<string[] | undefined>(undefined);
   const [sheetBusy, setSheetBusy] = useState(false);
   const [sheet, setSheet] = useState<{ part: SheetPart; format: SheetFormat; withMarks: boolean; withEmail: boolean }>({
     part: 'viva',
@@ -506,6 +509,29 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
   }, [rows, search]);
 
   const ready = rows.filter((r) => r.complete && !r.cert);
+  // A student can be ticked once every mark is in: a ready one to get a certificate, an issued one to be emailed it again.
+  const selectable = (r: (typeof rows)[number]) => r.complete;
+  const pickedIds = ready.filter((r) => selected.has(r.id)).map((r) => r.id);
+  const pickedIssuedIds = rows.filter((r) => r.cert && selected.has(r.id)).map((r) => r.id);
+  const selectableVisible = visible.filter(selectable);
+  const allVisiblePicked = selectableVisible.length > 0 && selectableVisible.every((r) => selected.has(r.id));
+  const someVisiblePicked = selectableVisible.some((r) => selected.has(r.id));
+  const toggleOne = (id: string, on: boolean) =>
+    setSelected((p) => {
+      const n = new Set(p);
+      if (on) n.add(id);
+      else n.delete(id);
+      return n;
+    });
+  const toggleAllVisible = (on: boolean) =>
+    setSelected((p) => {
+      const n = new Set(p);
+      for (const r of selectableVisible) {
+        if (on) n.add(r.id);
+        else n.delete(r.id);
+      }
+      return n;
+    });
   // Everyone who has not been sent a certificate yet, for the admin to review and tick.
   const candidates: ReviewCandidate[] = rows
     .filter((r) => !r.cert)
@@ -538,6 +564,34 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
     }
     q.refetch();
     return true;
+  };
+
+  // Emails the certificate that was already issued again, for a student who says it never arrived.
+  const resend = async (ids: string[]) => {
+    setResending(ids.length === 1 ? ids[0] : 'many');
+    let done = 0;
+    const problems: string[] = [];
+    const nameOf = (id: string) => rows.find((r) => r.id === id)?.name ?? 'Student';
+    for (let i = 0; i < ids.length; i += 5) {
+      try {
+        const res = await invokeFn<{ results: { student_id: string; status: string; message?: string }[] }>('finalize-assessment', {
+          course_id: course.id,
+          student_ids: ids.slice(i, i + 5),
+          resend: true,
+        });
+        for (const r of res.results) {
+          if (r.status === 'resent') done++;
+          else problems.push(`${nameOf(r.student_id)}: ${r.status === 'no_certificate' ? 'no certificate issued yet' : r.message ?? 'could not be sent'}`);
+        }
+      } catch (e) {
+        problems.push((e as Error).message);
+        break;
+      }
+    }
+    setResending(null);
+    if (done) toast(`Certificate emailed again to ${done} student${done > 1 ? 's' : ''}`);
+    if (problems.length) toast(problems.slice(0, 3).join(' · '), 'error');
+    if (done) setSelected(new Set());
   };
 
   const issue = async (ids: string[]) => {
@@ -640,7 +694,7 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
             </Button>
           )}
           {canMark && (
-            <Button onClick={() => setReviewOpen(true)} disabled={!candidates.length} loading={issuing === 'all'}>
+            <Button onClick={() => { setReviewIds(undefined); setReviewOpen(true); }} disabled={!candidates.length} loading={issuing === 'all'}>
               <Award size={15} /> Review &amp; send certificates{ready.length ? ` (${ready.length} ready)` : ''}
             </Button>
           )}
@@ -669,8 +723,49 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
         )}
       </div>
 
+      {canMark && pickedIds.length + pickedIssuedIds.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50/80 px-4 py-2.5 text-sm">
+          <span className="font-medium text-blue-900">{pickedIds.length + pickedIssuedIds.length} selected</span>
+          {pickedIds.length > 0 && (
+            <Button
+              onClick={() => {
+                setReviewIds(pickedIds);
+                setReviewOpen(true);
+              }}
+              loading={issuing === 'all'}
+            >
+              <Award size={15} /> Review &amp; send certificates ({pickedIds.length})
+            </Button>
+          )}
+          {pickedIssuedIds.length > 0 && (
+            <Button
+              variant="secondary"
+              loading={resending === 'many'}
+              onClick={() => {
+                if (window.confirm(`Email the certificate again to ${pickedIssuedIds.length} student${pickedIssuedIds.length > 1 ? 's' : ''}?`)) resend(pickedIssuedIds);
+              }}
+            >
+              <Mail size={15} /> Resend certificate email ({pickedIssuedIds.length})
+            </Button>
+          )}
+          <button type="button" className="text-xs font-medium text-neutral-500 hover:underline" onClick={() => setSelected(new Set())}>
+            Clear selection
+          </button>
+          <span className="text-xs text-blue-900/70">New certificates are confirmed in a list before anything is emailed.</span>
+        </div>
+      )}
+
       {canMark && reviewOpen && (
-        <CertificateReviewModal courseTitle={course.title} candidates={candidates} onSend={(ids) => issue(ids)} onClose={() => setReviewOpen(false)} />
+        <CertificateReviewModal
+          courseTitle={course.title}
+          candidates={candidates}
+          initialPicked={reviewIds}
+          onSend={async (ids) => {
+            await issue(ids);
+            setSelected(new Set());
+          }}
+          onClose={() => setReviewOpen(false)}
+        />
       )}
 
       {canExport && resetOpen && (
@@ -690,6 +785,22 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
           <table className="w-full min-w-[900px] text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-neutral-400">
+                {canMark && (
+                  <th className="w-10 px-3 py-3">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={allVisiblePicked}
+                      ref={(el) => {
+                        if (el) el.indeterminate = someVisiblePicked && !allVisiblePicked;
+                      }}
+                      disabled={!selectableVisible.length}
+                      onChange={(e) => toggleAllVisible(e.target.checked)}
+                      aria-label="Select every student who is ready"
+                      title={`Select all ${selectableVisible.length} ready students shown`}
+                    />
+                  </th>
+                )}
                 <th className="px-3 py-3">Student</th>
                 {components.map((c) => (
                   <th key={c.key} className="px-3 py-3">
@@ -711,6 +822,19 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
             <tbody className="divide-y divide-white/50">
               {visible.map((r) => (
                 <tr key={r.id}>
+                  {canMark && (
+                    <td className="px-3 py-2">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        disabled={!selectable(r)}
+                        checked={selected.has(r.id)}
+                        onChange={(e) => toggleOne(r.id, e.target.checked)}
+                        aria-label={`Select ${r.name}`}
+                        title={selectable(r) ? undefined : 'Waiting for marks'}
+                      />
+                    </td>
+                  )}
                   <td className="px-3 py-2">
                     <div className="font-medium text-neutral-900">{r.name}</div>
                     <div className="text-xs text-neutral-500">{r.email}</div>
@@ -758,6 +882,18 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
                       {canMark && r.complete && !r.cert && (
                         <Button variant="secondary" onClick={() => issue([r.id])} loading={issuing === r.id}>
                           Issue
+                        </Button>
+                      )}
+                      {canMark && r.cert && (
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            if (window.confirm(`Email the certificate again to ${r.name} (${r.email})?`)) resend([r.id]);
+                          }}
+                          loading={resending === r.id}
+                          title="Email this certificate to the student again"
+                        >
+                          <Mail size={14} /> Resend
                         </Button>
                       )}
                     </div>

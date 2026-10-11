@@ -88,13 +88,98 @@ async function embedTrimmedImage(pdf: PDFDocument, url: string) {
   return await pdf.embedPng(bytes);
 }
 
+type Report = {
+  modules: { key: string; label: string; marks: number; max: number; pass: number; cleared: boolean; note?: string }[];
+  total: number;
+  max: number;
+  clearedAll: boolean;
+  failed: string[];
+};
+type Breakdown = { online: number; viva: number; simulation: number; piloting: number; total: number; max: number };
+
+/** The certificate email: the report card (when there is one), the PDF attached and the public verification link. */
+async function emailCertificate(o: {
+  student: { full_name: string | null; email: string };
+  course: { title: string };
+  // deno-lint-ignore no-explicit-any
+  org: any;
+  certId: string;
+  verifyUrl: string;
+  certType: string;
+  report?: Report | null;
+  breakdown?: Breakdown;
+  score_pct?: number | null;
+  pdfBytes: Uint8Array;
+}) {
+  const { student, course, org, certId, verifyUrl, certType, breakdown, score_pct, pdfBytes } = o;
+  const report = o.report ?? undefined;
+  const isMerit = certType.toLowerCase() === 'merit';
+  const cell = 'padding:6px 14px 6px 0;border-bottom:1px solid #eee';
+  // Module-by-module report card in the email: marks, pass mark and a clear Cleared / Not cleared.
+  const marksTable = report
+    ? `<table style="border-collapse:collapse;margin:0 0 16px;font-size:14px;color:#444;width:100%">` +
+      `<tr style="text-align:left;color:#888;font-size:12px"><th style="${cell}">Module</th><th style="${cell}">Your marks</th><th style="${cell}">Pass mark</th><th style="${cell}">Status</th></tr>` +
+      report.modules
+        .map(
+          (m) =>
+            m.note
+              ? `<tr><td style="${cell}">${esc(m.label)}</td><td style="${cell};font-weight:600" colspan="2">${esc(m.note)}</td><td style="${cell};color:#555">Not marked</td></tr>`
+              : `<tr><td style="${cell}">${esc(m.label)}</td><td style="${cell};font-weight:600">${m.marks} / ${m.max}</td><td style="${cell}">${m.pass}</td>` +
+                `<td style="${cell};font-weight:600;color:${m.cleared ? '#15803d' : '#b91c1c'}">${m.cleared ? 'Cleared' : 'Not cleared'}</td></tr>`,
+        )
+        .join('') +
+      `<tr><td style="padding:8px 14px 4px 0"><strong>Total</strong></td><td style="padding:8px 14px 4px 0;font-weight:700" colspan="3">${report.total} / ${report.max}</td></tr></table>`
+    : breakdown
+      ? `<table style="border-collapse:collapse;margin:0 0 16px;font-size:14px;color:#444">` +
+        (
+          [
+            ['Online exam', breakdown.online],
+            ['Viva', breakdown.viva],
+            ['Simulation', breakdown.simulation],
+            ['Free flight', breakdown.piloting],
+          ] as [string, number][]
+        )
+          .map(([k, v]) => `<tr><td style="padding:3px 24px 3px 0">${k}</td><td style="padding:3px 0;font-weight:600">${v}</td></tr>`)
+          .join('') +
+        `<tr><td style="padding:6px 24px 3px 0;border-top:1px solid #e5e5e5"><strong>Total</strong></td><td style="padding:6px 0 3px;border-top:1px solid #e5e5e5;font-weight:700">${breakdown.total} / ${breakdown.max}</td></tr></table>`
+      : '';
+  const notCleared =
+    report && !report.clearedAll
+      ? `<p style="margin:0 0 16px;color:#444">To earn a Certificate of Merit a student has to clear <strong>every</strong> module, whatever the total. You did not clear: <strong>${esc(report.failed.join(', '))}</strong>.</p>`
+      : '';
+  const intro = breakdown
+    ? isMerit
+      ? `<h1 style="font-size:20px;margin:0 0 12px;color:#0a0a0a">Congratulations, ${esc(student.full_name || 'there')}! 🎉</h1>` +
+        `<p style="margin:0 0 16px;color:#444">You cleared every module and earned a <strong>Certificate of Merit</strong> for <strong>${esc(course.title)}</strong>. Here is your report card:</p>`
+      : `<h1 style="font-size:20px;margin:0 0 12px;color:#0a0a0a">Thank you for taking part, ${esc(student.full_name || 'there')}!</h1>` +
+        `<p style="margin:0 0 16px;color:#444">You completed <strong>${esc(course.title)}</strong>. Here is your Certificate of Participation and your report card:</p>`
+    : `<h1 style="font-size:20px;margin:0 0 12px;color:#0a0a0a">Congratulations, ${esc(student.full_name || 'there')}! 🎉</h1>` +
+      `<p style="margin:0 0 16px;color:#444">You passed <strong>${esc(course.title)}</strong> with a score of ${Number(score_pct ?? 0)}%.</p>`;
+
+  return await sendEmail({
+    to: student.email,
+    subject: breakdown
+      ? `Your ${org.org_name} Certificate of ${certType} - ${course.title}`
+      : `Your ${org.org_name} certificate - ${course.title}`,
+    html: emailShell(
+      intro +
+        marksTable +
+        notCleared +
+        `<p style="margin:0 0 16px;color:#444">Your certificate <strong>${certId}</strong> is attached to this email. Anyone can confirm it here:</p>` +
+        `<p style="margin:0"><a href="${verifyUrl}" style="color:#0a0a0a">${verifyUrl}</a></p>`,
+      org,
+    ),
+    attachments: [{ filename: `${certId}.pdf`, content: encodeBase64(pdfBytes) }],
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
   try {
     if (!callerIsServiceRole(req)) throw new HttpError(403, 'Forbidden.');
     const admin = adminClient();
-    const { attempt_id, student_id, course_id, score_pct, cert_type, breakdown, report } = (await req.json()) as {
+    const { attempt_id, student_id, course_id, score_pct, cert_type, breakdown, report, resend } = (await req.json()) as {
       attempt_id?: string;
       student_id?: string;
       course_id?: string;
@@ -102,26 +187,47 @@ Deno.serve(async (req) => {
       /** Per-certificate type (e.g. "Merit"); falls back to the course's cert_type. */
       cert_type?: string;
       /** Composite assessment marks; when present the certificate reports total marks, not exam %. */
-      breakdown?: { online: number; viva: number; simulation: number; piloting: number; total: number; max: number };
+      breakdown?: Breakdown;
       /** Per-module report card snapshot (marks, pass marks, cleared flags) from finalize-assessment. */
-      report?: {
-        modules: { key: string; label: string; marks: number; max: number; pass: number; cleared: boolean; note?: string }[];
-        total: number;
-        max: number;
-        clearedAll: boolean;
-        failed: string[];
-      };
+      report?: Report;
+      /** Email the certificate that was already issued again; nothing new is created. */
+      resend?: boolean;
     };
     if (!student_id || !course_id) throw new HttpError(400, 'student_id and course_id are required.');
 
     const { data: existing } = await admin
       .from('certificates')
-      .select('cert_id_string, pdf_path')
+      .select('cert_id_string, pdf_path, cert_type, report, score_pct')
       .eq('student_id', student_id)
       .eq('course_id', course_id)
       .eq('revoked', false)
       .maybeSingle();
-    if (existing) return json(existing);
+    if (existing && !resend) return json({ cert_id_string: existing.cert_id_string, pdf_path: existing.pdf_path });
+    if (existing) {
+      const [{ data: org }, { data: course }, { data: student }] = await Promise.all([
+        admin.from('org_settings').select('*').single(),
+        admin.from('courses').select('title, cert_type').eq('id', course_id).single(),
+        admin.from('profiles').select('full_name, email').eq('id', student_id).single(),
+      ]);
+      if (!org || !course || !student) throw new HttpError(404, 'Missing data for certificate.');
+      const file = await admin.storage.from('certificates').download(existing.pdf_path);
+      if (file.error || !file.data) throw new HttpError(500, 'The certificate file could not be found.');
+      const pdfBytes = new Uint8Array(await file.data.arrayBuffer());
+      const stored = (existing.report ?? undefined) as Report | undefined;
+      const sent = await emailCertificate({
+        student,
+        course,
+        org,
+        certId: existing.cert_id_string,
+        verifyUrl: `${String(org.verify_base_url || '').replace(//+$/, '')}/verify/${existing.cert_id_string}`,
+        certType: String(existing.cert_type || course.cert_type || 'Participation'),
+        report: stored,
+        breakdown: stored ? { online: 0, viva: 0, simulation: 0, piloting: 0, total: stored.total, max: stored.max } : undefined,
+        score_pct: existing.score_pct,
+        pdfBytes,
+      });
+      return json({ cert_id_string: existing.cert_id_string, resent: sent.sent, skipped: sent.skipped ?? null });
+    }
 
     const [{ data: org }, { data: course }, { data: student }] = await Promise.all([
       admin.from('org_settings').select('*').single(),
@@ -352,64 +458,7 @@ Deno.serve(async (req) => {
       link: report ? '/app/report-card' : '/app/certificates',
     });
 
-    const isMerit = certType.toLowerCase() === 'merit';
-    const cell = 'padding:6px 14px 6px 0;border-bottom:1px solid #eee';
-    // Module-by-module report card in the email: marks, pass mark and a clear Cleared / Not cleared.
-    const marksTable = report
-      ? `<table style="border-collapse:collapse;margin:0 0 16px;font-size:14px;color:#444;width:100%">` +
-        `<tr style="text-align:left;color:#888;font-size:12px"><th style="${cell}">Module</th><th style="${cell}">Your marks</th><th style="${cell}">Pass mark</th><th style="${cell}">Status</th></tr>` +
-        report.modules
-          .map(
-            (m) =>
-              m.note
-                ? `<tr><td style="${cell}">${esc(m.label)}</td><td style="${cell};font-weight:600" colspan="2">${esc(m.note)}</td><td style="${cell};color:#555">Not marked</td></tr>`
-                : `<tr><td style="${cell}">${esc(m.label)}</td><td style="${cell};font-weight:600">${m.marks} / ${m.max}</td><td style="${cell}">${m.pass}</td>` +
-                  `<td style="${cell};font-weight:600;color:${m.cleared ? '#15803d' : '#b91c1c'}">${m.cleared ? 'Cleared' : 'Not cleared'}</td></tr>`,
-          )
-          .join('') +
-        `<tr><td style="padding:8px 14px 4px 0"><strong>Total</strong></td><td style="padding:8px 14px 4px 0;font-weight:700" colspan="3">${report.total} / ${report.max}</td></tr></table>`
-      : breakdown
-        ? `<table style="border-collapse:collapse;margin:0 0 16px;font-size:14px;color:#444">` +
-          (
-            [
-              ['Online exam', breakdown.online],
-              ['Viva', breakdown.viva],
-              ['Simulation', breakdown.simulation],
-              ['Free flight', breakdown.piloting],
-            ] as [string, number][]
-          )
-            .map(([k, v]) => `<tr><td style="padding:3px 24px 3px 0">${k}</td><td style="padding:3px 0;font-weight:600">${v}</td></tr>`)
-            .join('') +
-          `<tr><td style="padding:6px 24px 3px 0;border-top:1px solid #e5e5e5"><strong>Total</strong></td><td style="padding:6px 0 3px;border-top:1px solid #e5e5e5;font-weight:700">${breakdown.total} / ${breakdown.max}</td></tr></table>`
-        : '';
-    const notCleared =
-      report && !report.clearedAll
-        ? `<p style="margin:0 0 16px;color:#444">To earn a Certificate of Merit a student has to clear <strong>every</strong> module, whatever the total. You did not clear: <strong>${esc(report.failed.join(', '))}</strong>.</p>`
-        : '';
-    const intro = breakdown
-      ? isMerit
-        ? `<h1 style="font-size:20px;margin:0 0 12px;color:#0a0a0a">Congratulations, ${esc(student.full_name || 'there')}! 🎉</h1>` +
-          `<p style="margin:0 0 16px;color:#444">You cleared every module and earned a <strong>Certificate of Merit</strong> for <strong>${esc(course.title)}</strong>. Here is your report card:</p>`
-        : `<h1 style="font-size:20px;margin:0 0 12px;color:#0a0a0a">Thank you for taking part, ${esc(student.full_name || 'there')}!</h1>` +
-          `<p style="margin:0 0 16px;color:#444">You completed <strong>${esc(course.title)}</strong>. Here is your Certificate of Participation and your report card:</p>`
-      : `<h1 style="font-size:20px;margin:0 0 12px;color:#0a0a0a">Congratulations, ${esc(student.full_name || 'there')}! 🎉</h1>` +
-        `<p style="margin:0 0 16px;color:#444">You passed <strong>${esc(course.title)}</strong> with a score of ${Number(score_pct ?? 0)}%.</p>`;
-
-    await sendEmail({
-      to: student.email,
-      subject: breakdown
-        ? `Your ${org.org_name} Certificate of ${certType} - ${course.title}`
-        : `Your ${org.org_name} certificate - ${course.title}`,
-      html: emailShell(
-        intro +
-          marksTable +
-          notCleared +
-          `<p style="margin:0 0 16px;color:#444">Your certificate <strong>${certId}</strong> is attached to this email. Anyone can confirm it here:</p>` +
-          `<p style="margin:0"><a href="${verifyUrl}" style="color:#0a0a0a">${verifyUrl}</a></p>`,
-        org,
-      ),
-      attachments: [{ filename: `${certId}.pdf`, content: encodeBase64(pdfBytes) }],
-    });
+    await emailCertificate({ student, course, org, certId, verifyUrl, certType, report, breakdown, score_pct, pdfBytes });
 
     return json({ cert_id_string: certId, pdf_path: pdfPath });
   } catch (e) {
