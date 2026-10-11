@@ -1001,6 +1001,7 @@ export type Database = {
           id: string
           marks_online: number
           marks_piloting: number
+          piloting_label: string | null
           marks_simulation: number
           marks_viva: number
           max_attempts: number
@@ -1041,6 +1042,7 @@ export type Database = {
           id?: string
           marks_online?: number
           marks_piloting?: number
+          piloting_label?: string | null
           marks_simulation?: number
           marks_viva?: number
           max_attempts?: number
@@ -1081,6 +1083,7 @@ export type Database = {
           id?: string
           marks_online?: number
           marks_piloting?: number
+          piloting_label?: string | null
           marks_simulation?: number
           marks_viva?: number
           max_attempts?: number

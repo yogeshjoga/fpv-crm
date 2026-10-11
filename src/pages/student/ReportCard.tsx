@@ -18,6 +18,7 @@ interface CompositeCourse {
   pass_marks_viva: number;
   pass_marks_simulation: number;
   pass_marks_piloting: number;
+  piloting_label: string | null;
 }
 
 interface CertRow {
@@ -34,13 +35,14 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 // The standard Sivani scheme, used only to draw the sample report cards staff can preview.
 const SAMPLE_SCHEME: Scheme = {
-  max: { online: 15, viva: 15, simulation: 30, piloting: 40 },
-  pass: { online: 11.25, viva: 8, simulation: 24, piloting: 32 },
-  meritMin: 75,
+  max: { online: 15, viva: 15, simulation: 30, piloting: 0 },
+  pass: { online: 11.25, viva: 8, simulation: 24, piloting: 0 },
+  meritMin: 45,
+  unscored: { piloting: 'Moderate piloting skills' },
 };
 const SAMPLES = [
-  { name: 'Sample student — cleared every module', marks: { online: 13.5, viva: 12, simulation: 27, piloting: 36 } },
-  { name: 'Sample student — high total, but one module missed', marks: { online: 14, viva: 6, simulation: 28, piloting: 38 } },
+  { name: 'Sample student — cleared every module', marks: { online: 13.5, viva: 12, simulation: 27 } },
+  { name: 'Sample student — high total, but one module missed', marks: { online: 14, viva: 6, simulation: 28 } },
 ];
 
 /**
@@ -74,7 +76,7 @@ export function ReportCard() {
             supabase
               .from('courses')
               .select(
-                'id, title, marks_online, marks_viva, marks_simulation, marks_piloting, pass_marks_online, pass_marks_viva, pass_marks_simulation, pass_marks_piloting',
+                'id, title, marks_online, marks_viva, marks_simulation, marks_piloting, pass_marks_online, pass_marks_viva, pass_marks_simulation, pass_marks_piloting, piloting_label',
               )
               .eq('scoring_mode', 'composite'),
           ) as Promise<CompositeCourse[]>),
@@ -147,7 +149,7 @@ function AwaitingCard({ course: c }: { course: CompositeCourse }) {
     { label: 'Online exam', max: Number(c.marks_online), pass: Number(c.pass_marks_online) },
     { label: 'Viva', max: Number(c.marks_viva), pass: Number(c.pass_marks_viva) },
     { label: 'Simulation', max: Number(c.marks_simulation), pass: Number(c.pass_marks_simulation) },
-    { label: 'Free flight', max: Number(c.marks_piloting), pass: Number(c.pass_marks_piloting) },
+    { label: 'Free flight', max: Number(c.marks_piloting), pass: Number(c.pass_marks_piloting), note: Number(c.marks_piloting) === 0 ? c.piloting_label : null },
   ];
   return (
     <GlassCard className="overflow-hidden p-0">
@@ -178,18 +180,31 @@ function AwaitingCard({ course: c }: { course: CompositeCourse }) {
             {rows.map((m) => (
               <tr key={m.label}>
                 <td className="py-3 pr-4 font-medium text-neutral-900">{m.label}</td>
-                <td className="py-3 pr-4 text-neutral-600">{m.max}</td>
-                <td className="py-3 pr-4 text-neutral-900">
-                  {m.pass} <span className="text-xs text-neutral-400">({m.max ? Math.round((m.pass / m.max) * 100) : 0}%)</span>
-                </td>
-                <td className="py-3">
-                  <Badge tone="neutral">Pending</Badge>
-                </td>
+                {m.note ? (
+                  <>
+                    <td className="py-3 pr-4 text-neutral-900" colSpan={2}>
+                      {m.note}
+                    </td>
+                    <td className="py-3">
+                      <Badge tone="blue">Not marked</Badge>
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td className="py-3 pr-4 text-neutral-600">{m.max}</td>
+                    <td className="py-3 pr-4 text-neutral-900">
+                      {m.pass} <span className="text-xs text-neutral-400">({m.max ? Math.round((m.pass / m.max) * 100) : 0}%)</span>
+                    </td>
+                    <td className="py-3">
+                      <Badge tone="neutral">Pending</Badge>
+                    </td>
+                  </>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
-        <p className="mt-4 text-xs text-neutral-400">Missing the pass mark in even one module means not cleared, however well you do in the others.</p>
+        <p className="mt-4 text-xs text-neutral-400">Missing the pass mark in even one marked module means not cleared, however well you do in the others.</p>
       </div>
     </GlassCard>
   );
@@ -279,6 +294,19 @@ export function ReportCardView({
           </thead>
           <tbody className="divide-y divide-white/60">
             {r.modules.map((m) => {
+              if (m.note) {
+                return (
+                  <tr key={m.key}>
+                    <td className="py-3 pr-4 font-medium text-neutral-900">{m.label}</td>
+                    <td className="py-3 pr-4 font-semibold text-neutral-900" colSpan={3}>
+                      {m.note}
+                    </td>
+                    <td className="py-3">
+                      <Badge tone="blue">Not marked</Badge>
+                    </td>
+                  </tr>
+                );
+              }
               const share = m.max ? Math.min(100, (m.marks / m.max) * 100) : 0;
               const passAt = m.max ? Math.min(100, (m.pass / m.max) * 100) : 0;
               return (
@@ -328,7 +356,7 @@ export function ReportCardView({
           </tfoot>
         </table>
         <p className="mt-4 text-xs text-neutral-400">
-          The thin line on each bar marks the pass mark. To clear the assessment you must reach the pass mark in all {r.modules.length} modules.
+          The thin line on each bar marks the pass mark. To clear the assessment you must reach the pass mark in all {r.modules.filter((m) => !m.note).length} marked modules.
         </p>
       </div>
     </GlassCard>

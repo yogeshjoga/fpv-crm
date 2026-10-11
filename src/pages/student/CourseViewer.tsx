@@ -215,7 +215,7 @@ export function CourseViewer() {
       supabase
         .from('courses')
         .select(
-          'id, title, slug, description, pass_pct, exam_time_limit_min, exam_question_count, max_attempts, cooldown_hours, exam_access, exam_opens_at, exam_closes_at, scoring_mode, marks_online, marks_viva, marks_simulation, marks_piloting, merit_min_marks, pass_marks_online, pass_marks_viva, pass_marks_simulation, pass_marks_piloting, ' +
+          'id, title, slug, description, pass_pct, exam_time_limit_min, exam_question_count, max_attempts, cooldown_hours, exam_access, exam_opens_at, exam_closes_at, scoring_mode, marks_online, marks_viva, marks_simulation, marks_piloting, piloting_label, merit_min_marks, pass_marks_online, pass_marks_viva, pass_marks_simulation, pass_marks_piloting, ' +
             'modules(id, title, position, lessons(id, title, position, kind, content, video_url, embed_url, lesson_resources(id, file_name, file_path, mime)))',
         )
         .eq('slug', slug as string)
@@ -424,7 +424,7 @@ export function CourseViewer() {
             {composite && (
               <div className="mt-3 rounded-xl bg-white/50 p-3 text-xs leading-relaxed text-neutral-600">
                 <div className="font-semibold text-neutral-800">How you clear this assessment</div>
-                <p className="mt-1">You must reach the pass mark in every module. Missing any one means not cleared, however well you score in the others.</p>
+                <p className="mt-1">You must reach the pass mark in every marked module. Missing any one means not cleared, however well you score in the others.</p>
                 <ul className="mt-2 space-y-0.5">
                   {[
                     ['Online exam', course.marks_online, course.pass_marks_online],
@@ -435,13 +435,19 @@ export function CourseViewer() {
                     <li key={label as string} className="flex justify-between gap-2">
                       <span>{label}</span>
                       <span className="font-medium text-neutral-800">
-                        {Number(pass)} of {Number(max)} <span className="font-normal text-neutral-400">({Math.round((Number(pass) / Number(max)) * 100)}%)</span>
+                        {Number(max) === 0 ? (
+                          <>{course.piloting_label ?? 'Not marked'} <span className="font-normal text-neutral-400">(not marked)</span></>
+                        ) : (
+                          <>
+                            {Number(pass)} of {Number(max)} <span className="font-normal text-neutral-400">({Math.round((Number(pass) / Number(max)) * 100)}%)</span>
+                          </>
+                        )}
                       </span>
                     </li>
                   ))}
                 </ul>
                 <p className="mt-2">
-                  Clear all four for a Merit certificate; otherwise you receive a Participation certificate. Your marks and result appear under{' '}
+                  Clear every marked module for a Merit certificate; otherwise you receive a Participation certificate. Your marks and result appear under{' '}
                   <Link to="/app/report-card" className="font-medium text-blue-600 underline">
                     Report card
                   </Link>{' '}

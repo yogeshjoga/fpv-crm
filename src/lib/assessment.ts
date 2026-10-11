@@ -21,6 +21,11 @@ export interface Scheme {
   pass: Record<ModuleKey, number>;
   /** Total needed for Merit, on top of clearing every module. */
   meritMin: number;
+  /**
+   * Modules that are not marked. They carry a short description instead (e.g. "Moderate piloting skills"),
+   * need no marks, and count towards neither the total nor the cleared check.
+   */
+  unscored?: Partial<Record<ModuleKey, string>>;
 }
 
 export interface ModuleResult {
@@ -30,6 +35,8 @@ export interface ModuleResult {
   max: number;
   pass: number;
   cleared: boolean;
+  /** Set for a module that is not marked: what the report card shows instead of marks. */
+  note?: string;
 }
 
 export interface Evaluation {
@@ -56,17 +63,23 @@ export function isCleared(marks: number, pass: number): boolean {
  * unrounded). Returns null until all four modules have marks.
  */
 export function evaluate(scheme: Scheme, marks: Partial<Record<ModuleKey, number>>): Evaluation | null {
-  if (MODULES.some((m) => marks[m.key] === undefined || marks[m.key] === null || Number.isNaN(marks[m.key]))) return null;
-  const modules: ModuleResult[] = MODULES.map((m) => ({
-    key: m.key,
-    label: m.label,
-    marks: round2(marks[m.key]!),
-    max: scheme.max[m.key],
-    pass: scheme.pass[m.key],
-    cleared: isCleared(marks[m.key]!, scheme.pass[m.key]),
-  }));
-  const total = round2(MODULES.reduce((sum, m) => sum + marks[m.key]!, 0));
-  const max = round2(MODULES.reduce((sum, m) => sum + scheme.max[m.key], 0));
+  const note = (key: ModuleKey) => scheme.unscored?.[key];
+  const scored = MODULES.filter((m) => !note(m.key));
+  if (scored.some((m) => marks[m.key] === undefined || marks[m.key] === null || Number.isNaN(marks[m.key]))) return null;
+  const modules: ModuleResult[] = MODULES.map((m) =>
+    note(m.key)
+      ? { key: m.key, label: m.label, marks: 0, max: 0, pass: 0, cleared: true, note: note(m.key) }
+      : {
+          key: m.key,
+          label: m.label,
+          marks: round2(marks[m.key]!),
+          max: scheme.max[m.key],
+          pass: scheme.pass[m.key],
+          cleared: isCleared(marks[m.key]!, scheme.pass[m.key]),
+        },
+  );
+  const total = round2(scored.reduce((sum, m) => sum + marks[m.key]!, 0));
+  const max = round2(scored.reduce((sum, m) => sum + scheme.max[m.key], 0));
   const failed = modules.filter((m) => !m.cleared).map((m) => m.label);
   const clearedAll = failed.length === 0;
   return { modules, total, max, clearedAll, failed, result: clearedAll && total + 1e-9 >= scheme.meritMin ? 'Merit' : 'Participation' };

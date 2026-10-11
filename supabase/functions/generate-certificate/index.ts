@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
       breakdown?: { online: number; viva: number; simulation: number; piloting: number; total: number; max: number };
       /** Per-module report card snapshot (marks, pass marks, cleared flags) from finalize-assessment. */
       report?: {
-        modules: { key: string; label: string; marks: number; max: number; pass: number; cleared: boolean }[];
+        modules: { key: string; label: string; marks: number; max: number; pass: number; cleared: boolean; note?: string }[];
         total: number;
         max: number;
         clearedAll: boolean;
@@ -361,8 +361,10 @@ Deno.serve(async (req) => {
         report.modules
           .map(
             (m) =>
-              `<tr><td style="${cell}">${esc(m.label)}</td><td style="${cell};font-weight:600">${m.marks} / ${m.max}</td><td style="${cell}">${m.pass}</td>` +
-              `<td style="${cell};font-weight:600;color:${m.cleared ? '#15803d' : '#b91c1c'}">${m.cleared ? 'Cleared' : 'Not cleared'}</td></tr>`,
+              m.note
+                ? `<tr><td style="${cell}">${esc(m.label)}</td><td style="${cell};font-weight:600" colspan="2">${esc(m.note)}</td><td style="${cell};color:#555">Not marked</td></tr>`
+                : `<tr><td style="${cell}">${esc(m.label)}</td><td style="${cell};font-weight:600">${m.marks} / ${m.max}</td><td style="${cell}">${m.pass}</td>` +
+                  `<td style="${cell};font-weight:600;color:${m.cleared ? '#15803d' : '#b91c1c'}">${m.cleared ? 'Cleared' : 'Not cleared'}</td></tr>`,
           )
           .join('') +
         `<tr><td style="padding:8px 14px 4px 0"><strong>Total</strong></td><td style="padding:8px 14px 4px 0;font-weight:700" colspan="3">${report.total} / ${report.max}</td></tr></table>`

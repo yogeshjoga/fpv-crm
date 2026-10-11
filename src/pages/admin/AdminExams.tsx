@@ -441,6 +441,9 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
   }, [course.id]);
 
   const onlineMax = num(course.marks_online);
+  // Free flight can be assessed without marks (a label on the report card instead): no mark entry, not in the total.
+  const unscoredPiloting = num(course.marks_piloting) === 0 && !!course.piloting_label;
+  const components = unscoredPiloting ? COMPONENTS.filter((c) => c.key !== 'piloting') : COMPONENTS;
   const maxTotal = round2(onlineMax + num(course.marks_viva) + num(course.marks_simulation) + num(course.marks_piloting));
   const merit = num(course.merit_min_marks);
   // Pass marks per module. A student must reach every one of them; total never makes up for a miss.
@@ -453,6 +456,7 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
       piloting: num(course.pass_marks_piloting),
     },
     meritMin: merit,
+    unscored: unscoredPiloting ? { piloting: course.piloting_label! } : undefined,
   };
 
   const rows = useMemo(() => {
@@ -471,12 +475,12 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
         const online = onlineRaw === undefined ? undefined : round2(onlineRaw);
         const missing = [
           ...(online === undefined ? ['online exam'] : []),
-          ...COMPONENTS.filter((c) => m[c.key] === undefined).map((c) => c.label.toLowerCase()),
+          ...components.filter((c) => m[c.key] === undefined).map((c) => c.label.toLowerCase()),
         ];
         const sum = round2((online ?? 0) + (m.viva ?? 0) + (m.simulation ?? 0) + (m.piloting ?? 0));
         const ev =
-          onlineRaw !== undefined && m.viva !== undefined && m.simulation !== undefined && m.piloting !== undefined
-            ? evaluate(scheme, { online: onlineRaw, viva: m.viva, simulation: m.simulation, piloting: m.piloting })
+          onlineRaw !== undefined && m.viva !== undefined && m.simulation !== undefined && (m.piloting !== undefined || unscoredPiloting)
+            ? evaluate(scheme, { online: onlineRaw, viva: m.viva, simulation: m.simulation, piloting: m.piloting ?? 0 })
             : null;
         return {
           id: e.student_id,
@@ -687,7 +691,7 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-neutral-400">
                 <th className="px-3 py-3">Student</th>
-                {COMPONENTS.map((c) => (
+                {components.map((c) => (
                   <th key={c.key} className="px-3 py-3">
                     {c.label} <span className="normal-case text-neutral-300">/ {num(course[c.field])}</span>
                     <div className="text-[10px] normal-case tracking-normal text-neutral-400">pass {scheme.pass[c.key]}</div>
@@ -711,7 +715,7 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
                     <div className="font-medium text-neutral-900">{r.name}</div>
                     <div className="text-xs text-neutral-500">{r.email}</div>
                   </td>
-                  {COMPONENTS.map((c) => (
+                  {components.map((c) => (
                     <td key={c.key} className="px-3 py-2">
                       <MarkInput
                         initial={r.marks[c.key]}
@@ -802,8 +806,8 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
               <Select value={sheet.part} onChange={(e) => setSheet((p) => ({ ...p, part: e.target.value as SheetPart }))}>
                 <option value="viva">Viva (out of {num(course.marks_viva)})</option>
                 <option value="simulation">Simulation (out of {num(course.marks_simulation)})</option>
-                <option value="piloting">Real FPV piloting (out of {num(course.marks_piloting)})</option>
-                <option value="all">All three parts together</option>
+                {!unscoredPiloting && <option value="piloting">Real FPV piloting (out of {num(course.marks_piloting)})</option>}
+                <option value="all">{unscoredPiloting ? 'Both parts together' : 'All three parts together'}</option>
               </Select>
             </Field>
 

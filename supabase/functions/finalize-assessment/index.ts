@@ -113,7 +113,9 @@ async function finalizeOne(admin: Admin, course: Course, studentId: string) {
 
   const missing: string[] = [];
   if (!best) missing.push('online exam');
-  for (const c of ['viva', 'simulation', 'piloting']) if (!marks.has(c)) missing.push(c);
+  // A course whose free flight is not marked (marks_piloting 0 and a label) needs no piloting mark.
+  const unscoredPiloting = Number(course.marks_piloting) === 0 && !!course.piloting_label;
+  for (const c of unscoredPiloting ? ['viva', 'simulation'] : ['viva', 'simulation', 'piloting']) if (!marks.has(c)) missing.push(c);
   if (missing.length) return { status: 'incomplete', missing };
 
   const scheme: Scheme = {
@@ -130,10 +132,11 @@ async function finalizeOne(admin: Admin, course: Course, studentId: string) {
       piloting: Number(course.pass_marks_piloting),
     },
     meritMin: Number(course.merit_min_marks),
+    unscored: unscoredPiloting ? { piloting: String(course.piloting_label) } : undefined,
   };
   // The online mark is judged unrounded (74.99% must not round up into a pass), shown rounded.
   const onlineRaw = (Number(best!.score_pct ?? 0) / 100) * scheme.max.online;
-  const ev = evaluate(scheme, { online: onlineRaw, viva: Number(marks.get('viva')), simulation: Number(marks.get('simulation')), piloting: Number(marks.get('piloting')) })!;
+  const ev = evaluate(scheme, { online: onlineRaw, viva: Number(marks.get('viva')), simulation: Number(marks.get('simulation')), piloting: Number(marks.get('piloting') ?? 0) })!;
   const byKey = Object.fromEntries(ev.modules.map((m) => [m.key, m.marks])) as Record<string, number>;
   const certType = ev.result;
   const total = ev.total;

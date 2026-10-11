@@ -36,22 +36,23 @@ const PART_LABEL: Record<Exclude<SheetPart, 'all'>, string> = { viva: 'Viva', si
 
 /** "Merit", or "Participation (not cleared: Viva, Free flight)"; the PDF uses the short form. */
 function resultText(o: SheetOptions, s: SheetStudent, long: boolean): string {
-  if (!o.scheme || s.viva === undefined || s.simulation === undefined || s.piloting === undefined || (s.online === undefined && s.onlineRaw === undefined)) {
+  if (!o.scheme || s.viva === undefined || s.simulation === undefined || (s.piloting === undefined && !o.scheme.unscored?.piloting) || (s.online === undefined && s.onlineRaw === undefined)) {
     return 'Incomplete';
   }
-  const ev = evaluate(o.scheme, { online: s.onlineRaw ?? s.online!, viva: s.viva, simulation: s.simulation, piloting: s.piloting });
+  const ev = evaluate(o.scheme, { online: s.onlineRaw ?? s.online!, viva: s.viva, simulation: s.simulation, piloting: s.piloting ?? 0 });
   if (!ev) return 'Incomplete';
   if (!ev.failed.length) return ev.result;
   return long ? `${ev.result} (not cleared: ${ev.failed.join(', ')})` : 'Not cleared';
 }
 
 function layout(o: SheetOptions, longResult = true) {
-  const parts = (o.part === 'all' ? ['viva', 'simulation', 'piloting'] : [o.part]) as Exclude<SheetPart, 'all'>[];
+  const marked = (o.max.piloting > 0 ? ['viva', 'simulation', 'piloting'] : ['viva', 'simulation']) as Exclude<SheetPart, 'all'>[];
+  const parts = o.part === 'all' ? marked : [o.part];
   const total = o.part === 'all' ? o.max.viva + o.max.simulation + o.max.piloting + o.max.online : o.max[o.part];
   const title = o.part === 'all' ? `${o.course} — mark sheet` : `${o.course} — ${PART_LABEL[o.part]} mark sheet`;
   const subtitle =
     o.part === 'all'
-      ? `Viva ${o.max.viva} · Simulation ${o.max.simulation} · Real piloting ${o.max.piloting} · Online exam ${o.max.online} · Total ${total}`
+      ? `Viva ${o.max.viva} · Simulation ${o.max.simulation} · ${o.max.piloting > 0 ? `Real piloting ${o.max.piloting} · ` : ''}Online exam ${o.max.online} · Total ${total}`
       : `${PART_LABEL[o.part]} — out of ${total} marks`;
   const showResult = o.part === 'all' && o.withMarks && o.scheme !== undefined;
   const headers = [
@@ -65,8 +66,8 @@ function layout(o: SheetOptions, longResult = true) {
   ];
   const body = o.students.map((s, i) => {
     const partValues = parts.map((p) => (o.withMarks && s[p] !== undefined ? s[p]! : ''));
-    const sum = o.part === 'all' && o.withMarks && s.viva !== undefined && s.simulation !== undefined && s.piloting !== undefined && s.online !== undefined
-      ? Math.round((s.viva + s.simulation + s.piloting + s.online) * 100) / 100
+    const sum = o.part === 'all' && o.withMarks && s.viva !== undefined && s.simulation !== undefined && (s.piloting !== undefined || o.max.piloting === 0) && s.online !== undefined
+      ? Math.round((s.viva + s.simulation + (s.piloting ?? 0) + s.online) * 100) / 100
       : '';
     return [
       i + 1,
