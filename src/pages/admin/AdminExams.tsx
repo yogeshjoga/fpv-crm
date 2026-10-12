@@ -14,6 +14,7 @@ import { ReportCardView } from '../student/ReportCard';
 import { ExamAttempts } from './ExamAttempts';
 import { ResetExamModal } from './ResetExamModal';
 import { CertificateReviewModal, type ReviewCandidate } from './CertificateReviewModal';
+import { ResendCertificateModal, type ResendResult } from './ResendCertificateModal';
 import type { Tables } from '../../lib/database.types';
 
 type Course = Tables<'courses'>;
@@ -404,7 +405,7 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
   const toast = useToast();
   const [search, setSearch] = useState('');
   const [issuing, setIssuing] = useState<string | null>(null);
-  const [resending, setResending] = useState<string | null>(null);
+  const [resendIds, setResendIds] = useState<string[] | null>(null);
   // Printable / Excel mark sheets for rounds examined offline (pen and paper first).
   const [sheetOpen, setSheetOpen] = useState(false);
   // Shows what a student will see on their report card, before the certificate is issued.
@@ -567,31 +568,27 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
   };
 
   // Emails the certificate that was already issued again, for a student who says it never arrived.
-  const resend = async (ids: string[]) => {
-    setResending(ids.length === 1 ? ids[0] : 'many');
-    let done = 0;
-    const problems: string[] = [];
-    const nameOf = (id: string) => rows.find((r) => r.id === id)?.name ?? 'Student';
+  // Returns one result per student so the confirmation window can show who got it and who did not.
+  const resend = async (ids: string[]): Promise<ResendResult[]> => {
+    const out: ResendResult[] = [];
     for (let i = 0; i < ids.length; i += 5) {
+      const chunk = ids.slice(i, i + 5);
       try {
         const res = await invokeFn<{ results: { student_id: string; status: string; message?: string }[] }>('finalize-assessment', {
           course_id: course.id,
-          student_ids: ids.slice(i, i + 5),
+          student_ids: chunk,
           resend: true,
         });
         for (const r of res.results) {
-          if (r.status === 'resent') done++;
-          else problems.push(`${nameOf(r.student_id)}: ${r.status === 'no_certificate' ? 'no certificate issued yet' : r.message ?? 'could not be sent'}`);
+          out.push({ id: r.student_id, ok: r.status === 'resent', message: r.status === 'resent' ? undefined : r.status === 'no_certificate' ? 'No certificate has been issued yet' : r.message ?? 'Could not be sent' });
         }
       } catch (e) {
-        problems.push((e as Error).message);
+        for (const id of ids.slice(i)) out.push({ id, ok: false, message: (e as Error).message });
         break;
       }
     }
-    setResending(null);
-    if (done) toast(`Certificate emailed again to ${done} student${done > 1 ? 's' : ''}`);
-    if (problems.length) toast(problems.slice(0, 3).join(' · '), 'error');
-    if (done) setSelected(new Set());
+    if (out.some((r) => r.ok)) setSelected(new Set());
+    return out;
   };
 
   const issue = async (ids: string[]) => {
@@ -740,10 +737,7 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
           {pickedIssuedIds.length > 0 && (
             <Button
               variant="secondary"
-              loading={resending === 'many'}
-              onClick={() => {
-                if (window.confirm(`Email the certificate again to ${pickedIssuedIds.length} student${pickedIssuedIds.length > 1 ? 's' : ''}?`)) resend(pickedIssuedIds);
-              }}
+              onClick={() => setResendIds(pickedIssuedIds)}
             >
               <Mail size={15} /> Resend certificate email ({pickedIssuedIds.length})
             </Button>
@@ -753,6 +747,18 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
           </button>
           <span className="text-xs text-blue-900/70">New certificates are confirmed in a list before anything is emailed.</span>
         </div>
+      )}
+
+      {canMark && resendIds && (
+        <ResendCertificateModal
+          courseTitle={course.title}
+          recipients={resendIds.map((id) => {
+            const r = rows.find((x) => x.id === id);
+            return { id, name: r?.name ?? 'Student', email: r?.email ?? '', certId: r?.cert?.cert_id_string ?? '' };
+          })}
+          send={resend}
+          onClose={() => setResendIds(null)}
+        />
       )}
 
       {canMark && reviewOpen && (
@@ -887,10 +893,7 @@ function MarksPanel({ course, canMark, canExport }: { course: Course; canMark: b
                       {canMark && r.cert && (
                         <Button
                           variant="ghost"
-                          onClick={() => {
-                            if (window.confirm(`Email the certificate again to ${r.name} (${r.email})?`)) resend([r.id]);
-                          }}
-                          loading={resending === r.id}
+                          onClick={() => setResendIds([r.id])}
                           title="Email this certificate to the student again"
                         >
                           <Mail size={14} /> Resend
