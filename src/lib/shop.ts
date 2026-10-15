@@ -91,6 +91,7 @@ export const DEPARTMENTS = [
   { slug: 'cameras', name: 'Cameras & gimbals' },
   { slug: 'electronics', name: 'Electronics' },
   { slug: 'tools', name: 'Tools & gear' },
+  { slug: 'printing', name: 'Printing service' },
 ];
 
 export const CATEGORIES = [
@@ -125,5 +126,10 @@ export const CATEGORIES = [
   { slug: 'soldering', name: 'Soldering', department: 'tools' },
   { slug: 'hand-tools', name: 'Hand tools', department: 'tools' },
   { slug: 'bags-cases', name: 'Bags & cases', department: 'tools' },
+  { slug: 'gps-supports', name: 'GPS supports', department: 'printing' },
+  { slug: 'battery-supports', name: 'Battery supports', department: 'printing' },
+  { slug: 'prop-guards', name: 'Prop guards', department: 'printing' },
+  { slug: 'ball-frames', name: 'Ball frame prints', department: 'printing' },
+  { slug: 'printed-cases', name: 'Cases', department: 'printing' },
 ];
 export const categoryName = new Map(CATEGORIES.map((c) => [c.slug, c.name]));
