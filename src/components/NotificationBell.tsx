@@ -49,7 +49,8 @@ export function NotificationBell() {
   const openItem = async (n: Notification) => {
     if (!n.read_at) await markRead([n.id]);
     setOpen(false);
-    if (n.link) navigate(n.link);
+    // Shop alerts carry store-dashboard paths (/shop/...); the shop now lives under /admin/shop.
+    if (n.link) navigate(n.link.startsWith('/shop') ? `/admin${n.link}` : n.link);
   };
 
   return (

@@ -2,7 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { PublicShell } from './layout/PublicShell';
 import { Shell } from './layout/Shell';
-import { studentNav, adminNav } from './layout/navConfig';
+import { studentNav, adminWorkspaces } from './layout/navConfig';
 import { RequireActive, RequireModule, RequireRole, RequireStudentModule } from './auth/guards';
 
 import { Landing } from './pages/public/Landing';
@@ -71,6 +71,12 @@ import { AdminSitePartners } from './pages/admin/AdminSitePartners';
 import { AdminSiteVideos } from './pages/admin/AdminSiteVideos';
 import { AdminEnquiries } from './pages/admin/AdminEnquiries';
 import { AdminSiteBlog } from './pages/admin/AdminSiteBlog';
+import { ShopDashboard } from './pages/admin/shop/ShopDashboard';
+import { ShopProducts } from './pages/admin/shop/ShopProducts';
+import { ShopProductEdit } from './pages/admin/shop/ShopProductEdit';
+import { ShopOrder, ShopOrders } from './pages/admin/shop/ShopOrders';
+import { ShopBrands } from './pages/admin/shop/ShopBrands';
+import { ShopNotifications } from './pages/admin/shop/ShopNotifications';
 import { Settings } from './pages/admin/Settings';
 import { Employees } from './pages/admin/Employees';
 import { AdminCalendar } from './pages/admin/AdminCalendar';
@@ -132,7 +138,7 @@ export function AppRoutes() {
         path="/admin"
         element={
           <RequireRole roles={['instructor', 'coordinator', 'admin', 'super_admin']}>
-            <Shell nav={adminNav} area="Admin" />
+            <Shell workspaces={adminWorkspaces} area="Admin" />
           </RequireRole>
         }
       >
@@ -406,6 +412,70 @@ export function AppRoutes() {
           element={
             <RequireRole roles={['super_admin']}>
               <AdminSiteBlog />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="shop"
+          element={
+            <RequireRole roles={['admin', 'super_admin']}>
+              <ShopDashboard />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="shop/products"
+          element={
+            <RequireRole roles={['admin', 'super_admin']}>
+              <ShopProducts />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="shop/products/new"
+          element={
+            <RequireRole roles={['admin', 'super_admin']}>
+              <ShopProductEdit />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="shop/products/:id"
+          element={
+            <RequireRole roles={['admin', 'super_admin']}>
+              <ShopProductEdit />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="shop/orders"
+          element={
+            <RequireRole roles={['admin', 'super_admin']}>
+              <ShopOrders />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="shop/orders/:id"
+          element={
+            <RequireRole roles={['admin', 'super_admin']}>
+              <ShopOrder />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="shop/brands"
+          element={
+            <RequireRole roles={['admin', 'super_admin']}>
+              <ShopBrands />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="shop/notifications"
+          element={
+            <RequireRole roles={['admin', 'super_admin']}>
+              <ShopNotifications />
             </RequireRole>
           }
         />

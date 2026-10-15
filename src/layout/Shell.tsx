@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Eye, GraduationCap, LayoutGrid, LogOut, Menu, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
@@ -8,6 +8,7 @@ import { Logo } from '../components/Brand';
 import { useStaffActivityTracker } from '../lib/useTimeTracker';
 import { isModuleVisible, isModuleWritable, useModuleAccess } from '../lib/moduleAccess';
 import { AdminAccessProvider } from './AdminAccessContext';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 
 export interface NavItem {
   to: string;
@@ -20,6 +21,21 @@ export interface NavItem {
   superAdminOnly?: boolean;
 }
 
+type StaffRole = 'super_admin' | 'admin' | 'instructor' | 'coordinator';
+
+/** A separate area of the admin app (CRM, website content, online store) with its own sidebar. */
+export interface Workspace {
+  key: string;
+  label: string;
+  description: string;
+  icon: LucideIcon;
+  nav: NavItem[];
+  /** Paths that belong to this workspace. The workspace without prefixes is the fallback. */
+  prefixes?: string[];
+  /** Only these roles (or a super admin previewing them) see the workspace. Omit for every staff role. */
+  roles?: StaffRole[];
+}
+
 const roleLabel: Record<string, string> = {
   super_admin: 'Super Admin',
   admin: 'Admin',
@@ -28,7 +44,7 @@ const roleLabel: Record<string, string> = {
   student: 'Student',
 };
 
-export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin' }) {
+export function Shell({ nav: baseNav, workspaces, area }: { nav?: NavItem[]; workspaces?: Workspace[]; area: 'Student' | 'Admin' }) {
   const { profile, signOut, isStaff, mfa } = useAuth();
   const navigate = useNavigate();
   const [openMobile, setOpenMobile] = useState(false);
@@ -45,19 +61,44 @@ export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin'
   // Students may have sections switched off; staff opening the student view see everything.
   const accessRole = area === 'Admin' ? staffRole : profile?.role === 'student' ? 'student' : null;
   const moduleAccess = useModuleAccess(accessRole);
+  const { pathname } = useLocation();
+
+  const isItemVisible = useMemo(() => {
+    return (item: NavItem) => {
+      if (!restricted) return true;
+      if (item.superAdminOnly) return false;
+      if (!item.key) return true; // e.g. Dashboard — always reachable, never gated
+      return isModuleVisible(moduleAccess.data, item.key);
+    };
+  }, [restricted, moduleAccess.data]);
+
+  // Workspaces the person can open: allowed for their (previewed) role, with at least one page.
+  const effectiveRole = (staffRole ?? profile?.role) as StaffRole | undefined;
+  const availableWorkspaces = useMemo(
+    () =>
+      (workspaces ?? []).filter(
+        (w) => (!w.roles || (effectiveRole && w.roles.includes(effectiveRole))) && w.nav.some(isItemVisible),
+      ),
+    [workspaces, effectiveRole, isItemVisible],
+  );
+  const activeWorkspace = useMemo(() => {
+    if (!workspaces?.length) return null;
+    return (
+      workspaces.find((w) => w.prefixes?.some((p) => pathname.startsWith(p))) ??
+      workspaces.find((w) => !w.prefixes) ??
+      workspaces[0]
+    );
+  }, [workspaces, pathname]);
+  const nav = activeWorkspace?.nav ?? baseNav ?? [];
+  const homeFor = (w: Workspace) => (w.nav.find(isItemVisible) ?? w.nav[0]).to;
 
   const visibleNav = useMemo(() => {
     if (area === 'Student') {
       if (profile?.role !== 'student') return nav;
       return nav.filter((item) => !item.key || isModuleVisible(moduleAccess.data, item.key));
     }
-    if (!restricted) return nav;
-    return nav.filter((item) => {
-      if (item.superAdminOnly) return false;
-      if (!item.key) return true; // e.g. Dashboard — always reachable, never gated
-      return isModuleVisible(moduleAccess.data, item.key);
-    });
-  }, [nav, area, restricted, profile?.role, moduleAccess.data]);
+    return nav.filter(isItemVisible);
+  }, [nav, area, profile?.role, moduleAccess.data, isItemVisible]);
 
   const accessValue = useMemo(
     () => ({
@@ -80,9 +121,17 @@ export function Shell({ nav, area }: { nav: NavItem[]; area: 'Student' | 'Admin'
           openMobile ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
+        {activeWorkspace && availableWorkspaces.length > 1 && (
+          <WorkspaceSwitcher
+            workspaces={availableWorkspaces}
+            active={activeWorkspace}
+            homeFor={homeFor}
+            onNavigate={() => setOpenMobile(false)}
+          />
+        )}
         <div className="flex h-16 items-center gap-2 px-6 text-neutral-900">
           <Logo height={34} />
-          <span className="ml-1 text-[11px] text-neutral-500">{area}</span>
+          <span className="ml-1 text-[11px] text-neutral-500">{activeWorkspace?.label ?? area}</span>
         </div>
         <nav className="flex flex-col gap-1 px-3 py-4">
           {visibleNav.map((item) => (
