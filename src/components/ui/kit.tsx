@@ -147,12 +147,12 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
   );
 }
 
-export function Modal({ open, onClose, title, children, wide }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode; wide?: boolean }) {
+export function Modal({ open, onClose, title, children, wide }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode; wide?: boolean | 'xl' }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 p-4 backdrop-blur-sm" onClick={onClose}>
       <div
-        className={`mt-16 w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} rounded-[1.75rem] border border-white/70 bg-white/90 p-6 shadow-2xl backdrop-blur-2xl`}
+        className={`mt-16 w-full ${wide === 'xl' ? 'max-w-6xl' : wide ? 'max-w-3xl' : 'max-w-lg'} rounded-[1.75rem] border border-white/70 bg-white/90 p-6 shadow-2xl backdrop-blur-2xl`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">

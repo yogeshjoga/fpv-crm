@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import type React from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, X } from 'lucide-react';
+import { ArrowLeft, Eye, ExternalLink, X } from 'lucide-react';
 import { useQuery } from '../../../lib/useQuery';
 import {
   ARTS, PRODUCT_TAGS, SHOP_URL, categoryName, digits, optInt, run, shopDb, slugify, toInt, uploadShopImage,
 } from '../../../lib/shop';
-import { Badge, Button, Checkbox, Field, PageHeader, Select, Spinner, TextArea, TextInput, useToast } from '../../../components/ui/kit';
+import { Badge, Button, Checkbox, Field, Modal, PageHeader, Select, Spinner, TextArea, TextInput, useToast } from '../../../components/ui/kit';
 import { CategorySelect, Panel, Thumb } from './ShopUi';
+import { PreviewPanel, StoreCard, type PreviewProduct } from './ShopPreview';
 
 interface Variant { id: string; label: string; sku: string | null; price: number; mrp: number | null; stock: number; sort: number }
 interface Product {
@@ -85,6 +86,26 @@ export function ShopProductEdit() {
   );
 }
 
+/** Whole number from a text box, or null when it is empty or not a number (the preview shows what is missing). */
+const num = (s: string) => (s.trim() !== '' && Number.isFinite(Number(s)) ? Number(s) : null);
+
+/** Live store tile in the side column, plus a full preview window (product page on a computer or phone, and the real store). */
+function PreviewBox({ product, canShowReal }: { product: PreviewProduct; canShowReal: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Panel title="Store preview">
+        <div className="mx-auto max-w-[230px]"><StoreCard p={product} /></div>
+        <p className="mt-2 text-xs text-neutral-500">How this product looks in the store grid. It updates as you type.</p>
+        <Button type="button" variant="secondary" className="mt-3 w-full" onClick={() => setOpen(true)}><Eye size={15} /> Preview product page</Button>
+      </Panel>
+      <Modal open={open} onClose={() => setOpen(false)} title="Store preview" wide="xl">
+        <PreviewPanel p={product} canShowReal={canShowReal} />
+      </Modal>
+    </>
+  );
+}
+
 /* ─────────────────────────── Official (brand-synced) products: commercial fields only ─── */
 
 type OfficialVariantEdit = { id: string; price: string; mrp: string; stock: string };
@@ -152,6 +173,16 @@ function OfficialForm({ p, variants, onSaved }: { p: Product; variants: Variant[
       setSaving(false);
     }
   }
+
+  const preview: PreviewProduct = {
+    name: p.name, brand: p.brand, category: f.category, slug: p.slug,
+    price: vs.length ? null : num(f.price), mrp: vs.length ? null : num(f.mrp), stock: num(f.stock) ?? 0, lowStockAt: num(f.low_stock_at) ?? 0,
+    tags: f.tags, short: f.short, highlights: p.highlights ?? [],
+    specs: Object.entries(p.specs ?? {}).map(([key, value]) => ({ key, value })), inBox: p.in_box ?? [],
+    images: images.length ? images : f.image_url ? [f.image_url] : [], art: p.art, variantName: p.variant_name ?? '',
+    variants: vs.map((v) => ({ label: variants.find((x) => x.id === v.id)?.label ?? '', price: num(v.price), mrp: num(v.mrp), stock: num(v.stock) ?? 0 })),
+    weightG: p.weight_g, published: f.is_published, hasOfficialDescription: Boolean(p.description_html),
+  };
 
   return (
     <form onSubmit={save} className="grid gap-4 lg:grid-cols-[1fr_340px]">
@@ -237,6 +268,7 @@ function OfficialForm({ p, variants, onSaved }: { p: Product; variants: Variant[
       </div>
 
       <aside className="space-y-4 lg:sticky lg:top-0 lg:self-start">
+        <PreviewBox product={preview} canShowReal={p.is_published} />
         <Panel>
           <Field label="Category"><CategorySelect value={f.category} onChange={(v) => set('category', v)} /></Field>
           <TagPicker tags={f.tags} onChange={(t) => set('tags', t)} />
@@ -374,6 +406,15 @@ function ManualForm({ initial, onSaved }: { initial: ManualInput; onSaved?: () =
     }
   }
 
+  const preview: PreviewProduct = {
+    name: p.name, brand: p.brand, category: p.category, slug: p.slug || slugify(p.name),
+    price: hasVariants ? null : num(p.price), mrp: hasVariants ? null : num(p.mrp), stock: num(p.stock) ?? 0, lowStockAt: num(p.low_stock_at) ?? 0,
+    tags: p.tags, short: p.short, highlights: p.highlights, specs: p.specs, inBox: p.in_box,
+    images: p.image_url ? [p.image_url] : [], art: p.art, variantName: p.variant_name,
+    variants: p.variants.map((v) => ({ label: v.label, price: num(v.price), mrp: num(v.mrp), stock: num(v.stock) ?? 0 })),
+    weightG: num(p.weight_g), published: p.is_published,
+  };
+
   return (
     <form onSubmit={submit} className="grid gap-4 lg:grid-cols-[1fr_320px]">
       <div className="space-y-4">
@@ -462,6 +503,7 @@ function ManualForm({ initial, onSaved }: { initial: ManualInput; onSaved?: () =
       </div>
 
       <aside className="space-y-4 lg:sticky lg:top-0 lg:self-start">
+        <PreviewBox product={preview} canShowReal={Boolean(initial.id && initial.is_published)} />
         <Panel title="Photo">
           <Thumb src={p.image_url} alt={p.name} className="aspect-[4/3] w-full" />
           <label className="mt-3 block cursor-pointer rounded-full bg-white/70 py-2 text-center text-sm font-medium shadow-sm hover:bg-white">
