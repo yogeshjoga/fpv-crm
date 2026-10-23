@@ -68,6 +68,8 @@ import { AdminAnalytics } from './pages/admin/AdminAnalytics';
 import { AdminAsk } from './pages/admin/AdminAsk';
 import { AdminSiteGallery } from './pages/admin/AdminSiteGallery';
 import { AdminSitePartners } from './pages/admin/AdminSitePartners';
+import { AdminQuotations } from './pages/admin/AdminQuotations';
+import { QuotationEditor } from './pages/admin/QuotationEditor';
 import { AdminSiteVideos } from './pages/admin/AdminSiteVideos';
 import { AdminEnquiries } from './pages/admin/AdminEnquiries';
 import { AdminSiteBlog } from './pages/admin/AdminSiteBlog';
@@ -399,6 +401,9 @@ export function AppRoutes() {
             </RequireModule>
           }
         />
+        <Route path="quotations" element={<RequireModule moduleKey="quotations"><AdminQuotations /></RequireModule>} />
+        <Route path="quotations/new" element={<RequireModule moduleKey="quotations"><QuotationEditor /></RequireModule>} />
+        <Route path="quotations/:id" element={<RequireModule moduleKey="quotations"><QuotationEditor /></RequireModule>} />
         <Route
           path="site-partners"
           element={

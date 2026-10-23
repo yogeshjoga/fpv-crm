@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Building2, Download, GraduationCap, Inbox, Mail, MessageCircle, Phone, PlayCircle, Trash2 } from 'lucide-react';
+import { Building2, Download, FilePlus2, GraduationCap, Inbox, Mail, MessageCircle, Phone, PlayCircle, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
@@ -218,6 +219,9 @@ export function AdminEnquiries() {
 
 function EnquiryModal({ enquiry, staff, writable, onClose, onSaved }: { enquiry: Enquiry; staff: Staff[]; writable: boolean; onClose: () => void; onSaved: () => void }) {
   const toast = useToast();
+  const navigate = useNavigate();
+  const { canWrite } = useAdminAccess();
+  const canQuote = canWrite('quotations') && (enquiry.kind === 'college' || enquiry.kind === 'general' || enquiry.kind === 'demo');
   const [status, setStatus] = useState<Status>(enquiry.status);
   const [assignedTo, setAssignedTo] = useState(enquiry.assigned_to ?? '');
   const [notes, setNotes] = useState(enquiry.notes);
@@ -292,10 +296,15 @@ function EnquiryModal({ enquiry, staff, writable, onClose, onSaved }: { enquiry:
         </Field>
 
         <div className="flex justify-between gap-2">
-          <div>
+          <div className="flex gap-2">
             {writable && (
               <Button variant="secondary" onClick={remove} disabled={busy}>
                 <Trash2 size={15} /> Delete
+              </Button>
+            )}
+            {canQuote && (
+              <Button variant="secondary" onClick={() => navigate(`/admin/quotations/new?enquiry=${enquiry.id}`)} disabled={busy}>
+                <FilePlus2 size={15} /> Create quotation
               </Button>
             )}
           </div>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   LayoutDashboard, UserPlus, Inbox, ClipboardCheck, GraduationCap, Layers3, FileQuestion,
   FormInput, CalendarDays, Megaphone, ScrollText, MessageCircle, BarChart3, Briefcase,
-  Users, Settings2, Workflow, ChevronRight, Lock, IdCard, Activity, Images, Newspaper, Building2, Video, MessageSquareHeart,
+  Users, Settings2, Workflow, ChevronRight, Lock, IdCard, Activity, Images, Newspaper, Building2, Video, MessageSquareHeart, FileText,
 } from 'lucide-react';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, PageHeader } from '../../components/ui/kit';
@@ -203,6 +203,20 @@ const SECTIONS: Section[] = [
       'Use the phone and mail icons on a card to contact the person. The filters and search narrow the list, and admins can export it as a CSV.',
       'Enquiries hold phone numbers and emails, so by default only admins and instructors can see them, and they are the people who get the notification and email when one arrives. A super admin can change this per role in Company Settings → module access (\"Enquiries\").',
       'Delete spam or test entries from the enquiry itself. Deleting is permanent.',
+    ],
+  },
+  {
+    id: 'quotations',
+    icon: FileText,
+    title: 'Quotations',
+    summary: 'Workshop and training quotations for colleges, clubs and companies. Fill in what the client asked for and download a clean PDF with the logo, the signature and the company seal.',
+    points: [
+      'Start from an enquiry (open it and choose "Create quotation") to bring the lead\'s name, college and contact over, or choose "New quotation" for a client who wrote to you elsewhere.',
+      'Fill in the programme: what it is for, how many students, how many days, where, the topics and the proposed dates. Add the price lines (a fee per student, travel, kits) with a discount and GST if they apply.',
+      'The quotation number (EGR-QTN-year-number) and the totals are made for you, including the amount in words. The issue date, the valid-until date and the proposed dates are printed together at the top of the PDF.',
+      'Use Preview PDF to check it, then Download PDF. Send it to the client yourself, then mark it Sent. A sent quotation shows as Expired once its valid-until date has passed.',
+      'The inclusions, terms and payment terms start with standard text. Read them and change anything that does not match what you offer this client. The copy button on the list starts a new quotation from an old one.',
+      'Quotations show prices, so instructors and coordinators have no access until a super admin turns it on in Company Settings → module access ("Quotations").',
     ],
   },
   {
