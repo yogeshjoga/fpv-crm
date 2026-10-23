@@ -70,6 +70,8 @@ import { AdminSiteGallery } from './pages/admin/AdminSiteGallery';
 import { AdminSitePartners } from './pages/admin/AdminSitePartners';
 import { AdminQuotations } from './pages/admin/AdminQuotations';
 import { QuotationEditor } from './pages/admin/QuotationEditor';
+import { QuoteRequests } from './pages/admin/QuoteRequests';
+import { QuoteRequest } from './pages/public/QuoteRequest';
 import { AdminSiteVideos } from './pages/admin/AdminSiteVideos';
 import { AdminEnquiries } from './pages/admin/AdminEnquiries';
 import { AdminSiteBlog } from './pages/admin/AdminSiteBlog';
@@ -101,6 +103,7 @@ export function AppRoutes() {
       </Route>
 
       <Route path="/register-form/:slug" element={<PublicRegistrationForm />} />
+      <Route path="/quote/:token" element={<QuoteRequest />} />
 
       <Route
         path="/enroll/:slug"
@@ -402,6 +405,7 @@ export function AppRoutes() {
           }
         />
         <Route path="quotations" element={<RequireModule moduleKey="quotations"><AdminQuotations /></RequireModule>} />
+        <Route path="quotations/requests" element={<RequireModule moduleKey="quotations"><QuoteRequests /></RequireModule>} />
         <Route path="quotations/new" element={<RequireModule moduleKey="quotations"><QuotationEditor /></RequireModule>} />
         <Route path="quotations/:id" element={<RequireModule moduleKey="quotations"><QuotationEditor /></RequireModule>} />
         <Route

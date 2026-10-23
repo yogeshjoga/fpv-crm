@@ -2586,6 +2586,7 @@ export type Database = {
           proposed_end: string | null
           proposed_start: string | null
           quote_no: string | null
+          request_id: string | null
           responded_at: string | null
           sent_at: string | null
           signatory_designation: string
@@ -2631,6 +2632,7 @@ export type Database = {
           proposed_end?: string | null
           proposed_start?: string | null
           quote_no?: string | null
+          request_id?: string | null
           responded_at?: string | null
           sent_at?: string | null
           signatory_designation?: string
@@ -2676,6 +2678,7 @@ export type Database = {
           proposed_end?: string | null
           proposed_start?: string | null
           quote_no?: string | null
+          request_id?: string | null
           responded_at?: string | null
           sent_at?: string | null
           signatory_designation?: string
@@ -2693,6 +2696,75 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "quotations_enquiry_id_fkey"
+            columns: ["enquiry_id"]
+            isOneToOne: false
+            referencedRelation: "site_enquiries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotations_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "quote_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_requests: {
+        Row: {
+          answers: Json | null
+          client_email: string | null
+          client_name: string
+          client_phone: string
+          created_at: string
+          created_by: string | null
+          enquiry_id: string | null
+          expires_at: string
+          id: string
+          organisation: string
+          status: string
+          submit_count: number
+          submitted_at: string | null
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          answers?: Json | null
+          client_email?: string | null
+          client_name: string
+          client_phone?: string
+          created_at?: string
+          created_by?: string | null
+          enquiry_id?: string | null
+          expires_at?: string
+          id?: string
+          organisation?: string
+          status?: string
+          submit_count?: number
+          submitted_at?: string | null
+          token?: string
+          updated_at?: string
+        }
+        Update: {
+          answers?: Json | null
+          client_email?: string | null
+          client_name?: string
+          client_phone?: string
+          created_at?: string
+          created_by?: string | null
+          enquiry_id?: string | null
+          expires_at?: string
+          id?: string
+          organisation?: string
+          status?: string
+          submit_count?: number
+          submitted_at?: string | null
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_requests_enquiry_id_fkey"
             columns: ["enquiry_id"]
             isOneToOne: false
             referencedRelation: "site_enquiries"

@@ -7,6 +7,7 @@ import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery } from '../../lib/useQuery';
 import { fetchOrgBrand } from '../../lib/useOrgBrand';
 import { DEFAULT_DESIGNATION } from '../../lib/offers';
+import { draftFromAnswers, moduleLine, parseAnswers, type QuoteRequest } from '../../lib/quoteRequests';
 import type { Json } from '../../lib/database.types';
 import {
   DEFAULT_INCLUSIONS, DEFAULT_PAYMENT, DEFAULT_TERMS, MODE_LABEL, PROGRAMME_LABEL, TOPIC_SUGGESTIONS,
@@ -54,7 +55,7 @@ function toQuotation(f: Form, saved: Quotation | null): Quotation {
     subtotal: t.subtotal, gst_amount: t.gst, total: t.total,
     inclusions: f.inclusions.map(clean).filter(Boolean) as unknown as Json, terms: f.terms.trim(), payment_terms: f.payment_terms.trim(), notes: f.notes.trim(),
     prepared_by: clean(f.prepared_by), prepared_phone: clean(f.prepared_phone), signatory_name: clean(f.signatory_name), signatory_designation: clean(f.signatory_designation),
-    sent_at: saved?.sent_at ?? null, responded_at: saved?.responded_at ?? null, created_by: saved?.created_by ?? null,
+    request_id: saved?.request_id ?? null, sent_at: saved?.sent_at ?? null, responded_at: saved?.responded_at ?? null, created_by: saved?.created_by ?? null,
     created_at: saved?.created_at ?? new Date().toISOString(), updated_at: new Date().toISOString(),
   };
 }
@@ -97,6 +98,7 @@ export function QuotationEditor() {
   const [params] = useSearchParams();
   const enquiryId = params.get('enquiry');
   const copyFrom = params.get('from');
+  const requestId = params.get('request');
   const { profile } = useAuth();
   const { canWrite } = useAdminAccess();
   const writable = canWrite('quotations');
@@ -117,6 +119,11 @@ export function QuotationEditor() {
     return data;
   }, [enquiryId, isNew]);
 
+  const request = useQuery(async () => {
+    if (!isNew || !requestId) return null;
+    const { data } = await supabase.from('quote_requests').select('*').eq('id', requestId).maybeSingle();
+    return data as QuoteRequest | null;
+  }, [requestId, isNew]);
   const [f, setF] = useState<Form | null>(null);
   const [busy, setBusy] = useState(false);
   const [signed, setSigned] = useState(true);
@@ -124,7 +131,7 @@ export function QuotationEditor() {
 
   // Fill the form once what it depends on has loaded.
   useEffect(() => {
-    if (f || saved.loading || org.loading || enquiry.loading) return;
+    if (f || saved.loading || org.loading || enquiry.loading || request.loading) return;
     const base = saved.data && !isNew ? fromQuotation(saved.data) : blank();
     if (isNew) {
       if (saved.data) Object.assign(base, fromQuotation(saved.data), { issued_on: isoDate(0), valid_until: isoDate(15), proposed_start: '', proposed_end: '' });
@@ -134,13 +141,20 @@ export function QuotationEditor() {
           organisation: enquiry.data.organisation ?? '', title: enquiry.data.interest ? `${enquiry.data.interest}` : base.title,
         });
       }
+      const ans = parseAnswers(request.data?.answers);
+      if (ans) {
+        const d = draftFromAnswers(ans);
+        const { wantsCertificates, ...rest } = d;
+        Object.assign(base, rest, { notes: [base.notes, rest.notes].filter(Boolean).join('\n') });
+        if (!wantsCertificates) base.inclusions = base.inclusions.filter((x) => !/certificate/i.test(x));
+      }
       base.prepared_by = base.prepared_by || profile?.full_name || '';
       base.prepared_phone = base.prepared_phone || profile?.phone || '';
       base.signatory_name = base.signatory_name || org.data?.signatoryName || '';
       base.signatory_designation = org.data?.signatoryTitle || base.signatory_designation;
     }
     setF(base);
-  }, [f, saved.loading, saved.data, org.loading, org.data, enquiry.loading, enquiry.data, isNew, profile]);
+  }, [f, saved.loading, saved.data, org.loading, org.data, enquiry.loading, enquiry.data, request.loading, request.data, isNew, profile]);
 
   const draft = useMemo(() => (f ? toQuotation(f, isNew ? null : saved.data ?? null) : null), [f, isNew, saved.data]);
 
@@ -204,8 +218,9 @@ export function QuotationEditor() {
     setBusy(true);
     try {
       if (isNew) {
-        const { data, error: e } = await supabase.from('quotations').insert({ ...row(), enquiry_id: enquiryId || null }).select('*').single();
+        const { data, error: e } = await supabase.from('quotations').insert({ ...row(), enquiry_id: enquiryId || request.data?.enquiry_id || null, request_id: request.data?.id ?? null }).select('*').single();
         if (e) throw new Error(e.message);
+        if (request.data) await supabase.from('quote_requests').update({ status: 'quoted' }).eq('id', request.data.id);
         toast(`Saved as ${(data as Quotation).quote_no}`);
         navigate(`/admin/quotations/${(data as Quotation).id}`, { replace: true });
         return data as Quotation;
@@ -260,6 +275,15 @@ export function QuotationEditor() {
         subtitle={isNew ? 'Fill in what the client asked for. The totals, the number and the PDF are made for you.' : `${saved.data?.organisation || saved.data?.client_name}, ${STATUS_LABEL[status].toLowerCase()}`}
         actions={!isNew && <Badge tone={status === 'accepted' ? 'green' : status === 'sent' ? 'blue' : status === 'declined' ? 'red' : 'neutral'}>{STATUS_LABEL[status]}</Badge>}
       />
+
+      {request.data && parseAnswers(request.data.answers) && (
+        <GlassCard className="mb-4 p-4 text-sm">
+          <p className="font-medium text-neutral-900">What the client asked for (from their requirement form)</p>
+          <ul className="mt-1 space-y-0.5 text-neutral-600">{parseAnswers(request.data.answers)!.modules.map((m) => <li key={m.key}>{moduleLine(m)}</li>)}</ul>
+          {parseAnswers(request.data.answers)!.budget && <p className="mt-1 text-neutral-600">Budget they mentioned: {parseAnswers(request.data.answers)!.budget}</p>}
+          <p className="mt-2 text-xs text-neutral-500">The programme details below are filled in from it. Enter the rates and check everything before you save.</p>
+        </GlassCard>
+      )}
 
       {enquiry.data && (
         <GlassCard className="mb-4 p-4 text-sm">
