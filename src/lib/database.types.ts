@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -1001,7 +1001,6 @@ export type Database = {
           id: string
           marks_online: number
           marks_piloting: number
-          piloting_label: string | null
           marks_simulation: number
           marks_viva: number
           max_attempts: number
@@ -1014,6 +1013,7 @@ export type Database = {
           pass_marks_simulation: number
           pass_marks_viva: number
           pass_pct: number
+          piloting_label: string | null
           scoring_mode: string
           show_review: boolean
           slug: string
@@ -1042,7 +1042,6 @@ export type Database = {
           id?: string
           marks_online?: number
           marks_piloting?: number
-          piloting_label?: string | null
           marks_simulation?: number
           marks_viva?: number
           max_attempts?: number
@@ -1055,6 +1054,7 @@ export type Database = {
           pass_marks_simulation?: number
           pass_marks_viva?: number
           pass_pct?: number
+          piloting_label?: string | null
           scoring_mode?: string
           show_review?: boolean
           slug: string
@@ -1083,7 +1083,6 @@ export type Database = {
           id?: string
           marks_online?: number
           marks_piloting?: number
-          piloting_label?: string | null
           marks_simulation?: number
           marks_viva?: number
           max_attempts?: number
@@ -1096,6 +1095,7 @@ export type Database = {
           pass_marks_simulation?: number
           pass_marks_viva?: number
           pass_pct?: number
+          piloting_label?: string | null
           scoring_mode?: string
           show_review?: boolean
           slug?: string
@@ -2153,6 +2153,86 @@ export type Database = {
         }
         Relationships: []
       }
+      mcp_agent_keys: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          revoked_at: string | null
+          scopes: string[]
+          use_count: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expires_at: string
+          id?: string
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          name: string
+          revoked_at?: string | null
+          scopes?: string[]
+          use_count?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          revoked_at?: string | null
+          scopes?: string[]
+          use_count?: number
+        }
+        Relationships: []
+      }
+      mcp_call_log: {
+        Row: {
+          at: string
+          detail: string | null
+          id: number
+          key_id: string | null
+          ok: boolean
+          rows_returned: number | null
+          tool: string
+        }
+        Insert: {
+          at?: string
+          detail?: string | null
+          id?: never
+          key_id?: string | null
+          ok: boolean
+          rows_returned?: number | null
+          tool: string
+        }
+        Update: {
+          at?: string
+          detail?: string | null
+          id?: never
+          key_id?: string | null
+          ok?: boolean
+          rows_returned?: number | null
+          tool?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_call_log_key_id_fkey"
+            columns: ["key_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_agent_keys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       modules: {
         Row: {
           course_id: string
@@ -2470,6 +2550,152 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotations: {
+        Row: {
+          client_address: string
+          client_designation: string
+          client_email: string | null
+          client_name: string
+          client_phone: string
+          created_at: string
+          created_by: string | null
+          dates_note: string
+          discount_amount: number
+          duration_days: number | null
+          enquiry_id: string | null
+          gst_amount: number
+          gst_note: string
+          gst_percent: number
+          hours_per_day: number | null
+          id: string
+          inclusions: Json
+          issued_on: string
+          items: Json
+          mode: string
+          notes: string
+          organisation: string
+          participants: number
+          payment_terms: string
+          prepared_by: string
+          prepared_phone: string
+          programme_type: string
+          proposed_end: string | null
+          proposed_start: string | null
+          quote_no: string | null
+          responded_at: string | null
+          sent_at: string | null
+          signatory_designation: string
+          signatory_name: string
+          status: string
+          subtotal: number
+          terms: string
+          title: string
+          topics: Json
+          total: number
+          updated_at: string
+          valid_until: string
+          venue: string
+        }
+        Insert: {
+          client_address?: string
+          client_designation?: string
+          client_email?: string | null
+          client_name: string
+          client_phone?: string
+          created_at?: string
+          created_by?: string | null
+          dates_note?: string
+          discount_amount?: number
+          duration_days?: number | null
+          enquiry_id?: string | null
+          gst_amount?: number
+          gst_note?: string
+          gst_percent?: number
+          hours_per_day?: number | null
+          id?: string
+          inclusions?: Json
+          issued_on?: string
+          items?: Json
+          mode?: string
+          notes?: string
+          organisation?: string
+          participants: number
+          payment_terms?: string
+          prepared_by?: string
+          prepared_phone?: string
+          programme_type?: string
+          proposed_end?: string | null
+          proposed_start?: string | null
+          quote_no?: string | null
+          responded_at?: string | null
+          sent_at?: string | null
+          signatory_designation?: string
+          signatory_name?: string
+          status?: string
+          subtotal?: number
+          terms?: string
+          title: string
+          topics?: Json
+          total?: number
+          updated_at?: string
+          valid_until: string
+          venue?: string
+        }
+        Update: {
+          client_address?: string
+          client_designation?: string
+          client_email?: string | null
+          client_name?: string
+          client_phone?: string
+          created_at?: string
+          created_by?: string | null
+          dates_note?: string
+          discount_amount?: number
+          duration_days?: number | null
+          enquiry_id?: string | null
+          gst_amount?: number
+          gst_note?: string
+          gst_percent?: number
+          hours_per_day?: number | null
+          id?: string
+          inclusions?: Json
+          issued_on?: string
+          items?: Json
+          mode?: string
+          notes?: string
+          organisation?: string
+          participants?: number
+          payment_terms?: string
+          prepared_by?: string
+          prepared_phone?: string
+          programme_type?: string
+          proposed_end?: string | null
+          proposed_start?: string | null
+          quote_no?: string | null
+          responded_at?: string | null
+          sent_at?: string | null
+          signatory_designation?: string
+          signatory_name?: string
+          status?: string
+          subtotal?: number
+          terms?: string
+          title?: string
+          topics?: Json
+          total?: number
+          updated_at?: string
+          valid_until?: string
+          venue?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotations_enquiry_id_fkey"
+            columns: ["enquiry_id"]
+            isOneToOne: false
+            referencedRelation: "site_enquiries"
             referencedColumns: ["id"]
           },
         ]
@@ -2795,6 +3021,412 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      shop_announcements: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          ends_at: string | null
+          id: string
+          is_active: boolean
+          link: string | null
+          message: string
+          starts_at: string
+          tone: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string | null
+          id?: string
+          is_active?: boolean
+          link?: string | null
+          message: string
+          starts_at?: string
+          tone?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string | null
+          id?: string
+          is_active?: boolean
+          link?: string | null
+          message?: string
+          starts_at?: string
+          tone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_announcements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_brands: {
+        Row: {
+          logo_height: number | null
+          logo_source: string | null
+          logo_url: string | null
+          logo_width: number | null
+          name: string
+          slug: string
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          logo_height?: number | null
+          logo_source?: string | null
+          logo_url?: string | null
+          logo_width?: number | null
+          name: string
+          slug: string
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          logo_height?: number | null
+          logo_source?: string | null
+          logo_url?: string | null
+          logo_width?: number | null
+          name?: string
+          slug?: string
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
+      shop_option_price_hold: {
+        Row: {
+          held_at: string
+          product_id: string
+        }
+        Insert: {
+          held_at?: string
+          product_id: string
+        }
+        Update: {
+          held_at?: string
+          product_id?: string
+        }
+        Relationships: []
+      }
+      shop_order_items: {
+        Row: {
+          id: number
+          mrp: number | null
+          name: string
+          order_id: string
+          product_id: string | null
+          qty: number
+          unit_price: number
+          variant_id: string | null
+          variant_label: string | null
+        }
+        Insert: {
+          id?: never
+          mrp?: number | null
+          name: string
+          order_id: string
+          product_id?: string | null
+          qty: number
+          unit_price: number
+          variant_id?: string | null
+          variant_label?: string | null
+        }
+        Update: {
+          id?: never
+          mrp?: number | null
+          name?: string
+          order_id?: string
+          product_id?: string | null
+          qty?: number
+          unit_price?: number
+          variant_id?: string | null
+          variant_label?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "shop_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "shop_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_order_items_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "shop_product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_orders: {
+        Row: {
+          address: Json
+          cod_fee: number
+          company: string | null
+          courier: string | null
+          created_at: string
+          customer_name: string
+          email: string
+          gstin: string | null
+          id: string
+          paid_at: string | null
+          payment_method: string
+          payment_status: string
+          phone: string
+          razorpay_order_id: string | null
+          razorpay_payment_id: string | null
+          savings: number
+          shipping: number
+          staff_notes: string | null
+          status: string
+          subtotal: number
+          total: number
+          tracking_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          address: Json
+          cod_fee?: number
+          company?: string | null
+          courier?: string | null
+          created_at?: string
+          customer_name: string
+          email: string
+          gstin?: string | null
+          id: string
+          paid_at?: string | null
+          payment_method: string
+          payment_status?: string
+          phone: string
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
+          savings?: number
+          shipping?: number
+          staff_notes?: string | null
+          status?: string
+          subtotal: number
+          total: number
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: Json
+          cod_fee?: number
+          company?: string | null
+          courier?: string | null
+          created_at?: string
+          customer_name?: string
+          email?: string
+          gstin?: string | null
+          id?: string
+          paid_at?: string | null
+          payment_method?: string
+          payment_status?: string
+          phone?: string
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
+          savings?: number
+          shipping?: number
+          staff_notes?: string | null
+          status?: string
+          subtotal?: number
+          total?: number
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      shop_private: {
+        Row: {
+          key: string
+          value: string
+        }
+        Insert: {
+          key: string
+          value: string
+        }
+        Update: {
+          key?: string
+          value?: string
+        }
+        Relationships: []
+      }
+      shop_product_variants: {
+        Row: {
+          id: string
+          image_url: string | null
+          label: string
+          mrp: number | null
+          price: number
+          product_id: string
+          sku: string | null
+          sort: number
+          source_key: string | null
+          source_price: number | null
+          stock: number
+        }
+        Insert: {
+          id?: string
+          image_url?: string | null
+          label: string
+          mrp?: number | null
+          price: number
+          product_id: string
+          sku?: string | null
+          sort?: number
+          source_key?: string | null
+          source_price?: number | null
+          stock?: number
+        }
+        Update: {
+          id?: string
+          image_url?: string | null
+          label?: string
+          mrp?: number | null
+          price?: number
+          product_id?: string
+          sku?: string | null
+          sort?: number
+          source_key?: string | null
+          source_price?: number | null
+          stock?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_product_variants_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "shop_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_products: {
+        Row: {
+          art: string
+          brand: string
+          category: string
+          created_at: string
+          created_by: string | null
+          description_html: string | null
+          highlights: string[]
+          id: string
+          image_url: string | null
+          images: string[]
+          in_box: string[] | null
+          is_published: boolean
+          low_stock_at: number
+          mrp: number | null
+          name: string
+          price: number
+          short: string
+          sku: string
+          slug: string
+          sort: number
+          source: string
+          source_currency: string | null
+          source_key: string | null
+          source_price: number | null
+          source_synced_at: string | null
+          source_url: string | null
+          specs: Json
+          stock: number
+          tags: string[]
+          updated_at: string
+          variant_name: string | null
+          weight_g: number | null
+        }
+        Insert: {
+          art?: string
+          brand: string
+          category: string
+          created_at?: string
+          created_by?: string | null
+          description_html?: string | null
+          highlights?: string[]
+          id?: string
+          image_url?: string | null
+          images?: string[]
+          in_box?: string[] | null
+          is_published?: boolean
+          low_stock_at?: number
+          mrp?: number | null
+          name: string
+          price: number
+          short?: string
+          sku: string
+          slug: string
+          sort?: number
+          source?: string
+          source_currency?: string | null
+          source_key?: string | null
+          source_price?: number | null
+          source_synced_at?: string | null
+          source_url?: string | null
+          specs?: Json
+          stock?: number
+          tags?: string[]
+          updated_at?: string
+          variant_name?: string | null
+          weight_g?: number | null
+        }
+        Update: {
+          art?: string
+          brand?: string
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description_html?: string | null
+          highlights?: string[]
+          id?: string
+          image_url?: string | null
+          images?: string[]
+          in_box?: string[] | null
+          is_published?: boolean
+          low_stock_at?: number
+          mrp?: number | null
+          name?: string
+          price?: number
+          short?: string
+          sku?: string
+          slug?: string
+          sort?: number
+          source?: string
+          source_currency?: string | null
+          source_key?: string | null
+          source_price?: number | null
+          source_synced_at?: string | null
+          source_url?: string | null
+          specs?: Json
+          stock?: number
+          tags?: string[]
+          updated_at?: string
+          variant_name?: string | null
+          weight_g?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_products_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       showcase_comments: {
         Row: {
@@ -3565,6 +4197,10 @@ export type Database = {
         Returns: Json
       }
       careers_sync_test_scores: { Args: { p_job_id: string }; Returns: number }
+      create_mcp_key: {
+        Args: { p_days?: number; p_name: string; p_scopes: string[] }
+        Returns: string
+      }
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
@@ -3626,6 +4262,44 @@ export type Database = {
       is_staff: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
       jwt_session_id: { Args: never; Returns: string }
+      mcp_authenticate: {
+        Args: { p_hash: string }
+        Returns: {
+          id: string
+          name: string
+          scopes: string[]
+        }[]
+      }
+      mcp_careers_pipeline: {
+        Args: { p_job?: string; p_limit?: number }
+        Returns: Json
+      }
+      mcp_course_stats: { Args: { p_course: string }; Returns: Json }
+      mcp_exam_results: {
+        Args: { p_course: string; p_limit?: number }
+        Returns: Json
+      }
+      mcp_hr_summary: {
+        Args: { p_from?: string; p_to?: string }
+        Returns: Json
+      }
+      mcp_log_call: {
+        Args: {
+          p_detail: string
+          p_key: string
+          p_ok: boolean
+          p_rows: number
+          p_tool: string
+        }
+        Returns: undefined
+      }
+      mcp_overview: { Args: { p_days?: number }; Returns: Json }
+      mcp_student_profile: { Args: { p_student: string }; Returns: Json }
+      mcp_workshop_members: {
+        Args: { p_group: string; p_limit?: number }
+        Returns: Json
+      }
+      mcp_workshop_stats: { Args: { p_group: string }; Returns: Json }
       mfa_ok: { Args: never; Returns: boolean }
       my_exam_review: { Args: { p_attempt_id: string }; Returns: Json }
       next_cert_number: { Args: { p_course_code: string }; Returns: number }
@@ -3654,12 +4328,42 @@ export type Database = {
         }
         Returns: Json
       }
+      revoke_mcp_key: { Args: { p_id: string }; Returns: boolean }
       revoke_trusted_device: { Args: { p_id?: string }; Returns: number }
       safe_avatar_url: { Args: { p_url: string }; Returns: boolean }
       session_is_trusted: { Args: never; Returns: boolean }
       set_review_website_consent: {
         Args: { p_allow: boolean; p_full?: boolean; p_review: string }
         Returns: undefined
+      }
+      shop_attach_payment: {
+        Args: { p_order_id: string; p_rzp_order_id: string; p_secret: string }
+        Returns: undefined
+      }
+      shop_dashboard_stats: { Args: never; Returns: Json }
+      shop_expire_unpaid: { Args: never; Returns: number }
+      shop_mark_paid: {
+        Args: { p_payment_id: string; p_rzp_order_id: string; p_secret: string }
+        Returns: Json
+      }
+      shop_notify_admins: {
+        Args: {
+          p_body: string
+          p_kind: string
+          p_link: string
+          p_title: string
+        }
+        Returns: undefined
+      }
+      shop_place_order: { Args: { p: Json }; Returns: Json }
+      shop_server_ok: { Args: { p_secret: string }; Returns: boolean }
+      shop_sync_official: {
+        Args: { p_items: Json; p_secret: string }
+        Returns: Json
+      }
+      shop_track_order: {
+        Args: { p_id: string; p_phone: string }
+        Returns: Json
       }
       student_kinds: {
         Args: never
