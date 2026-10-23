@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Copy, Download, FilePlus2, FileText, Trash2 } from 'lucide-react';
+import { Copy, Download, FilePlus2, FileText, Link2, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
@@ -72,7 +72,12 @@ export function AdminQuotations() {
       <PageHeader
         title="Quotations"
         subtitle="Workshop and training quotations for colleges, clubs and companies, with the PDF ready to send."
-        actions={writable && <Button onClick={() => navigate('/admin/quotations/new')}><FilePlus2 size={15} /> New quotation</Button>}
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => navigate('/admin/quotations/requests')}><Link2 size={15} /> Requirement forms</Button>
+            {writable && <Button onClick={() => navigate('/admin/quotations/new')}><FilePlus2 size={15} /> New quotation</Button>}
+          </>
+        }
       />
 
       <div className="mb-5 grid gap-3 sm:grid-cols-3">

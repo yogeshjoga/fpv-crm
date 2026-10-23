@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Building2, Download, FilePlus2, GraduationCap, Inbox, Mail, MessageCircle, Phone, PlayCircle, Trash2 } from 'lucide-react';
+import { Building2, Download, FilePlus2, GraduationCap, Inbox, Link2, Mail, MessageCircle, Phone, PlayCircle, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
@@ -300,6 +300,11 @@ function EnquiryModal({ enquiry, staff, writable, onClose, onSaved }: { enquiry:
             {writable && (
               <Button variant="secondary" onClick={remove} disabled={busy}>
                 <Trash2 size={15} /> Delete
+              </Button>
+            )}
+            {canQuote && (
+              <Button variant="secondary" onClick={() => navigate(`/admin/quotations/requests?enquiry=${enquiry.id}`)} disabled={busy}>
+                <Link2 size={15} /> Send requirement form
               </Button>
             )}
             {canQuote && (
