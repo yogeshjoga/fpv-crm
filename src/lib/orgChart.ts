@@ -215,3 +215,5 @@ export function periodRange(p: Period): { from: string | null; to: string | null
 }
 
 export const pct = (x: number) => `${Math.round(x * 1000) / 10}%`;
+/** Rupees in Indian grouping with no paise: ₹1,26,000 */
+export const inr0 = (n: number) => `₹${Math.round(Number(n)).toLocaleString('en-IN')}`;
