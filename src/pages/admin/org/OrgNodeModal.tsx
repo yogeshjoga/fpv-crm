@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
+import { removeMedia, uploadOrgPhoto } from '../../../lib/siteMedia';
 import { Button, Checkbox, Field, Modal, Select, TextArea, TextInput, useToast } from '../../../components/ui/kit';
 import {
   ACCENTS, EMPLOYMENT_TYPE_LABEL, displayName, subtreeIds,
@@ -52,7 +53,9 @@ export function OrgNodeModal({ chartId, node, nodes, accounts, employees, defaul
   const [image, setImage] = useState(node?.image_url ?? '');
   const [note, setNote] = useState(node?.note ?? '');
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const takenProfiles = useMemo(() => new Set(nodes.filter((n) => n.profile_id && n.id !== node?.id).map((n) => n.profile_id as string)), [nodes, node?.id]);
   const takenEmployees = useMemo(() => new Set(nodes.filter((n) => n.employee_id && n.id !== node?.id).map((n) => n.employee_id as string)), [nodes, node?.id]);
@@ -74,6 +77,22 @@ export function OrgNodeModal({ chartId, node, nodes, accounts, employees, defaul
     setProfileId(id);
     const a = accounts.find((x) => x.id === id);
     if (a && !title.trim()) setTitle(a.designation || '');
+  };
+
+  // The photo is uploaded straight away and used as the box's picture once the box is saved.
+  const choosePhoto = async (file: File | undefined) => {
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const { url } = await uploadOrgPhoto(file);
+      setImage(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not upload the photo');
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
   };
 
   const save = async () => {
@@ -98,6 +117,9 @@ export function OrgNodeModal({ chartId, node, nodes, accounts, employees, defaul
     const { error: e } = node ? await supabase.from('org_nodes').update(row).eq('id', node.id) : await supabase.from('org_nodes').insert(row);
     setBusy(false);
     if (e) return setError(e.message.includes('duplicate') ? 'That person is already in this chart.' : e.message);
+    // a replaced or removed picture that we uploaded is deleted so old files do not pile up
+    const old = node?.image_url ?? '';
+    if (old && old !== url && old.includes('/site-media/org/')) await removeMedia([old.slice(old.indexOf('org/'))]);
     toast(node ? 'Saved' : 'Added to the chart');
     onSaved();
   };
@@ -180,7 +202,21 @@ export function OrgNodeModal({ chartId, node, nodes, accounts, employees, defaul
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Colour"><Select value={accent} onChange={(e) => setAccent(e.target.value as Accent)}>{(Object.keys(ACCENTS) as Accent[]).map((a) => <option key={a} value={a}>{ACCENTS[a].label}</option>)}</Select></Field>
-          <Field label="Photo link" hint="Optional, https only. Accounts use their own photo."><TextInput value={image} maxLength={500} onChange={(e) => { setError(null); setImage(e.target.value); }} placeholder="https://…" /></Field>
+          <Field label="Photo" hint="Upload a picture, or paste a https link. Without one, an account's own photo (or initials) is used.">
+            <div className="flex items-center gap-3">
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white bg-neutral-100 text-xs text-neutral-400">
+                {/^https:\/\//i.test(image.trim()) ? <img src={image.trim()} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" /> : 'No photo'}
+              </span>
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => void choosePhoto(e.target.files?.[0])} />
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="secondary" loading={uploading} onClick={() => fileRef.current?.click()}>{image ? 'Replace photo' : 'Upload photo'}</Button>
+                  {image && <Button type="button" variant="ghost" onClick={() => setImage('')}>Remove</Button>}
+                </div>
+                <TextInput value={image} maxLength={500} onChange={(e) => { setError(null); setImage(e.target.value); }} placeholder="or paste a https:// link" />
+              </div>
+            </div>
+          </Field>
         </div>
         <Field label="Note" hint="Optional, shown when the box is opened."><TextArea rows={2} maxLength={400} value={note} onChange={(e) => setNote(e.target.value)} /></Field>
         {error && <p role="alert" className="rounded-2xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
@@ -188,7 +224,7 @@ export function OrgNodeModal({ chartId, node, nodes, accounts, employees, defaul
           <div>{node && <Button variant="secondary" onClick={() => void remove()} disabled={busy}><Trash2 size={15} /> Remove</Button>}</div>
           <div className="flex gap-2">
             <Button variant="secondary" onClick={onClose}>Cancel</Button>
-            <Button onClick={() => void save()} loading={busy}>{node ? 'Save' : 'Add'}</Button>
+            <Button onClick={() => void save()} loading={busy} disabled={uploading}>{node ? 'Save' : 'Add'}</Button>
           </div>
         </div>
       </div>
