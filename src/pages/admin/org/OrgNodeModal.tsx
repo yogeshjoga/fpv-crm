@@ -12,10 +12,12 @@ export interface StaffOption extends PersonProfile {
   designation: string;
 }
 
+const ROLE_LABEL: Record<string, string> = { super_admin: 'Super admin', admin: 'Admin', coordinator: 'Coordinator', instructor: 'Instructor' };
+
 type Source = 'employee' | 'account' | 'outside' | 'group';
 const SOURCES: { key: Source; label: string; hint: string }[] = [
-  { key: 'employee', label: 'Employee or intern', hint: 'From your HR records' },
-  { key: 'account', label: 'A user account', hint: 'Staff, or anyone who has a login' },
+  { key: 'employee', label: 'Employee or intern', hint: 'Everyone on the team: CEO, CTO, instructors, interns' },
+  { key: 'account', label: 'Any user account', hint: 'Including students who have a login' },
   { key: 'outside', label: 'Someone from outside', hint: 'A temporary person, not in the organisation' },
   { key: 'group', label: 'A team or role', hint: 'A box that groups people' },
 ];
@@ -24,7 +26,7 @@ const sourceOf = (n: OrgNodeView | null): Source => {
   if (!n) return 'employee';
   if (n.kind === 'group') return 'group';
   if (n.employee_id) return 'employee';
-  if (n.profile_id) return 'account';
+  if (n.profile_id) return n.profile?.role === 'student' ? 'account' : 'employee';
   return 'outside';
 };
 
@@ -42,7 +44,8 @@ export function OrgNodeModal({ chartId, node, nodes, accounts, employees, defaul
   const toast = useToast();
   const [source, setSource] = useState<Source>(sourceOf(node));
   const [profileId, setProfileId] = useState(node?.profile_id ?? '');
-  const [employeeId, setEmployeeId] = useState(node?.employee_id ?? '');
+  // one value for the team picker: "p:<account>" for a staff account, "e:<hr record>" for an HR record
+  const [teamPick, setTeamPick] = useState(node?.employee_id ? `e:${node.employee_id}` : node?.profile_id && node.profile?.role !== 'student' ? `p:${node.profile_id}` : '');
   const [find, setFind] = useState('');
   const [label, setLabel] = useState(node?.label ?? '');
   const [title, setTitle] = useState(node?.title ?? '');
@@ -63,14 +66,22 @@ export function OrgNodeModal({ chartId, node, nodes, accounts, employees, defaul
   const managers = nodes.filter((n) => !blocked.has(n.id));
   const needle = find.trim().toLowerCase();
   const shownAccounts = accounts.filter((a) => !needle || `${a.full_name ?? ''} ${a.email ?? ''}`.toLowerCase().includes(needle));
+  const team = useMemo(() => accounts.filter((a) => a.role !== 'student'), [accounts]);
+  const shownTeam = team.filter((a) => !needle || `${a.full_name ?? ''} ${a.email ?? ''} ${a.designation}`.toLowerCase().includes(needle));
   const shownEmployees = employees.filter((e) => !needle || `${e.full_name} ${e.designation}`.toLowerCase().includes(needle));
-  const chosenEmployee = employees.find((e) => e.id === employeeId);
+  const chosenEmployee = teamPick.startsWith('e:') ? employees.find((e) => e.id === teamPick.slice(2)) : undefined;
+  const chosenStaff = teamPick.startsWith('p:') ? team.find((a) => a.id === teamPick.slice(2)) : undefined;
 
-  const pickEmployee = (id: string) => {
+  const pickTeam = (value: string) => {
     setError(null);
-    setEmployeeId(id);
-    const e = employees.find((x) => x.id === id);
-    if (e && !title.trim()) setTitle(e.designation || EMPLOYMENT_TYPE_LABEL[e.employment_type] || '');
+    setTeamPick(value);
+    if (value.startsWith('e:')) {
+      const e = employees.find((x) => x.id === value.slice(2));
+      if (e && !title.trim()) setTitle(e.designation || EMPLOYMENT_TYPE_LABEL[e.employment_type] || '');
+    } else {
+      const a = team.find((x) => x.id === value.slice(2));
+      if (a && !title.trim()) setTitle(a.designation || '');
+    }
   };
   const pickAccount = (id: string) => {
     setError(null);
@@ -96,7 +107,7 @@ export function OrgNodeModal({ chartId, node, nodes, accounts, employees, defaul
   };
 
   const save = async () => {
-    if (source === 'employee' && !employeeId) return setError('Choose the employee or intern.');
+    if (source === 'employee' && !teamPick) return setError('Choose the person.');
     if (source === 'account' && !profileId) return setError('Choose the user account.');
     if ((source === 'outside' || source === 'group') && !label.trim()) return setError(source === 'group' ? 'Give the team a name.' : 'Type the person’s name.');
     const url = image.trim();
@@ -106,8 +117,8 @@ export function OrgNodeModal({ chartId, node, nodes, accounts, employees, defaul
     const row = {
       chart_id: chartId, parent_id: parent || null,
       kind: source === 'group' ? 'group' : 'person',
-      profile_id: source === 'account' ? profileId : null,
-      employee_id: source === 'employee' ? employeeId : null,
+      profile_id: source === 'account' ? profileId : source === 'employee' && teamPick.startsWith('p:') ? teamPick.slice(2) : null,
+      employee_id: source === 'employee' && teamPick.startsWith('e:') ? teamPick.slice(2) : null,
       is_external: external,
       until: external && until ? until : null,
       label: source === 'outside' || source === 'group' ? label.trim() : '',
@@ -152,17 +163,27 @@ export function OrgNodeModal({ chartId, node, nodes, accounts, employees, defaul
 
         {source === 'employee' && (
           <div className="space-y-2">
-            <Field label="Employee or intern" required>
+            <Field label="Employee or intern" required hint="Staff and instructors (including interns who instruct) and anyone in the HR records. Students are not listed here.">
               <TextInput value={find} onChange={(e) => setFind(e.target.value)} placeholder="Type to search by name" />
             </Field>
-            {!employees.length ? (
-              <p className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-900">There are no employees or interns in the HR records yet. They appear here once someone is hired from Careers. Until then, add them as a user account or as someone from outside.</p>
+            {!team.length && !employees.length ? (
+              <p className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-900">There are no staff accounts or HR records yet.</p>
             ) : (
-              <Select value={employeeId} onChange={(e) => pickEmployee(e.target.value)} size={Math.min(6, Math.max(2, shownEmployees.length))} className="!h-auto !rounded-2xl !py-2">
-                {shownEmployees.map((e) => <option key={e.id} value={e.id} disabled={takenEmployees.has(e.id)}>{e.full_name} ({EMPLOYMENT_TYPE_LABEL[e.employment_type] ?? e.employment_type}{e.designation ? `, ${e.designation}` : ''}){takenEmployees.has(e.id) ? ' (already in this chart)' : ''}</option>)}
+              <Select value={teamPick} onChange={(e) => pickTeam(e.target.value)} size={Math.min(8, Math.max(3, shownTeam.length + shownEmployees.length + 2))} className="!h-auto !rounded-2xl !py-2">
+                {shownTeam.length > 0 && (
+                  <optgroup label="Team (staff accounts)">
+                    {shownTeam.map((a) => <option key={a.id} value={`p:${a.id}`} disabled={takenProfiles.has(a.id)}>{a.full_name || a.email} ({ROLE_LABEL[a.role] ?? a.role}{a.designation ? `, ${a.designation}` : ''}){takenProfiles.has(a.id) ? ' (already in this chart)' : ''}</option>)}
+                  </optgroup>
+                )}
+                {shownEmployees.length > 0 && (
+                  <optgroup label="HR records">
+                    {shownEmployees.map((e) => <option key={e.id} value={`e:${e.id}`} disabled={takenEmployees.has(e.id)}>{e.full_name} ({EMPLOYMENT_TYPE_LABEL[e.employment_type] ?? e.employment_type}{e.designation ? `, ${e.designation}` : ''}){takenEmployees.has(e.id) ? ' (already in this chart)' : ''}</option>)}
+                  </optgroup>
+                )}
               </Select>
             )}
             {chosenEmployee && !chosenEmployee.profile_id && <p className="text-xs text-amber-700">This person has no login account, so leads cannot be credited to them. They can still be shown in the chart.</p>}
+            {chosenStaff && <p className="text-xs text-neutral-500">Their photo and name come from their account, and their leads and admissions are counted.</p>}
           </div>
         )}
 

@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { Pencil, Trophy, X } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, LabelList, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { BadgeCheck, IndianRupee, Pencil, Percent, Target, Trophy, X } from 'lucide-react';
 import { GlassCard } from '../../../components/ui/shared';
 import { Button } from '../../../components/ui/kit';
-import { inr } from '../../../lib/quotations';
 import {
-  ACCENTS, displayName, hasEnded, initials, metricsFor, pct, photoOf, profileIdOf, sourceLabel, subtreeIds, weeklySeries,
+  ACCENTS, displayName, hasEnded, inr0, initials, metricsFor, pct, photoOf, profileIdOf, sourceLabel, subtreeIds, weeklySeries,
   type KpiSummary, type Metrics, type OrgNodeView,
 } from '../../../lib/orgChart';
 
@@ -43,7 +42,7 @@ function Tiles({ m }: { m: Metrics }) {
       <Tile label="Admissions (won)" value={String(m.won)} tone="text-green-700" sub={`Conversion ${pct(m.conversion)}`} />
       <Tile label="Open" value={String(m.open)} tone="text-amber-700" sub="Still being worked" />
       <Tile label="Lost" value={String(m.lost)} tone="text-neutral-700" sub="Enquiries marked lost" />
-      <div className="col-span-2"><Tile label="Fees collected" value={inr(m.fees)} sub="Paid amounts on accepted registrations" /></div>
+      <div className="col-span-2"><Tile label="Fees collected" value={inr0(m.fees)} sub="Paid amounts recorded on registrations" /></div>
     </div>
   );
 }
@@ -186,12 +185,68 @@ export function NodeDrawer({ node, nodes, summary, periodLabel, writable, onEdit
 }
 
 type SortKey = 'leads' | 'won' | 'conversion' | 'fees';
-const SORTS: { key: SortKey; label: string }[] = [
-  { key: 'leads', label: 'Leads generated' },
-  { key: 'won', label: 'Admissions' },
-  { key: 'conversion', label: 'Conversion' },
-  { key: 'fees', label: 'Fees collected' },
+const SORTS: { key: SortKey; label: string; hint: string }[] = [
+  { key: 'leads', label: 'Leads generated', hint: 'Total leads, split into admissions, open and lost' },
+  { key: 'won', label: 'Admissions', hint: 'Leads that became admissions' },
+  { key: 'conversion', label: 'Conversion', hint: 'Admissions as a share of leads' },
+  { key: 'fees', label: 'Fees collected', hint: 'Payments recorded as paid' },
 ];
+const COLOR = { won: '#16a34a', open: '#f59e0b', lost: '#94a3b8', bar: '#2563eb' };
+
+function KpiCard({ icon, label, value, sub, tone = 'text-neutral-900' }: { icon: React.ReactNode; label: string; value: string; sub?: string; tone?: string }) {
+  return (
+    <div className="rounded-2xl border border-white/70 bg-white/70 p-4 shadow-sm">
+      <div className="flex items-center justify-between text-neutral-400">
+        <span className="text-xs font-medium uppercase tracking-wide text-neutral-500">{label}</span>
+        {icon}
+      </div>
+      <p className={`mt-2 text-2xl font-semibold tabular-nums tracking-tight ${tone}`}>{value}</p>
+      {sub && <p className="mt-0.5 truncate text-xs text-neutral-500">{sub}</p>}
+    </div>
+  );
+}
+
+function RankBadge({ n }: { n: number }) {
+  const tone = n === 1 ? 'bg-amber-100 text-amber-800' : n === 2 ? 'bg-slate-200 text-slate-700' : n === 3 ? 'bg-orange-100 text-orange-800' : 'bg-transparent text-neutral-400';
+  return <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${tone}`}>{n}</span>;
+}
+
+function ConversionPill({ value, leads }: { value: number; leads: number }) {
+  if (!leads) return <span className="text-neutral-400">-</span>;
+  const tone = value >= 0.9 ? 'bg-green-100 text-green-800' : value >= 0.6 ? 'bg-blue-100 text-blue-800' : value >= 0.3 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800';
+  return <span className={`inline-block min-w-[3.5rem] rounded-full px-2 py-0.5 text-center text-xs font-semibold tabular-nums ${tone}`}>{pct(value)}</span>;
+}
+
+interface Row {
+  node: OrgNodeView;
+  name: string;
+  m: Metrics;
+}
+
+function ChartTip({ active, payload }: { active?: boolean; payload?: { payload: Row & { label: string } }[] }) {
+  if (!active || !payload?.length) return null;
+  const { name, m } = payload[0].payload;
+  const line = (k: string, v: string, color?: string) => (
+    <div className="flex items-center justify-between gap-6 text-xs">
+      <span className="flex items-center gap-1.5 text-neutral-500">{color && <span className="h-2 w-2 rounded-full" style={{ background: color }} />}{k}</span>
+      <span className="font-medium tabular-nums text-neutral-900">{v}</span>
+    </div>
+  );
+  return (
+    <div className="min-w-[200px] rounded-xl border border-black/5 bg-white p-3 shadow-lg">
+      <p className="mb-1.5 text-sm font-semibold text-neutral-900">{name}</p>
+      <div className="space-y-1">
+        {line('Leads generated', String(m.leads))}
+        {line('Admissions', String(m.won), COLOR.won)}
+        {line('Open', String(m.open), COLOR.open)}
+        {line('Lost', String(m.lost), COLOR.lost)}
+        <div className="my-1 border-t border-black/5" />
+        {line('Conversion', pct(m.conversion))}
+        {line('Fees collected', inr0(m.fees))}
+      </div>
+    </div>
+  );
+}
 
 /** Everyone side by side: who took more leads, who closed more, who converts best. */
 export function ComparePanel({ people, summary, unassigned, periodLabel, onSelect }: {
@@ -202,74 +257,151 @@ export function ComparePanel({ people, summary, unassigned, periodLabel, onSelec
   onSelect: (id: string) => void;
 }) {
   const [sort, setSort] = useState<SortKey>('leads');
-  const rows = useMemo(
+  const rows = useMemo<Row[]>(
     () => people.map((n) => ({ node: n, name: displayName(n), m: metricsFor(summary, [profileIdOf(n) as string]) })).sort((a, b) => b.m[sort] - a.m[sort] || a.name.localeCompare(b.name)),
     [people, summary, sort],
   );
-  const chart = rows.map((r) => ({ name: r.name.split(' ')[0], Leads: r.m.leads, Admissions: r.m.won, Open: r.m.open }));
+
+  if (!people.length) return <GlassCard className="p-5 text-sm text-neutral-600">Add people linked to accounts to compare them.</GlassCard>;
+
+  const total = rows.reduce(
+    (t, r) => ({ leads: t.leads + r.m.leads, open: t.open + r.m.open, won: t.won + r.m.won, lost: t.lost + r.m.lost, fees: t.fees + r.m.fees }),
+    { leads: 0, open: 0, won: 0, lost: 0, fees: 0 },
+  );
+  const conversion = total.leads ? total.won / total.leads : 0;
+  const top = rows[0];
+  const sortLabel = SORTS.find((s) => s.key === sort)!;
   const best = Math.max(1, ...rows.map((r) => r.m[sort]));
 
-  if (!people.length) return <GlassCard className="p-5 text-sm text-neutral-600">Add people linked to staff accounts to compare them.</GlassCard>;
+  const chartData = rows.map((r) => ({
+    ...r, label: r.name.length > 22 ? `${r.name.slice(0, 21)}…` : r.name,
+    leads: r.m.leads, won: r.m.won, open: r.m.open, lost: r.m.lost, pad: 0.0001, conversion: Math.round(r.m.conversion * 1000) / 10, fees: r.m.fees,
+  }));
+  const valueFmt = (v: unknown) => (sort === 'conversion' ? `${v}%` : sort === 'fees' ? inr0(Number(v)) : String(v));
+
   return (
-    <GlassCard className="p-5">
+    <GlassCard className="p-5 sm:p-6">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-neutral-900">Team performance</h2>
+          <p className="text-sm text-neutral-500">Leads created in {periodLabel.toLowerCase()}, {people.length} {people.length === 1 ? 'person' : 'people'}</p>
+        </div>
+      </div>
+
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <KpiCard icon={<Target size={16} />} label="Leads generated" value={String(total.leads)} sub={`${total.open} still open`} />
+        <KpiCard icon={<BadgeCheck size={16} />} label="Admissions" value={String(total.won)} tone="text-green-700" sub={`${total.lost} lost`} />
+        <KpiCard icon={<Percent size={16} />} label="Conversion" value={pct(conversion)} sub="Admissions ÷ leads" />
+        <KpiCard icon={<IndianRupee size={16} />} label="Fees collected" value={inr0(total.fees)} sub={total.won ? `${inr0(total.fees / total.won)} per admission` : undefined} />
+        <KpiCard icon={<Trophy size={16} className="text-amber-500" />} label={`Top: ${sortLabel.label.toLowerCase()}`} value={top && top.m[sort] > 0 ? top.name.split(' ')[0] : '-'} sub={top && top.m[sort] > 0 ? valueFmt(sort === 'conversion' ? Math.round(top.m.conversion * 1000) / 10 : top.m[sort]) : 'No data yet'} />
+      </div>
+
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="font-semibold text-neutral-900">Who took more leads</h2>
-          <p className="text-xs text-neutral-500">{periodLabel}, {people.length} people</p>
+          <p className="text-sm font-semibold text-neutral-900">Ranking by {sortLabel.label.toLowerCase()}</p>
+          <p className="text-xs text-neutral-500">{sortLabel.hint}</p>
         </div>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="inline-flex flex-wrap gap-1 rounded-full bg-black/5 p-1">
           {SORTS.map((s) => (
-            <button key={s.key} type="button" onClick={() => setSort(s.key)} className={`rounded-full px-3 py-1 text-xs font-medium ${sort === s.key ? 'bg-[#1a1a1a] text-white' : 'bg-white/70 text-neutral-700 hover:bg-white'}`}>{s.label}</button>
+            <button key={s.key} type="button" onClick={() => setSort(s.key)} className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${sort === s.key ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-600 hover:text-neutral-900'}`}>{s.label}</button>
           ))}
         </div>
       </div>
-      <div className="h-56">
+
+      <div style={{ height: Math.max(150, rows.length * 46 + 50) }} className="rounded-2xl border border-white/70 bg-white/50 px-2 py-3">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chart} margin={{ top: 5, right: 8, left: -18, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-            <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-            <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-            <Tooltip />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Bar dataKey="Leads" fill="#2563eb" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="Admissions" fill="#16a34a" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="Open" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+          <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 56, left: 8, bottom: 0 }} barCategoryGap={14}>
+            <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="rgba(0,0,0,0.07)" />
+            <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#737373' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => (sort === 'fees' ? `₹${v >= 100000 ? `${Math.round(v / 1000) / 100}L` : v >= 1000 ? `${v / 1000}k` : v}` : sort === 'conversion' ? `${v}%` : String(v))} domain={sort === 'conversion' ? [0, 100] : [0, 'auto']} />
+            <YAxis type="category" dataKey="label" width={150} tick={{ fontSize: 12, fill: '#262626' }} axisLine={false} tickLine={false} />
+            <Tooltip content={<ChartTip />} cursor={{ fill: 'rgba(37,99,235,0.06)' }} />
+            {sort === 'leads' ? (
+              <>
+                <Legend verticalAlign="top" align="right" iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, paddingBottom: 8 }} />
+                <Bar dataKey="won" name="Admissions" stackId="l" fill={COLOR.won} />
+                <Bar dataKey="open" name="Open" stackId="l" fill={COLOR.open} />
+                <Bar dataKey="lost" name="Lost" stackId="l" fill={COLOR.lost} />
+                <Bar dataKey="pad" legendType="none" stackId="l" fill="transparent" isAnimationActive={false}>
+                  <LabelList dataKey="leads" position="right" offset={8} style={{ fontSize: 12, fontWeight: 600, fill: '#262626' }} />
+                </Bar>
+              </>
+            ) : (
+              <Bar dataKey={sort} name={sortLabel.label} fill={COLOR.bar} radius={[0, 6, 6, 0]} maxBarSize={26}>
+                <LabelList dataKey={sort} position="right" formatter={valueFmt} style={{ fontSize: 12, fontWeight: 600, fill: '#262626' }} />
+              </Bar>
+            )}
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[560px] text-sm">
-          <thead className="text-left text-xs text-neutral-500">
-            <tr><th className="pb-2 font-medium">#</th><th className="pb-2 font-medium">Person</th><th className="pb-2 text-right font-medium">Leads</th><th className="pb-2 text-right font-medium">Open</th><th className="pb-2 text-right font-medium">Admissions</th><th className="pb-2 text-right font-medium">Lost</th><th className="pb-2 text-right font-medium">Conversion</th><th className="pb-2 text-right font-medium">Fees</th></tr>
+
+      <div className="mt-5 overflow-x-auto">
+        <table className="w-full min-w-[780px] text-sm [&_td]:px-2 [&_th]:px-2">
+          <thead>
+            <tr className="border-b border-black/10 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+              <th className="w-10 pb-2.5">Rank</th>
+              <th className="pb-2.5">Person</th>
+              <th className="pb-2.5 text-right">Leads</th>
+              <th className="pb-2.5 text-right">Share</th>
+              <th className="pb-2.5 text-right">Open</th>
+              <th className="pb-2.5 text-right">Admissions</th>
+              <th className="pb-2.5 text-right">Lost</th>
+              <th className="pb-2.5 text-right">Conversion</th>
+              <th className="pb-2.5 text-right">Fees collected</th>
+            </tr>
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={r.node.id} className="border-t border-black/5">
-                <td className="py-2 pr-2 text-neutral-400">{i + 1}</td>
-                <td className="py-2 pr-3">
-                  <button type="button" onClick={() => onSelect(r.node.id)} className="flex items-center gap-2 text-left hover:underline">
-                    <Avatar node={r.node} size={26} /><span className="text-neutral-900">{r.name}</span>
+              <tr key={r.node.id} className="border-b border-black/5 transition-colors hover:bg-white/60">
+                <td className="py-3"><RankBadge n={i + 1} /></td>
+                <td className="py-3 pr-3">
+                  <button type="button" onClick={() => onSelect(r.node.id)} className="flex items-center gap-3 text-left">
+                    <Avatar node={r.node} size={34} />
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium text-neutral-900 hover:underline">{r.name}</span>
+                      <span className="block truncate text-xs text-neutral-500">{r.node.title || sourceLabel(r.node)}</span>
+                    </span>
                   </button>
-                  <div className="mt-1 h-1 w-full max-w-[160px] rounded bg-neutral-100"><div className="h-1 rounded bg-blue-500" style={{ width: `${(r.m[sort] / best) * 100}%` }} /></div>
+                  <div className="mt-1.5 h-1 w-full max-w-[200px] overflow-hidden rounded-full bg-neutral-100"><div className="h-1 rounded-full" style={{ width: `${(r.m[sort] / best) * 100}%`, background: COLOR.bar }} /></div>
                 </td>
-                <td className="py-2 text-right tabular-nums">{r.m.leads}</td>
-                <td className="py-2 text-right tabular-nums text-amber-700">{r.m.open}</td>
-                <td className="py-2 text-right tabular-nums text-green-700">{r.m.won}</td>
-                <td className="py-2 text-right tabular-nums text-neutral-500">{r.m.lost}</td>
-                <td className="py-2 text-right tabular-nums">{pct(r.m.conversion)}</td>
-                <td className="py-2 text-right tabular-nums">{inr(r.m.fees)}</td>
+                <td className="py-3 text-right font-semibold tabular-nums text-neutral-900">{r.m.leads}</td>
+                <td className="py-3 text-right tabular-nums text-neutral-500">{total.leads ? pct(r.m.leads / total.leads) : '-'}</td>
+                <td className="py-3 text-right tabular-nums text-amber-700">{r.m.open}</td>
+                <td className="py-3 text-right tabular-nums font-medium text-green-700">{r.m.won}</td>
+                <td className="py-3 text-right tabular-nums text-neutral-500">{r.m.lost}</td>
+                <td className="py-3 text-right"><ConversionPill value={r.m.conversion} leads={r.m.leads} /></td>
+                <td className="py-3 text-right tabular-nums text-neutral-900">{inr0(r.m.fees)}</td>
               </tr>
             ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t-2 border-black/10 text-sm font-semibold text-neutral-900">
+              <td className="py-3" />
+              <td className="py-3">Team total</td>
+              <td className="py-3 text-right tabular-nums">{total.leads}</td>
+              <td className="py-3 text-right tabular-nums text-neutral-500">{total.leads ? '100%' : '-'}</td>
+              <td className="py-3 text-right tabular-nums text-amber-700">{total.open}</td>
+              <td className="py-3 text-right tabular-nums text-green-700">{total.won}</td>
+              <td className="py-3 text-right tabular-nums text-neutral-500">{total.lost}</td>
+              <td className="py-3 text-right"><ConversionPill value={conversion} leads={total.leads} /></td>
+              <td className="py-3 text-right tabular-nums">{inr0(total.fees)}</td>
+            </tr>
             {unassigned && unassigned.leads > 0 && (
-              <tr className="border-t border-black/5 text-neutral-500">
-                <td className="py-2" /><td className="py-2 pr-3 italic">No owner yet</td>
-                <td className="py-2 text-right tabular-nums">{unassigned.leads}</td><td className="py-2 text-right tabular-nums">{unassigned.open}</td><td className="py-2 text-right tabular-nums">{unassigned.won}</td><td className="py-2 text-right tabular-nums">{unassigned.lost}</td><td className="py-2 text-right tabular-nums">{pct(unassigned.conversion)}</td><td className="py-2 text-right tabular-nums">{inr(unassigned.fees)}</td>
+              <tr className="text-xs text-neutral-500">
+                <td className="pb-1 pt-2" />
+                <td className="pb-1 pt-2 italic">Not credited to anyone yet</td>
+                <td className="pb-1 pt-2 text-right tabular-nums">{unassigned.leads}</td>
+                <td className="pb-1 pt-2" />
+                <td className="pb-1 pt-2 text-right tabular-nums">{unassigned.open}</td>
+                <td className="pb-1 pt-2 text-right tabular-nums">{unassigned.won}</td>
+                <td className="pb-1 pt-2 text-right tabular-nums">{unassigned.lost}</td>
+                <td className="pb-1 pt-2 text-right tabular-nums">{pct(unassigned.conversion)}</td>
+                <td className="pb-1 pt-2 text-right tabular-nums">{inr0(unassigned.fees)}</td>
               </tr>
             )}
-          </tbody>
+          </tfoot>
         </table>
       </div>
-      <p className="mt-2 text-xs text-neutral-500">Conversion is admissions divided by leads generated. A lead counts as an admission once a registration has been reviewed (accepted or rejected) or an enquiry is marked won. A registration still waiting for review is open.</p>
+      <p className="mt-3 text-xs text-neutral-500">Conversion is admissions divided by leads generated. A lead counts as an admission once a registration has been reviewed (accepted or rejected) or an enquiry is marked won. A registration still waiting for review is open.</p>
     </GlassCard>
   );
 }
