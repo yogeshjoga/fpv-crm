@@ -42,6 +42,34 @@ const SOURCE_LABEL: Record<Registration['source'], string> = {
   csv: 'CSV',
 };
 
+type OwnerOption = { id: string; full_name: string | null; email: string | null };
+
+/** Who can be credited with a lead: active staff, plus anyone who appears in an org chart (an intern or employee with a login). */
+async function loadLeadOwners(): Promise<OwnerOption[]> {
+  const staff = (await unwrap(
+    supabase.from('profiles').select('id, full_name, email').in('role', ['super_admin', 'admin', 'coordinator', 'instructor']).eq('status', 'active').is('archived_at', null).order('full_name'),
+  )) as OwnerOption[];
+  const have = new Set(staff.map((p) => p.id));
+  try {
+    const [nodes, hr] = await Promise.all([
+      supabase.from('org_nodes').select('profile_id, employee:hr_employees!org_nodes_employee_id_fkey(profile_id)'),
+      supabase.from('hr_employees').select('profile_id').eq('status', 'active').not('profile_id', 'is', null),
+    ]);
+    const extra = new Set<string>();
+    for (const n of (nodes.data ?? []) as unknown as { profile_id: string | null; employee: { profile_id: string | null } | null }[]) {
+      for (const id of [n.profile_id, n.employee?.profile_id]) if (id && !have.has(id)) extra.add(id);
+    }
+    for (const h of (hr.data ?? []) as { profile_id: string | null }[]) if (h.profile_id && !have.has(h.profile_id)) extra.add(h.profile_id);
+    if (extra.size) {
+      const more = (await unwrap(supabase.from('profiles').select('id, full_name, email').in('id', [...extra]).eq('status', 'active').order('full_name'))) as OwnerOption[];
+      return [...staff, ...more];
+    }
+  } catch {
+    /* people without access to the chart or HR records simply see the staff list */
+  }
+  return staff;
+}
+
 export function Registrations() {
   const { profile } = useAuth();
   const { canWrite } = useAdminAccess();
@@ -75,9 +103,7 @@ export function Registrations() {
       unwrap(supabase.from('course_group_courses').select('group_id, course_id')) as Promise<
         { group_id: string; course_id: string }[]
       >,
-      unwrap(supabase.from('profiles').select('id, full_name, email').in('role', ['super_admin', 'admin', 'coordinator', 'instructor']).eq('status', 'active').is('archived_at', null).order('full_name')) as Promise<
-        { id: string; full_name: string | null; email: string | null }[]
-      >,
+      loadLeadOwners(),
     ]);
     return { rows, groups, groupCourses, staff };
   }, [filter]);
