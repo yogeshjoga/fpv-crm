@@ -30,6 +30,7 @@ interface Registration {
   payment_amount: number | null;
   payment_ref: string | null;
   payment_method: string | null;
+  owner_id: string | null;
   form: { title: string } | null;
   requested_course: { id: string; title: string } | null;
   reviewer: { full_name: string; email: string } | null;
@@ -56,26 +57,36 @@ export function Registrations() {
     rows: Registration[];
     groups: { id: string; name: string }[];
     groupCourses: { group_id: string; course_id: string }[];
+    staff: { id: string; full_name: string | null; email: string | null }[];
   }>(async () => {
     let sel = supabase
       .from('registrations')
       .select(
         'id, source, full_name, email, phone, answers, status, review_note, reviewed_at, created_at, requested_course_id, ' +
-          'payment_status, payment_amount, payment_ref, payment_method, ' +
+          'payment_status, payment_amount, payment_ref, payment_method, owner_id, ' +
           'form:enrollment_forms(title), requested_course:courses(id, title), ' +
           'reviewer:profiles!registrations_reviewed_by_fkey(full_name, email)',
       )
       .order('created_at', { ascending: false });
     if (filter !== 'all') sel = sel.eq('status', filter);
-    const [rows, groups, groupCourses] = await Promise.all([
+    const [rows, groups, groupCourses, staff] = await Promise.all([
       unwrap(sel) as Promise<Registration[]>,
       unwrap(supabase.from('course_groups').select('id, name').order('name')) as Promise<{ id: string; name: string }[]>,
       unwrap(supabase.from('course_group_courses').select('group_id, course_id')) as Promise<
         { group_id: string; course_id: string }[]
       >,
+      unwrap(supabase.from('profiles').select('id, full_name, email').in('role', ['super_admin', 'admin', 'coordinator', 'instructor']).eq('status', 'active').is('archived_at', null).order('full_name')) as Promise<
+        { id: string; full_name: string | null; email: string | null }[]
+      >,
     ]);
-    return { rows, groups, groupCourses };
+    return { rows, groups, groupCourses, staff };
   }, [filter]);
+
+  const setOwner = async (id: string, owner: string | null) => {
+    const { error } = await supabase.from('registrations').update({ owner_id: owner }).eq('id', id);
+    if (error) return toast(error.message, 'error');
+    q.refetch();
+  };
 
   const pendingCount = useMemo(() => q.data?.rows.filter((r) => r.status === 'pending').length ?? 0, [q.data]);
 
@@ -271,6 +282,20 @@ export function Registrations() {
                 )}
               </div>
               <div className="flex items-center gap-2">
+                {writable ? (
+                  <Select
+                    aria-label={`Lead owner for ${r.full_name || r.email}`}
+                    title="Lead owner: who gets the credit for this admission"
+                    value={r.owner_id ?? ''}
+                    onChange={(e) => void setOwner(r.id, e.target.value || null)}
+                    className="!w-44 !py-1.5 text-sm"
+                  >
+                    <option value="">No lead owner</option>
+                    {q.data?.staff.map((p) => <option key={p.id} value={p.id}>{p.full_name || p.email}</option>)}
+                  </Select>
+                ) : (
+                  r.owner_id && <Badge tone="neutral">Owner: {q.data?.staff.find((p) => p.id === r.owner_id)?.full_name ?? '—'}</Badge>
+                )}
                 <Badge tone="neutral">{SOURCE_LABEL[r.source]}</Badge>
                 <Badge tone={r.payment_status === 'unpaid' ? 'neutral' : 'green'}>
                   {r.payment_status === 'waived' ? 'fee waived' : r.payment_status}

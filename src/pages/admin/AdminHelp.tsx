@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   LayoutDashboard, UserPlus, Inbox, ClipboardCheck, GraduationCap, Layers3, FileQuestion,
   FormInput, CalendarDays, Megaphone, ScrollText, MessageCircle, BarChart3, Briefcase,
-  Users, Settings2, Workflow, ChevronRight, Lock, IdCard, Activity, Images, Newspaper, Building2, Video, MessageSquareHeart, FileText,
+  Users, Settings2, Workflow, ChevronRight, Lock, IdCard, Activity, Images, Newspaper, Building2, Video, MessageSquareHeart, FileText, Network,
 } from 'lucide-react';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, PageHeader } from '../../components/ui/kit';
@@ -218,6 +218,20 @@ const SECTIONS: Section[] = [
       'Use Preview PDF to check it, then Download PDF. Send it to the client yourself, then mark it Sent. A sent quotation shows as Expired once its valid-until date has passed.',
       'The inclusions, terms and payment terms start with standard text. Read them and change anything that does not match what you offer this client. The copy button on the list starts a new quotation from an old one.',
       'Quotations show prices, so instructors and coordinators have no access until a super admin turns it on in Company Settings → module access ("Quotations").',
+    ],
+  },
+  {
+    id: 'org-tree',
+    icon: Network,
+    title: 'Org tree',
+    summary: 'A chart of who reports to whom, with profile photos. Click anyone to see their leads, admissions and how they compare with the rest of the team.',
+    points: [
+      'You can keep several charts: one for the whole company, one for the admissions team, anything else you need. Use New chart, then Edit chart to add boxes.',
+      'A box can be a person linked to a staff account (their photo and name come from the account), a person without an account, or a team or role. Drag a box onto another to make it report to that one.',
+      'Leads here are admissions. A registration counts for its Lead owner (set on the Registrations page), and a website enquiry counts for the person it is assigned to. Open means still being worked, Admissions means accepted or won, Lost means rejected or dropped. Conversion is admissions divided by leads.',
+      "Click a box to see that person's numbers for the period you choose, week by week, with their rank among everyone in the chart. A team box adds up everyone beneath it. Compare shows all people side by side, sorted by leads, admissions, conversion or fees collected.",
+      'Registrations that came in before owners existed can be credited in one step to the staff member who accepted them.',
+      "This page shows everyone's performance and fees, so instructors and coordinators have no access until a super admin allows it in Company Settings → module access (\"Org tree\").",
     ],
   },
   {

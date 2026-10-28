@@ -2316,6 +2316,103 @@ export type Database = {
           },
         ]
       }
+      org_charts: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      org_nodes: {
+        Row: {
+          accent: string
+          chart_id: string
+          created_at: string
+          id: string
+          image_url: string | null
+          kind: string
+          label: string
+          note: string
+          parent_id: string | null
+          profile_id: string | null
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          accent?: string
+          chart_id: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          kind?: string
+          label?: string
+          note?: string
+          parent_id?: string | null
+          profile_id?: string | null
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          accent?: string
+          chart_id?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          kind?: string
+          label?: string
+          note?: string
+          parent_id?: string | null
+          profile_id?: string | null
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_nodes_chart_id_fkey"
+            columns: ["chart_id"]
+            isOneToOne: false
+            referencedRelation: "org_charts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_nodes_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "org_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_nodes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_secrets: {
         Row: {
           google_form_secret: string
@@ -2781,6 +2878,7 @@ export type Database = {
           form_id: string | null
           full_name: string
           id: string
+          owner_id: string | null
           paid_at: string | null
           paid_by: string | null
           payment_amount: number | null
@@ -2803,6 +2901,7 @@ export type Database = {
           form_id?: string | null
           full_name?: string
           id?: string
+          owner_id?: string | null
           paid_at?: string | null
           paid_by?: string | null
           payment_amount?: number | null
@@ -2825,6 +2924,7 @@ export type Database = {
           form_id?: string | null
           full_name?: string
           id?: string
+          owner_id?: string | null
           paid_at?: string | null
           paid_by?: string | null
           payment_amount?: number | null
@@ -2852,6 +2952,13 @@ export type Database = {
             columns: ["form_id"]
             isOneToOne: false
             referencedRelation: "enrollment_forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registrations_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -4376,6 +4483,11 @@ export type Database = {
       my_exam_review: { Args: { p_attempt_id: string }; Returns: Json }
       next_cert_number: { Args: { p_course_code: string }; Returns: number }
       next_id_card_number: { Args: never; Returns: number }
+      org_credit_reviewers: { Args: never; Returns: number }
+      org_kpi_summary: {
+        Args: { p_from?: string; p_to?: string }
+        Returns: Json
+      }
       public_branding: {
         Args: never
         Returns: {
