@@ -6,7 +6,7 @@ import { GlassCard } from '../../../components/ui/shared';
 import { Button } from '../../../components/ui/kit';
 import { inr } from '../../../lib/quotations';
 import {
-  ACCENTS, displayName, initials, metricsFor, pct, photoOf, subtreeIds, weeklySeries,
+  ACCENTS, displayName, hasEnded, initials, metricsFor, pct, photoOf, profileIdOf, sourceLabel, subtreeIds, weeklySeries,
   type KpiSummary, type Metrics, type OrgNodeView,
 } from '../../../lib/orgChart';
 
@@ -23,7 +23,7 @@ export function Avatar({ node, size = 44 }: { node: OrgNodeView; size?: number }
 
 const peopleOf = (nodes: OrgNodeView[], ids: string[]) => {
   const set = new Set(ids);
-  return nodes.filter((n) => set.has(n.id) && n.profile_id);
+  return nodes.filter((n) => set.has(n.id) && profileIdOf(n));
 };
 
 function Tile({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
@@ -80,21 +80,22 @@ export function NodeDrawer({ node, nodes, summary, periodLabel, writable, onEdit
 }) {
   const subtree = useMemo(() => subtreeIds(nodes, node.id), [nodes, node.id]);
   const teamPeople = useMemo(() => peopleOf(nodes, subtree), [nodes, subtree]);
-  const teamIds = teamPeople.map((n) => n.profile_id as string);
+  const pid = profileIdOf(node);
+  const teamIds = teamPeople.map((n) => profileIdOf(n) as string);
   const hasTeam = subtree.length > 1;
-  const own = node.profile_id ? metricsFor(summary, [node.profile_id]) : null;
+  const own = pid ? metricsFor(summary, [pid]) : null;
   const team = metricsFor(summary, teamIds);
   const shown = own && !hasTeam ? own : own ?? team;
-  const everyone = useMemo(() => nodes.filter((n) => n.profile_id), [nodes]);
+  const everyone = useMemo(() => nodes.filter((n) => profileIdOf(n)), [nodes]);
   const ranks = useMemo(() => {
-    if (!node.profile_id) return null;
-    const rows = everyone.map((n) => ({ id: n.profile_id as string, m: metricsFor(summary, [n.profile_id as string]) }));
-    const rankBy = (f: (m: Metrics) => number) => 1 + rows.filter((r) => f(r.m) > f(metricsFor(summary, [node.profile_id as string]))).length;
+    if (!pid) return null;
+    const rows = everyone.map((n) => ({ id: profileIdOf(n) as string, m: metricsFor(summary, [profileIdOf(n) as string]) }));
+    const rankBy = (f: (m: Metrics) => number) => 1 + rows.filter((r) => f(r.m) > f(metricsFor(summary, [pid]))).length;
     const avgLeads = rows.length ? rows.reduce((n, r) => n + r.m.leads, 0) / rows.length : 0;
     const avgWon = rows.length ? rows.reduce((n, r) => n + r.m.won, 0) / rows.length : 0;
     return { of: rows.length, leads: rankBy((m) => m.leads), won: rankBy((m) => m.won), avgLeads, avgWon };
-  }, [everyone, summary, node.profile_id]);
-  const series = useMemo(() => weeklySeries(summary, own && !hasTeam ? [node.profile_id] : teamIds.length ? teamIds : [node.profile_id]), [summary, own, hasTeam, node.profile_id, teamIds]);
+  }, [everyone, summary, pid]);
+  const series = useMemo(() => weeklySeries(summary, own && !hasTeam ? [pid] : teamIds.length ? teamIds : [pid]), [summary, own, hasTeam, pid, teamIds]);
   const reports = nodes.filter((n) => n.parent_id === node.id);
 
   return (
@@ -103,8 +104,9 @@ export function NodeDrawer({ node, nodes, summary, periodLabel, writable, onEdit
         <Avatar node={node} size={52} />
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold text-neutral-900">{displayName(node)}</p>
-          <p className="truncate text-sm text-neutral-500">{node.title || (node.kind === 'group' ? 'Team' : node.profile?.role ?? '')}</p>
-          {node.profile?.email && <p className="truncate text-xs text-neutral-400">{node.profile.email}</p>}
+          <p className="truncate text-sm text-neutral-500">{node.title || sourceLabel(node)}</p>
+          {(node.profile?.email || node.employee?.email) && <p className="truncate text-xs text-neutral-400">{node.profile?.email || node.employee?.email}</p>}
+          {node.is_external && <p className="mt-0.5 text-xs text-amber-700">{hasEnded(node) ? 'Ended' : 'Temporary'}{node.until ? `, until ${new Date(`${node.until}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}, from outside the organisation</p>}
         </div>
         <div className="flex gap-1">
           {writable && <Button variant="ghost" title="Edit this node" onClick={onEdit}><Pencil size={15} /></Button>}
@@ -115,9 +117,14 @@ export function NodeDrawer({ node, nodes, summary, periodLabel, writable, onEdit
       <div className="space-y-5 overflow-y-auto p-4">
         <p className="text-xs text-neutral-500">Leads created in: <b>{periodLabel}</b>. A lead is an admission request: a registration or a website enquiry.</p>
 
-        {!node.profile_id && !hasTeam ? (
+        {!pid && !hasTeam ? (
           <div className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-900">
-            This node is not linked to a staff account, so it has no lead numbers of its own.{writable ? ' Edit it and choose the person’s account to see their performance.' : ''}
+            {node.is_external
+              ? 'This person is from outside the organisation, so they have no lead numbers.'
+              : node.employee
+                ? 'This HR record has no login account, so leads cannot be credited to them. Link their account on the HR record to see numbers.'
+                : 'This box is not linked to an account, so it has no lead numbers of its own.'}
+            {writable ? ' You can change who this box is with the edit button.' : ''}
           </div>
         ) : (
           <>
@@ -152,7 +159,7 @@ export function NodeDrawer({ node, nodes, summary, periodLabel, writable, onEdit
             <h3 className="mb-2 text-sm font-semibold text-neutral-900">Direct reports</h3>
             <ul className="space-y-1.5">
               {reports.map((r) => {
-                const ids = peopleOf(nodes, subtreeIds(nodes, r.id)).map((n) => n.profile_id as string);
+                const ids = peopleOf(nodes, subtreeIds(nodes, r.id)).map((n) => profileIdOf(n) as string);
                 const m = metricsFor(summary, ids);
                 return (
                   <li key={r.id}>
@@ -168,7 +175,7 @@ export function NodeDrawer({ node, nodes, summary, periodLabel, writable, onEdit
           </section>
         )}
         {node.note && <p className="rounded-2xl bg-neutral-50 p-3 text-sm text-neutral-600">{node.note}</p>}
-        {node.profile_id && (
+        {pid && (
           <p className="text-xs text-neutral-500">
             Leads are credited to a person on the <Link to="/admin/registrations" className="text-blue-600 hover:underline">Registrations</Link> page (Lead owner) and in <Link to="/admin/enquiries" className="text-blue-600 hover:underline">Enquiries</Link> (Assigned to).
           </p>
@@ -196,7 +203,7 @@ export function ComparePanel({ people, summary, unassigned, periodLabel, onSelec
 }) {
   const [sort, setSort] = useState<SortKey>('leads');
   const rows = useMemo(
-    () => people.map((n) => ({ node: n, name: displayName(n), m: metricsFor(summary, [n.profile_id as string]) })).sort((a, b) => b.m[sort] - a.m[sort] || a.name.localeCompare(b.name)),
+    () => people.map((n) => ({ node: n, name: displayName(n), m: metricsFor(summary, [profileIdOf(n) as string]) })).sort((a, b) => b.m[sort] - a.m[sort] || a.name.localeCompare(b.name)),
     [people, summary, sort],
   );
   const chart = rows.map((r) => ({ name: r.name.split(' ')[0], Leads: r.m.leads, Admissions: r.m.won, Open: r.m.open }));

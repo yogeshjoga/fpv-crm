@@ -11,13 +11,25 @@ export interface PersonProfile {
   role: string;
   status: string;
 }
-/** A node as the page uses it: the stored row plus the staff account it points at, if any. */
+export interface EmployeeRecord {
+  id: string;
+  full_name: string;
+  designation: string;
+  employment_type: string;
+  status: string;
+  profile_id: string | null;
+  email: string;
+}
+/** A node as the page uses it: the stored row plus the account or HR record it points at, if any. */
 export interface OrgNodeView {
   id: string;
   chart_id: string;
   parent_id: string | null;
   kind: 'person' | 'group';
   profile_id: string | null;
+  employee_id: string | null;
+  is_external: boolean;
+  until: string | null;
   label: string;
   title: string;
   image_url: string | null;
@@ -25,6 +37,7 @@ export interface OrgNodeView {
   accent: Accent;
   sort_order: number;
   profile: PersonProfile | null;
+  employee: EmployeeRecord | null;
 }
 
 export const ACCENTS: Record<Accent, { ring: string; chip: string; label: string }> = {
@@ -36,7 +49,18 @@ export const ACCENTS: Record<Accent, { ring: string; chip: string; label: string
   violet: { ring: 'border-violet-400', chip: 'bg-violet-100 text-violet-700', label: 'Violet' },
 };
 
-export const displayName = (n: OrgNodeView) => n.profile?.full_name?.trim() || n.profile?.email || n.label || 'Unnamed';
+export const displayName = (n: OrgNodeView) => n.profile?.full_name?.trim() || n.employee?.full_name?.trim() || n.label || n.profile?.email || 'Unnamed';
+/** The account whose leads count for this box: its own account, or the login of the HR record it points at. */
+export const profileIdOf = (n: OrgNodeView) => n.profile_id ?? n.employee?.profile_id ?? null;
+export const todayIso = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+/** A temporary person whose end date has passed. */
+export const hasEnded = (n: OrgNodeView) => n.is_external && !!n.until && n.until < todayIso();
+export const sourceLabel = (n: OrgNodeView) =>
+  n.kind === 'group' ? 'Team' : n.is_external ? 'Outside the organisation' : n.employee ? (n.employee.employment_type === 'internship' ? 'Intern' : 'Employee') : n.profile ? 'User account' : 'Person';
+export const EMPLOYMENT_TYPE_LABEL: Record<string, string> = { internship: 'Intern', full_time: 'Full-time', part_time: 'Part-time', contract: 'Contract' };
 export const initials = (s: string) => s.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '?';
 /** Picture shown on the node: the one typed in for this node, else the staff account's own photo. Always https. */
 export const photoOf = (n: OrgNodeView) => {

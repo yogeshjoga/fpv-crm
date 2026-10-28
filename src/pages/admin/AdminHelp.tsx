@@ -227,7 +227,7 @@ const SECTIONS: Section[] = [
     summary: 'A chart of who reports to whom, with profile photos. Click anyone to see their leads, admissions and how they compare with the rest of the team.',
     points: [
       'You can keep several charts: one for the whole company, one for the admissions team, anything else you need. Use New chart, then Edit chart to add boxes.',
-      'A box can be a person linked to a staff account (their photo and name come from the account), a person without an account, or a team or role. Drag a box onto another to make it report to that one.',
+      "A box can be an employee or intern from your HR records, any user account (staff or someone with a login, their photo comes from the account), someone from outside the organisation, or a team or role. Someone from outside is temporary: give an end date and the box shows Temporary, then Ended once the date passes. Drag a box onto another to make it report to that one.",
       'Leads here are admissions. A registration counts for its Lead owner (set on the Registrations page), and a website enquiry counts for the person it is assigned to. Open means still being worked, Admissions means accepted or won, Lost means rejected or dropped. Conversion is admissions divided by leads.',
       "Click a box to see that person's numbers for the period you choose, week by week, with their rank among everyone in the chart. A team box adds up everyone beneath it. Compare shows all people side by side, sorted by leads, admissions, conversion or fees collected.",
       'Registrations that came in before owners existed can be credited in one step to the staff member who accepted them.',

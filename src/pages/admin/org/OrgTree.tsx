@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Background, Controls, Handle, MarkerType, MiniMap, Position, ReactFlow, useNodesState,
+  Background, Controls, Handle, MarkerType, MiniMap, Position, ReactFlow, useNodesInitialized, useNodesState, useReactFlow,
   type Edge, type Node, type NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -10,8 +10,8 @@ import { supabase } from '../../../lib/supabase';
 import { useAdminAccess } from '../../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../../lib/useQuery';
 import {
-  ACCENTS, NODE_H, NODE_W, PERIOD_LABEL, displayName, layoutTree, metricsFor, periodRange, subtreeIds,
-  type Direction, type KpiSummary, type OrgChart, type OrgNodeView, type Period,
+  ACCENTS, NODE_H, NODE_W, PERIOD_LABEL, displayName, hasEnded, layoutTree, metricsFor, periodRange, profileIdOf, sourceLabel, subtreeIds,
+  type Direction, type EmployeeRecord, type KpiSummary, type OrgChart, type OrgNodeView, type Period,
 } from '../../../lib/orgChart';
 import { GlassCard } from '../../../components/ui/shared';
 import { Button, EmptyState, Field, Modal, PageHeader, Select, Spinner, TextArea, TextInput, useToast } from '../../../components/ui/kit';
@@ -33,21 +33,23 @@ function OrgCard({ data }: NodeProps<Node<CardData>>) {
   const { node, leads, won, teamLeads, hasNumbers, direction, selected, editing } = data;
   const lr = direction === 'LR';
   return (
-    <div style={{ width: NODE_W, height: NODE_H }} className={`flex items-center gap-3 rounded-2xl border-2 bg-white/95 px-3 shadow-md transition-shadow ${ACCENTS[node.accent].ring} ${selected ? 'shadow-xl ring-4 ring-blue-200' : ''} ${editing ? 'cursor-grab' : 'cursor-pointer'}`}>
+    <div style={{ width: NODE_W, height: NODE_H }} className={`flex items-center gap-3 rounded-2xl border-2 bg-white/95 px-3 shadow-md transition-shadow ${node.is_external ? 'border-dashed' : ''} ${hasEnded(node) ? 'opacity-55' : ''} ${ACCENTS[node.accent].ring} ${selected ? 'shadow-xl ring-4 ring-blue-200' : ''} ${editing ? 'cursor-grab' : 'cursor-pointer'}`}>
       <Handle type="target" position={lr ? Position.Left : Position.Top} className="!h-2 !w-2 !border-0 !bg-neutral-300" />
       <Avatar node={node} size={46} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-neutral-900">{displayName(node)}</p>
-        <p className="truncate text-xs text-neutral-500">{node.title || (node.kind === 'group' ? 'Team' : node.profile?.role ?? '')}</p>
+        <p className="truncate text-xs text-neutral-500">{node.title || sourceLabel(node)}</p>
         <div className="mt-1 flex flex-wrap gap-1">
+          {node.is_external && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">{hasEnded(node) ? 'Ended' : node.until ? `Temporary, until ${new Date(`${node.until}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : 'Temporary'}</span>}
+          {!node.is_external && node.employee && <span className="rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-700">{sourceLabel(node)}</span>}
           {hasNumbers ? (
             <>
               <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">{leads} leads</span>
               <span className="rounded-full bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-700">{won} admitted</span>
-              {teamLeads !== null && node.profile_id && <span className="rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-600">team {teamLeads}</span>}
+              {teamLeads !== null && profileIdOf(node) && <span className="rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-600">team {teamLeads}</span>}
             </>
           ) : (
-            <span className="text-[10px] text-neutral-400">No account linked</span>
+            !node.is_external && <span className="text-[10px] text-neutral-400">{node.kind === 'group' ? 'No people under it yet' : 'No login linked'}</span>
           )}
         </div>
       </div>
@@ -57,7 +59,30 @@ function OrgCard({ data }: NodeProps<Node<CardData>>) {
 }
 const nodeTypes = { org: OrgCard };
 
-const STAFF_ROLES = ['super_admin', 'admin', 'coordinator', 'instructor'] as const;
+/** Keeps the whole chart in view when it changes or the window is resized (fitView on its own only runs once, at the start). */
+function AutoFit({ signature }: { signature: string }) {
+  const { fitView } = useReactFlow();
+  const measured = useNodesInitialized();
+  useEffect(() => {
+    if (!measured) return;
+    const fit = () => void fitView({ padding: 0.2, maxZoom: 1 });
+    const t = setTimeout(fit, 80);
+    let r: ReturnType<typeof setTimeout> | undefined;
+    const onResize = () => {
+      clearTimeout(r);
+      r = setTimeout(fit, 150);
+    };
+    window.addEventListener('resize', onResize);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(r);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [signature, fitView, measured]);
+  return null;
+}
+
+const STAFF_ROLES: string[] = ['super_admin', 'admin', 'coordinator', 'instructor'];
 const readDirection = (): Direction => {
   try {
     return localStorage.getItem('org-direction') === 'LR' ? 'LR' : 'TB';
@@ -89,16 +114,20 @@ export function OrgTree() {
   const nodesQ = useQuery(async () => {
     if (!chartId) return [] as OrgNodeView[];
     return (await unwrap(
-      supabase.from('org_nodes').select('id, chart_id, parent_id, kind, profile_id, label, title, image_url, note, accent, sort_order, profile:profiles!org_nodes_profile_id_fkey(id, full_name, email, avatar_url, role, status)').eq('chart_id', chartId),
+      supabase.from('org_nodes').select('id, chart_id, parent_id, kind, profile_id, employee_id, is_external, until, label, title, image_url, note, accent, sort_order, profile:profiles!org_nodes_profile_id_fkey(id, full_name, email, avatar_url, role, status), employee:hr_employees!org_nodes_employee_id_fkey(id, full_name, designation, employment_type, status, profile_id, email)').eq('chart_id', chartId),
     )) as OrgNodeView[];
   }, [chartId]);
   const staffQ = useQuery(async () => {
     const [people, details] = await Promise.all([
-      unwrap(supabase.from('profiles').select('id, full_name, email, avatar_url, role, status').in('role', STAFF_ROLES).eq('status', 'active').is('archived_at', null).order('full_name')) as Promise<StaffOption[]>,
+      unwrap(supabase.from('profiles').select('id, full_name, email, avatar_url, role, status').eq('status', 'active').is('archived_at', null).order('full_name').limit(2000)) as Promise<StaffOption[]>,
       unwrap(supabase.from('staff_details').select('profile_id, designation')) as Promise<{ profile_id: string; designation: string }[]>,
     ]);
     const d = new Map(details.map((x) => [x.profile_id, x.designation] as const));
     return people.map((p) => ({ ...p, designation: d.get(p.id) ?? '' }));
+  }, []);
+  const employeesQ = useQuery(async () => {
+    const { data } = await supabase.from('hr_employees').select('id, full_name, designation, employment_type, status, profile_id, email').eq('status', 'active').order('full_name').limit(1000);
+    return (data ?? []) as EmployeeRecord[];
   }, []);
   const kpiQ = useQuery(async () => {
     const { from, to } = periodRange(period);
@@ -117,8 +146,9 @@ export function OrgTree() {
     () =>
       nodes.map((n) => {
         const sub = subtreeIds(nodes, n.id);
-        const teamIds = nodes.filter((x) => sub.includes(x.id) && x.profile_id).map((x) => x.profile_id as string);
-        const own = n.profile_id ? metricsFor(summary, [n.profile_id]) : null;
+        const teamIds = nodes.filter((x) => sub.includes(x.id) && profileIdOf(x)).map((x) => profileIdOf(x) as string);
+        const pid = profileIdOf(n);
+        const own = pid ? metricsFor(summary, [pid]) : null;
         const team = sub.length > 1 ? metricsFor(summary, teamIds) : null;
         const shown = own ?? team ?? metricsFor(summary, []);
         return {
@@ -168,7 +198,7 @@ export function OrgTree() {
 
   const period$ = PERIOD_LABEL[period];
   const unassigned = useMemo(() => (summary ? metricsFor(summary, [null]) : null), [summary]);
-  const people = useMemo(() => nodes.filter((n) => n.profile_id), [nodes]);
+  const people = useMemo(() => nodes.filter((n) => profileIdOf(n)), [nodes]);
 
   const setDir = (d: Direction) => {
     setDirection(d);
@@ -180,10 +210,11 @@ export function OrgTree() {
   };
 
   const addEveryone = async () => {
-    if (!chartId || !staffQ.data?.length) return;
-    if (!confirm(`Add all ${staffQ.data.length} active staff accounts to this chart? Super admins go at the top and everyone else under the first one. You can then drag people to the right managers.`)) return;
+    const staffOnly = (staffQ.data ?? []).filter((p) => STAFF_ROLES.includes(p.role));
+    if (!chartId || !staffOnly.length) return;
+    if (!confirm(`Add all ${staffOnly.length} active staff accounts to this chart? Super admins go at the top and everyone else under the first one. You can then drag people to the right managers.`)) return;
     setBusy(true);
-    const sorted = [...staffQ.data].sort((a, b) => (a.role === 'super_admin' ? 0 : 1) - (b.role === 'super_admin' ? 0 : 1));
+    const sorted = [...staffOnly].sort((a, b) => (a.role === 'super_admin' ? 0 : 1) - (b.role === 'super_admin' ? 0 : 1));
     const top = sorted[0];
     const { data: first, error } = await supabase.from('org_nodes').insert({ chart_id: chartId, kind: 'person', profile_id: top.id, title: top.designation || (top.role === 'super_admin' ? 'Founder' : ''), accent: 'blue' }).select('id').single();
     if (error || !first) {
@@ -290,6 +321,7 @@ export function OrgTree() {
                     minZoom={0.15}
                     maxZoom={1.6}
                   >
+                    <AutoFit signature={`${direction}|${nodes.map((n) => `${n.id}:${n.parent_id}`).join(',')}`} />
                     <Background gap={22} color="#e5e7eb" />
                     <Controls showInteractive={false} />
                     <MiniMap pannable zoomable className="!hidden md:!block" nodeColor="#cbd5e1" />
@@ -318,7 +350,7 @@ export function OrgTree() {
       )}
 
       {modal && chartId && (
-        <OrgNodeModal chartId={chartId} node={modal.node} nodes={nodes} staff={staffQ.data ?? []} defaultParent={modal.parent} onClose={() => setModal(null)} onSaved={() => { setModal(null); refreshNodes(); }} />
+        <OrgNodeModal chartId={chartId} node={modal.node} nodes={nodes} accounts={staffQ.data ?? []} employees={employeesQ.data ?? []} defaultParent={modal.parent} onClose={() => setModal(null)} onSaved={() => { setModal(null); refreshNodes(); }} />
       )}
       {chartModal && <ChartModal chart={chartModal === 'edit' ? chart : null} onClose={() => setChartModal(null)} onSaved={(id) => { setChartModal(null); if (id) setChartId(id); charts.refetch(); }} />}
     </div>

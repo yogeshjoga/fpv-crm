@@ -2348,8 +2348,10 @@ export type Database = {
           accent: string
           chart_id: string
           created_at: string
+          employee_id: string | null
           id: string
           image_url: string | null
+          is_external: boolean
           kind: string
           label: string
           note: string
@@ -2357,14 +2359,17 @@ export type Database = {
           profile_id: string | null
           sort_order: number
           title: string
+          until: string | null
           updated_at: string
         }
         Insert: {
           accent?: string
           chart_id: string
           created_at?: string
+          employee_id?: string | null
           id?: string
           image_url?: string | null
+          is_external?: boolean
           kind?: string
           label?: string
           note?: string
@@ -2372,14 +2377,17 @@ export type Database = {
           profile_id?: string | null
           sort_order?: number
           title?: string
+          until?: string | null
           updated_at?: string
         }
         Update: {
           accent?: string
           chart_id?: string
           created_at?: string
+          employee_id?: string | null
           id?: string
           image_url?: string | null
+          is_external?: boolean
           kind?: string
           label?: string
           note?: string
@@ -2387,6 +2395,7 @@ export type Database = {
           profile_id?: string | null
           sort_order?: number
           title?: string
+          until?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -2395,6 +2404,13 @@ export type Database = {
             columns: ["chart_id"]
             isOneToOne: false
             referencedRelation: "org_charts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_nodes_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
             referencedColumns: ["id"]
           },
           {
