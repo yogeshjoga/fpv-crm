@@ -114,6 +114,32 @@ export async function uploadPartnerLogo(file: File): Promise<string> {
   }
 }
 
+/** Upload a person's photo for the org tree: cropped to a square from the centre, 480px, under org/. Returns the public link. */
+export async function uploadOrgPhoto(file: File): Promise<{ path: string; url: string }> {
+  const bitmap = await open(file);
+  try {
+    const side = Math.min(bitmap.width, bitmap.height);
+    const size = Math.min(480, side);
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('This browser could not process the image');
+    ctx.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, size, size);
+    let q = 0.88;
+    let blob = await toBlob(canvas, q);
+    while (blob.size > 120_000 && q > 0.6) {
+      q = Math.round((q - 0.06) * 100) / 100;
+      blob = await toBlob(canvas, q);
+    }
+    const path = `org/${crypto.randomUUID()}.webp`;
+    await put(path, blob);
+    return { path, url: publicUrl(path) };
+  } finally {
+    bitmap.close();
+  }
+}
+
 export async function removeMedia(paths: Array<string | null | undefined>) {
   const list = paths.filter((p): p is string => !!p);
   if (list.length) await supabase.storage.from(BUCKET).remove(list);

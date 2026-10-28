@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Background, Controls, Handle, MarkerType, MiniMap, Position, ReactFlow, useNodesInitialized, useNodesState, useReactFlow,
+  Background, Controls, Handle, MarkerType, Position, ReactFlow, useNodesInitialized, useNodesState, useReactFlow,
   type Edge, type Node, type NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -318,13 +318,13 @@ export function OrgTree() {
                     nodesConnectable={false}
                     fitView
                     fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
+                    proOptions={{ hideAttribution: true }}
                     minZoom={0.15}
                     maxZoom={1.6}
                   >
                     <AutoFit signature={`${direction}|${nodes.map((n) => `${n.id}:${n.parent_id}`).join(',')}`} />
                     <Background gap={22} color="#e5e7eb" />
                     <Controls showInteractive={false} />
-                    <MiniMap pannable zoomable className="!hidden md:!block" nodeColor="#cbd5e1" />
                   </ReactFlow>
                 )}
                 {editing && nodes.length > 0 && <p className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-white/90 px-3 py-1 text-xs text-neutral-600 shadow">Drag a box onto its manager to change who it reports to.</p>}
