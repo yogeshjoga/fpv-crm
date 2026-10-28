@@ -42,7 +42,7 @@ function Tiles({ m }: { m: Metrics }) {
       <Tile label="Leads generated" value={String(m.leads)} sub={`${m.registrations.total} registrations, ${m.enquiries.total} enquiries`} />
       <Tile label="Admissions (won)" value={String(m.won)} tone="text-green-700" sub={`Conversion ${pct(m.conversion)}`} />
       <Tile label="Open" value={String(m.open)} tone="text-amber-700" sub="Still being worked" />
-      <Tile label="Lost" value={String(m.lost)} tone="text-neutral-700" sub="Rejected or dropped" />
+      <Tile label="Lost" value={String(m.lost)} tone="text-neutral-700" sub="Enquiries marked lost" />
       <div className="col-span-2"><Tile label="Fees collected" value={inr(m.fees)} sub="Paid amounts on accepted registrations" /></div>
     </div>
   );
@@ -269,7 +269,7 @@ export function ComparePanel({ people, summary, unassigned, periodLabel, onSelec
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-xs text-neutral-500">Conversion is admissions divided by leads generated. A lead counts as an admission when a registration is accepted or an enquiry is marked won.</p>
+      <p className="mt-2 text-xs text-neutral-500">Conversion is admissions divided by leads generated. A lead counts as an admission once a registration has been reviewed (accepted or rejected) or an enquiry is marked won. A registration still waiting for review is open.</p>
     </GlassCard>
   );
 }
