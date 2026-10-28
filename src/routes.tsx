@@ -71,6 +71,7 @@ import { AdminSitePartners } from './pages/admin/AdminSitePartners';
 import { AdminQuotations } from './pages/admin/AdminQuotations';
 import { QuotationEditor } from './pages/admin/QuotationEditor';
 import { QuoteRequests } from './pages/admin/QuoteRequests';
+import { OrgTree } from './pages/admin/org/OrgTree';
 import { QuoteRequest } from './pages/public/QuoteRequest';
 import { AdminSiteVideos } from './pages/admin/AdminSiteVideos';
 import { AdminEnquiries } from './pages/admin/AdminEnquiries';
@@ -405,6 +406,7 @@ export function AppRoutes() {
           }
         />
         <Route path="quotations" element={<RequireModule moduleKey="quotations"><AdminQuotations /></RequireModule>} />
+        <Route path="org-tree" element={<RequireModule moduleKey="org-tree"><OrgTree /></RequireModule>} />
         <Route path="quotations/requests" element={<RequireModule moduleKey="quotations"><QuoteRequests /></RequireModule>} />
         <Route path="quotations/new" element={<RequireModule moduleKey="quotations"><QuotationEditor /></RequireModule>} />
         <Route path="quotations/:id" element={<RequireModule moduleKey="quotations"><QuotationEditor /></RequireModule>} />
