@@ -26,6 +26,7 @@ export interface MemberRow {
   workshops: string;
   workshop_dates: string;
   workshop_ids: string[];
+  is_paid: boolean;
 }
 
 export interface MembersOverview {

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { CheckCircle2, Download, FolderPlus, GraduationCap, UsersRound, XCircle } from 'lucide-react';
+import { BadgeCheck, CheckCircle2, Download, FolderPlus, GraduationCap, UsersRound, XCircle } from 'lucide-react';
+import { invokeFn } from '../../lib/functions';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
@@ -16,6 +17,14 @@ const TYPES = [
 ];
 const typeTone = (t: string) => TYPES.find((x) => x.key === t)?.tone ?? 'neutral';
 const typeLabel = (t: string) => TYPES.find((x) => x.key === t)?.label ?? t;
+
+/** What a person can do in the CRM: students already have access; a website member needs to be paid and accepted by an admin. */
+function crmAccess(m: MemberRow): { label: string; tone: 'green' | 'amber' | 'neutral' | 'blue' } {
+  if (m.account_kind === 'student') return { label: m.status === 'active' ? 'Student' : m.status, tone: m.status === 'active' ? 'neutral' : 'amber' };
+  if (m.status === 'active' && m.is_paid) return { label: 'CRM access', tone: 'green' };
+  if (m.is_paid) return { label: 'Paid, awaiting approval', tone: 'amber' };
+  return { label: 'Not paid, no CRM', tone: 'neutral' };
+}
 
 interface Workshop { id: string; name: string; code: string | null; starts_on: string | null }
 interface Claim { id: string; profile_id: string; group_id: string | null; workshop_name: string; workshop_date: string | null; created_at: string; full_name: string; college_name: string }
@@ -77,10 +86,10 @@ export function AdminMembers() {
   const types = overview.data?.by_type ?? {};
 
   const exportCsv = (list: MemberRow[], name: string) => {
-    const headers = ['Name', 'Email', 'Phone', 'College', 'Type', 'Account', 'Workshop', 'Workshop date', 'Joined', 'Last seen'];
+    const headers = ['Name', 'Email', 'Phone', 'College', 'Type', 'Account', 'Workshop', 'Workshop date', 'Joined', 'Last seen', 'CRM access'];
     downloadCsv(`${name}-${new Date().toISOString().slice(0, 10)}.csv`, headers, list.map((m) => [
       m.full_name, m.email, m.phone, m.college_name, typeLabel(m.member_type), m.account_kind === 'member' ? 'Website member' : 'Student',
-      m.workshops, m.workshop_dates, new Date(m.created_at).toLocaleDateString('en-GB'), m.last_seen_at ? new Date(m.last_seen_at).toLocaleDateString('en-GB') : '',
+      m.workshops, m.workshop_dates, new Date(m.created_at).toLocaleDateString('en-GB'), m.last_seen_at ? new Date(m.last_seen_at).toLocaleDateString('en-GB') : '', crmAccess(m).label,
     ]));
     toast(`Exported ${list.length} ${list.length === 1 ? 'person' : 'people'}`);
   };
@@ -98,6 +107,36 @@ export function AdminMembers() {
       setGroupOpen(false);
       setGroupName('');
       groups.refetch();
+    } catch (e) {
+      toast((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const setPaid = async (m: MemberRow, paid: boolean) => {
+    setBusy(true);
+    try {
+      const { error } = await table('profiles').update({ paid_member: paid }).eq('id', m.id);
+      if (error) throw new Error(error.message);
+      toast(paid ? `${m.full_name || m.email} marked as paid` : `${m.full_name || m.email} marked as not paid`);
+      members.refetch();
+      overview.refetch();
+    } catch (e) {
+      toast((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const accept = async (m: MemberRow) => {
+    setBusy(true);
+    try {
+      const { error } = await table('profiles').update({ status: 'active' }).eq('id', m.id);
+      if (error) throw new Error(error.message);
+      invokeFn('notify', { kind: 'account_activated', user_id: m.id }).catch(() => {});
+      toast(`${m.full_name || m.email} accepted: they can now sign in to the CRM`);
+      members.refetch();
     } catch (e) {
       toast((e as Error).message);
     } finally {
@@ -220,7 +259,7 @@ export function AdminMembers() {
         <GlassCard className="overflow-x-auto p-0">
           <table className="w-full text-left text-sm">
             <thead className="bg-black/[0.03] text-xs uppercase tracking-wide text-neutral-500">
-              <tr><th className="px-4 py-2">Name</th><th>College</th><th>Type</th><th>Workshop</th><th>Joined</th><th>Account</th></tr>
+              <tr><th className="px-4 py-2">Name</th><th>College</th><th>Type</th><th>Workshop</th><th>Joined</th><th>CRM access</th>{writable && <th></th>}</tr>
             </thead>
             <tbody>
               {rows.map((m) => (
@@ -230,7 +269,13 @@ export function AdminMembers() {
                   <td><Badge tone={typeTone(m.member_type)}>{typeLabel(m.member_type)}</Badge></td>
                   <td className="pr-3">{m.workshops ? <>{m.workshops}<div className="text-xs text-neutral-400">{m.workshop_dates}</div></> : '—'}</td>
                   <td className="whitespace-nowrap pr-3 text-neutral-500">{new Date(m.created_at).toLocaleDateString('en-GB')}</td>
-                  <td><Badge tone={m.account_kind === 'member' ? 'blue' : 'neutral'}>{m.account_kind === 'member' ? 'Website' : 'Student'}</Badge></td>
+                  <td><Badge tone={crmAccess(m).tone}>{crmAccess(m).label}</Badge></td>
+                  {writable && (
+                    <td className="whitespace-nowrap pr-3 text-right">
+                      {m.account_kind === 'member' && !m.is_paid && <Button variant="secondary" onClick={() => setPaid(m, true)} disabled={busy}><BadgeCheck size={14} /> Mark paid</Button>}
+                      {m.account_kind === 'member' && m.is_paid && m.status !== 'active' && <Button onClick={() => accept(m)} disabled={busy}><CheckCircle2 size={14} /> Accept for CRM</Button>}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
