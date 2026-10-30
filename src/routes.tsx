@@ -75,6 +75,8 @@ import { OrgTree } from './pages/admin/org/OrgTree';
 import { QuoteRequest } from './pages/public/QuoteRequest';
 import { AdminSiteVideos } from './pages/admin/AdminSiteVideos';
 import { AdminEnquiries } from './pages/admin/AdminEnquiries';
+import { AdminMembers } from './pages/admin/AdminMembers';
+import { AdminTraffic } from './pages/admin/AdminTraffic';
 import { AdminSiteBlog } from './pages/admin/AdminSiteBlog';
 import { ShopDashboard } from './pages/admin/shop/ShopDashboard';
 import { ShopProducts } from './pages/admin/shop/ShopProducts';
@@ -386,6 +388,22 @@ export function AppRoutes() {
           element={
             <RequireModule moduleKey="site-gallery">
               <AdminSiteGallery />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="members"
+          element={
+            <RequireModule moduleKey="members">
+              <AdminMembers />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="site-traffic"
+          element={
+            <RequireModule moduleKey="site_analytics">
+              <AdminTraffic />
             </RequireModule>
           }
         />

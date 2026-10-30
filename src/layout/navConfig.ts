@@ -31,6 +31,7 @@ export const STUDENT_MODULES = studentNav.filter((i) => i.key).map((i) => ({ key
 export const crmNav: NavItem[] = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true, key: 'dashboard' },
   { to: '/admin/registrations', label: 'Registrations', icon: UserPlus, key: 'registrations' },
+  { to: '/admin/members', label: 'Members', icon: Users, key: 'members' },
   { to: '/admin/enrollments', label: 'Enrollment Requests', icon: Inbox, key: 'enrollments' },
   { to: '/admin/approvals', label: 'Account Approvals', icon: ClipboardCheck, key: 'approvals' },
   { to: '/admin/courses', label: 'Courses', icon: GraduationCap, key: 'courses' },
@@ -63,6 +64,7 @@ export const siteNav: NavItem[] = [
   { to: '/admin/site-gallery', label: 'Site Gallery', icon: Images, key: 'site-gallery' },
   { to: '/admin/site-videos', label: 'Site Videos', icon: Video, key: 'site-videos' },
   { to: '/admin/site-partners', label: 'Site Partners', icon: Building2, key: 'site-partners' },
+  { to: '/admin/site-traffic', label: 'Website traffic', icon: Activity, key: 'site_analytics' },
   { to: '/admin/site-blog', label: 'Site Blog', icon: Newspaper, key: 'site-blog', superAdminOnly: true },
 ];
 

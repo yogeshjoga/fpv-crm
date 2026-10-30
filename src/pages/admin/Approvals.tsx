@@ -15,13 +15,14 @@ export function Approvals() {
   const writable = canWrite('approvals');
   const q = useQuery<Profile[]>(
     () =>
-      unwrap(
+      // website members (they signed in on the public site) stay pending on purpose and are managed in the Members section
+      (unwrap(
         supabase
           .from('profiles')
           .select('*')
           .in('status', ['pending', 'suspended'])
           .order('created_at', { ascending: true }),
-      ) as Promise<Profile[]>,
+      ) as Promise<Profile[]>).then((rows) => rows.filter((r) => (r as { account_kind?: string }).account_kind !== 'member')),
     [],
   );
 
