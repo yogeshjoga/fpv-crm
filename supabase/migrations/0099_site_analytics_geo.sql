@@ -1,6 +1,6 @@
 -- Follow-up to 0098, applied to the live project in two steps. The versions below are what is running:
---  * track_visit takes region and city from the website's own location lookup (/api/geo, from Vercel's headers) when the request
---    itself carries only the country, and tolerates a badly typed "signals" value instead of failing the request.
+--  * track_visit takes country, region and city from the website's own location lookup (/api/geo, from Vercel's headers) when it
+--    answers, and falls back to the country the request itself carries, and tolerates a badly typed "signals" value instead of failing the request.
 --  * track_event ignores a badly typed flag instead of failing the request.
 create or replace function public.track_visit(p jsonb)
 returns uuid language plpgsql security definer set search_path = public, extensions as $$
@@ -45,9 +45,17 @@ begin
   select coalesce(jsonb_object_agg(key, left(value #>> '{}', 80)), '{}'::jsonb) into v_geo
     from jsonb_each(h) where key like 'cf-%' and key not in ('cf-connecting-ip', 'cf-ray', 'cf-visitor');
 
-  v_country := left(coalesce(nullif(v_geo ->> 'cf-ipcountry', ''), p -> 'geo' ->> 'country', ''), 80);
-  v_region := left(coalesce(nullif(v_geo ->> 'cf-region', ''), p -> 'geo' ->> 'region', ''), 80);
-  v_city := left(coalesce(nullif(v_geo ->> 'cf-ipcity', ''), p -> 'geo' ->> 'city', ''), 80);
+  -- Country, region and city all come from the same lookup so they agree. The website's own lookup (from Vercel's request headers)
+  -- is used when it answers; otherwise only the country the request itself carries is recorded.
+  if nullif(p -> 'geo' ->> 'country', '') is not null then
+    v_country := left(p -> 'geo' ->> 'country', 80);
+    v_region := left(coalesce(p -> 'geo' ->> 'region', ''), 80);
+    v_city := left(coalesce(p -> 'geo' ->> 'city', ''), 80);
+  else
+    v_country := left(coalesce(v_geo ->> 'cf-ipcountry', ''), 80);
+    v_region := '';
+    v_city := '';
+  end if;
 
   insert into public.site_visits as sv (session_key, visitor_hash, entry_path, referrer_host, source_kind, source_name, utm_source, utm_medium, utm_campaign,
       country, region, city, device, browser, os, language, traffic_class, bot_name, signals, member_id, geo_raw)
