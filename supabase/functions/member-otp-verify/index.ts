@@ -50,6 +50,12 @@ Deno.serve(async (req) => {
 
     let isNew = false;
     if (!prof) {
+      // the database's sign-up guard only lets an address through that was put on this short-lived list first
+      const { error: allowError } = await admin.from('signup_allowlist').upsert({ email, expires_at: new Date(Date.now() + 2 * 60 * 1000).toISOString() });
+      if (allowError) {
+        console.error('allowlist failed', allowError.message);
+        throw new HttpError(500, 'We could not create your account. Please try again.');
+      }
       const { error } = await admin.auth.admin.createUser({
         email,
         email_confirm: true,
