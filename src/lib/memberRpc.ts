@@ -77,3 +77,12 @@ export interface RecentVisit {
   duration_s: number;
   member: boolean;
 }
+
+export interface MemberAnswers {
+  id: string;
+  heard_from: string;
+  heard_from_other: string;
+  member_role: string;
+  looking_for: string[];
+  drone_experience: string;
+}

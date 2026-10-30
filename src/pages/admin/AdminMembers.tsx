@@ -6,9 +6,10 @@ import { useAuth } from '../../auth/AuthProvider';
 import { useAdminAccess } from '../../layout/AdminAccessContext';
 import { useQuery, unwrap } from '../../lib/useQuery';
 import { downloadCsv } from '../../lib/csv';
-import { rpc, table, type MemberRow, type MembersOverview } from '../../lib/memberRpc';
+import { rpc, table, type MemberAnswers, type MemberRow, type MembersOverview } from '../../lib/memberRpc';
+import { EXPERIENCE, HEARD_FROM, LOOKING_FOR, ROLES } from '../../lib/onboardingLabels';
 import { GlassCard } from '../../components/ui/shared';
-import { Badge, Button, EmptyState, Field, Modal, PageHeader, Select, Spinner, TextInput, useToast } from '../../components/ui/kit';
+import { Badge, Button, EmptyState, Field, Modal, PageHeader, Select, Spinner, TextArea, TextInput, useToast } from '../../components/ui/kit';
 
 const TYPES = [
   { key: 'individual', label: 'Individual', tone: 'neutral' as const },
@@ -44,6 +45,9 @@ export function AdminMembers() {
   const [workshop, setWorkshop] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [heard, setHeard] = useState('');
+  const [emailGroup, setEmailGroup] = useState('');
+  const [emailText, setEmailText] = useState('');
   const [groupOpen, setGroupOpen] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -65,6 +69,11 @@ export function AdminMembers() {
     if (error) throw new Error(error.message);
     return (data ?? []) as MemberRow[];
   }, [search, college, type, kind, workshop, from, to]);
+  const answers = useQuery(async () => {
+    const { data, error } = await rpc<MemberAnswers[]>('members_answers');
+    if (error) throw new Error(error.message);
+    return new Map(((data ?? []) as MemberAnswers[]).map((a) => [a.id, a] as const));
+  }, []);
   const claims = useQuery(async () => {
     const { data, error } = await table('member_workshops')
       .select('id, profile_id, group_id, workshop_name, workshop_date, created_at, profiles:profile_id(full_name, college_name)')
@@ -82,14 +91,19 @@ export function AdminMembers() {
     return ((data ?? []) as unknown as (Omit<Group, 'n'> & { member_group_members: { count: number }[] })[]).map((g) => ({ ...g, n: g.member_group_members?.[0]?.count ?? 0 })) as Group[];
   }, []);
 
-  const rows = members.data ?? [];
+  const rows = useMemo(() => {
+    const list = members.data ?? [];
+    return heard ? list.filter((m) => answers.data?.get(m.id)?.heard_from === heard) : list;
+  }, [members.data, heard, answers.data]);
   const types = overview.data?.by_type ?? {};
 
   const exportCsv = (list: MemberRow[], name: string) => {
-    const headers = ['Name', 'Email', 'Phone', 'College', 'Type', 'Account', 'Workshop', 'Workshop date', 'Joined', 'Last seen', 'CRM access'];
+    const headers = ['Name', 'Email', 'Phone', 'College', 'Type', 'Account', 'Workshop', 'Workshop date', 'Joined', 'Last seen', 'CRM access', 'Found us via', 'Describes them', 'Looking for', 'Drone experience'];
     downloadCsv(`${name}-${new Date().toISOString().slice(0, 10)}.csv`, headers, list.map((m) => [
       m.full_name, m.email, m.phone, m.college_name, typeLabel(m.member_type), m.account_kind === 'member' ? 'Website member' : 'Student',
       m.workshops, m.workshop_dates, new Date(m.created_at).toLocaleDateString('en-GB'), m.last_seen_at ? new Date(m.last_seen_at).toLocaleDateString('en-GB') : '', crmAccess(m).label,
+      HEARD_FROM[answers.data?.get(m.id)?.heard_from ?? ''] ?? '', ROLES[answers.data?.get(m.id)?.member_role ?? ''] ?? '',
+      (answers.data?.get(m.id)?.looking_for ?? []).map((k) => LOOKING_FOR[k] ?? k).join('; '), EXPERIENCE[answers.data?.get(m.id)?.drone_experience ?? ''] ?? '',
     ]));
     toast(`Exported ${list.length} ${list.length === 1 ? 'person' : 'people'}`);
   };
@@ -120,6 +134,25 @@ export function AdminMembers() {
       const { error } = await table('profiles').update({ paid_member: paid }).eq('id', m.id);
       if (error) throw new Error(error.message);
       toast(paid ? `${m.full_name || m.email} marked as paid` : `${m.full_name || m.email} marked as not paid`);
+      members.refetch();
+      overview.refetch();
+    } catch (e) {
+      toast((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addEmails = async () => {
+    const list = emailText.split(/[\s,;]+/).map((e) => e.trim()).filter(Boolean);
+    if (!emailGroup || !list.length) return;
+    setBusy(true);
+    try {
+      const { data, error } = await rpc<{ added: number; valid: number; matched_existing: number }>('workshop_emails_add', { p_group: emailGroup, p_emails: list });
+      if (error) throw new Error(error.message);
+      const r = data as { added: number; valid: number; matched_existing: number };
+      toast(`${r.valid} valid emails: ${r.added} new, ${r.matched_existing} already registered and added to the workshop now${list.length > r.valid ? `, ${list.length - r.valid} not valid` : ''}`);
+      setEmailText('');
       members.refetch();
       overview.refetch();
     } catch (e) {
@@ -227,6 +260,28 @@ export function AdminMembers() {
         </GlassCard>
       )}
 
+      {writable && (
+        <GlassCard className="mb-5 p-5">
+          <h3 className="mb-1 font-medium text-neutral-900">Workshop email list</h3>
+          <p className="mb-3 text-xs text-neutral-500">
+            Everyone who registers on the website starts as an individual. Paste the emails of a workshop's attendees here: anyone on the list is put into that workshop now,
+            or the moment they register with that email. They also get the workshop's courses.
+          </p>
+          <div className="grid gap-3 md:grid-cols-[260px_1fr_auto] md:items-end">
+            <Field label="Workshop">
+              <Select value={emailGroup} onChange={(e) => setEmailGroup(e.target.value)}>
+                <option value="">Choose a workshop</option>
+                {(workshops.data ?? []).map((w) => <option key={w.id} value={w.id}>{w.name}{w.code ? ` (${w.code})` : ''}</option>)}
+              </Select>
+            </Field>
+            <Field label="Emails (separate with commas, spaces or new lines)">
+              <TextArea rows={2} value={emailText} onChange={(e) => setEmailText(e.target.value)} placeholder="student1@college.edu, student2@college.edu" />
+            </Field>
+            <Button onClick={addEmails} loading={busy} disabled={!emailGroup || !emailText.trim()}>Add to workshop</Button>
+          </div>
+        </GlassCard>
+      )}
+
       <div className="mb-3 grid gap-3 md:grid-cols-4">
         <TextInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name or email" />
         <Select value={college} onChange={(e) => setCollege(e.target.value)}>
@@ -250,7 +305,10 @@ export function AdminMembers() {
         </Select>
         <Field label="Workshop from"><TextInput type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
         <Field label="Workshop to"><TextInput type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
-        <div className="flex items-end text-sm text-neutral-500">{members.data ? `${rows.length} ${rows.length === 1 ? 'person' : 'people'}` : 'Loading…'}</div>
+        <Select value={heard} onChange={(e) => setHeard(e.target.value)}>
+          <option value="">Found us: anywhere</option>
+          {Object.entries(HEARD_FROM).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+        </Select>
       </div>
 
       {!members.data ? <Spinner /> : !rows.length ? (
@@ -259,7 +317,7 @@ export function AdminMembers() {
         <GlassCard className="overflow-x-auto p-0">
           <table className="w-full text-left text-sm">
             <thead className="bg-black/[0.03] text-xs uppercase tracking-wide text-neutral-500">
-              <tr><th className="px-4 py-2">Name</th><th>College</th><th>Type</th><th>Workshop</th><th>Joined</th><th>CRM access</th>{writable && <th></th>}</tr>
+              <tr><th className="px-4 py-2">Name</th><th>College</th><th>Type</th><th>Workshop</th><th>Found us</th><th>Joined</th><th>CRM access</th>{writable && <th></th>}</tr>
             </thead>
             <tbody>
               {rows.map((m) => (
@@ -268,6 +326,7 @@ export function AdminMembers() {
                   <td className="pr-3">{m.college_name || <span className="text-neutral-400">not given</span>}</td>
                   <td><Badge tone={typeTone(m.member_type)}>{typeLabel(m.member_type)}</Badge></td>
                   <td className="pr-3">{m.workshops ? <>{m.workshops}<div className="text-xs text-neutral-400">{m.workshop_dates}</div></> : '—'}</td>
+                  <td className="pr-3 text-neutral-600">{HEARD_FROM[answers.data?.get(m.id)?.heard_from ?? ''] ?? <span className="text-neutral-400">-</span>}<div className="text-xs text-neutral-400">{ROLES[answers.data?.get(m.id)?.member_role ?? ''] ?? ''}</div></td>
                   <td className="whitespace-nowrap pr-3 text-neutral-500">{new Date(m.created_at).toLocaleDateString('en-GB')}</td>
                   <td><Badge tone={crmAccess(m).tone}>{crmAccess(m).label}</Badge></td>
                   {writable && (
