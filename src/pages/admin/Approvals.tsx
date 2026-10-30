@@ -15,14 +15,15 @@ export function Approvals() {
   const writable = canWrite('approvals');
   const q = useQuery<Profile[]>(
     () =>
-      // website members (they signed in on the public site) stay pending on purpose and are managed in the Members section
+      // website members (they signed in on the public site) stay pending on purpose. Only PAID members are listed here: they are the
+      // ones an admin can accept for CRM access. Unpaid members are managed in the Members section.
       (unwrap(
         supabase
           .from('profiles')
           .select('*')
           .in('status', ['pending', 'suspended'])
           .order('created_at', { ascending: true }),
-      ) as Promise<Profile[]>).then((rows) => rows.filter((r) => (r as { account_kind?: string }).account_kind !== 'member')),
+      ) as Promise<Profile[]>).then((rows) => rows.filter((r) => { const m = r as { account_kind?: string; is_paid?: boolean }; return m.account_kind !== 'member' || m.is_paid === true; })),
     [],
   );
 
