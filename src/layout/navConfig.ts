@@ -3,7 +3,7 @@ import {
   ClipboardCheck, Users, GraduationCap, Briefcase, Megaphone,
   FormInput, Inbox, ScrollText, Settings2, UserPlus, BarChart3,
   MessageCircle, ImagePlus, Layers3, HelpCircle, IdCard, Activity, FolderOpen, MessageSquareHeart, ListChecks, ClipboardList, Handshake, ShieldCheck, CalendarRange, Images, Newspaper, Building2, Video,
-  Store, Package, ShoppingBag, Tags, BellRing, Globe, FileText, Network,
+  Store, Package, ShoppingBag, Tags, BellRing, Globe, FileText, Network, Bot,
 } from 'lucide-react';
 import type { NavItem, Workspace } from './Shell';
 
@@ -49,6 +49,7 @@ export const crmNav: NavItem[] = [
   { to: '/admin/careers', label: 'Careers', icon: Handshake, key: 'careers' },
   { to: '/admin/reviews', label: 'Reviews', icon: MessageSquareHeart, key: 'reviews' },
   { to: '/admin/enquiries', label: 'Enquiries', icon: Inbox, key: 'enquiries' },
+  { to: '/admin/voice-agent', label: 'Voice Agent', icon: Bot, key: 'voice-agent' },
   { to: '/admin/quotations', label: 'Quotations', icon: FileText, key: 'quotations' },
   { to: '/admin/org-tree', label: 'Org tree', icon: Network, key: 'org-tree' },
   { to: '/admin/analytics', label: 'Analytics', icon: BarChart3, key: 'analytics', superAdminOnly: true },

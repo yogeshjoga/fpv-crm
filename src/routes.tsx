@@ -75,6 +75,7 @@ import { OrgTree } from './pages/admin/org/OrgTree';
 import { QuoteRequest } from './pages/public/QuoteRequest';
 import { AdminSiteVideos } from './pages/admin/AdminSiteVideos';
 import { AdminEnquiries } from './pages/admin/AdminEnquiries';
+import { AdminVoiceAgent } from './pages/admin/AdminVoiceAgent';
 import { AdminMembers } from './pages/admin/AdminMembers';
 import { AdminTraffic } from './pages/admin/AdminTraffic';
 import { AdminSiteBlog } from './pages/admin/AdminSiteBlog';
@@ -412,6 +413,14 @@ export function AppRoutes() {
           element={
             <RequireModule moduleKey="enquiries">
               <AdminEnquiries />
+            </RequireModule>
+          }
+        />
+        <Route
+          path="voice-agent"
+          element={
+            <RequireModule moduleKey="voice-agent">
+              <AdminVoiceAgent />
             </RequireModule>
           }
         />

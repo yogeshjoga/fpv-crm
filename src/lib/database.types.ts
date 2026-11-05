@@ -3853,6 +3853,119 @@ export type Database = {
           },
         ]
       }
+      voice_agent_calls: {
+        Row: {
+          assigned_to: string | null
+          audience_type: string
+          call_id: string
+          callback_time: string
+          channel: string
+          city: string
+          created_at: string
+          duration_seconds: number | null
+          id: string
+          institution: string
+          interest_level: string
+          language: string
+          lead_name: string
+          next_step: string
+          notes: string
+          phone: string
+          program: string
+          source_page: string
+          started_at: string | null
+          status: string
+          summary: string
+          transcript: Json
+          updated_at: string
+          voice: string
+          whatsapp_offered: boolean
+        }
+        Insert: {
+          assigned_to?: string | null
+          audience_type?: string
+          call_id?: string
+          callback_time?: string
+          channel: string
+          city?: string
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          institution?: string
+          interest_level?: string
+          language?: string
+          lead_name?: string
+          next_step?: string
+          notes?: string
+          phone?: string
+          program?: string
+          source_page?: string
+          started_at?: string | null
+          status?: string
+          summary?: string
+          transcript?: Json
+          updated_at?: string
+          voice?: string
+          whatsapp_offered?: boolean
+        }
+        Update: {
+          assigned_to?: string | null
+          audience_type?: string
+          call_id?: string
+          callback_time?: string
+          channel?: string
+          city?: string
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          institution?: string
+          interest_level?: string
+          language?: string
+          lead_name?: string
+          next_step?: string
+          notes?: string
+          phone?: string
+          program?: string
+          source_page?: string
+          started_at?: string | null
+          status?: string
+          summary?: string
+          transcript?: Json
+          updated_at?: string
+          voice?: string
+          whatsapp_offered?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_agent_calls_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voice_agent_settings: {
+        Row: {
+          founder_voice_enabled: boolean
+          id: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          founder_voice_enabled?: boolean
+          id?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          founder_voice_enabled?: boolean
+          id?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       site_featured_reviews: {
         Row: {
           consent: string

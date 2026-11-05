@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   LayoutDashboard, UserPlus, Inbox, ClipboardCheck, GraduationCap, Layers3, FileQuestion,
   FormInput, CalendarDays, Megaphone, ScrollText, MessageCircle, BarChart3, Briefcase,
-  Users, Settings2, Workflow, ChevronRight, Lock, IdCard, Activity, Images, Newspaper, Building2, Video, MessageSquareHeart, FileText, Network,
+  Users, Settings2, Workflow, ChevronRight, Lock, IdCard, Activity, Images, Newspaper, Building2, Video, MessageSquareHeart, FileText, Network, Bot,
 } from 'lucide-react';
 import { GlassCard } from '../../components/ui/shared';
 import { Badge, PageHeader } from '../../components/ui/kit';
@@ -203,6 +203,20 @@ const SECTIONS: Section[] = [
       'Use the phone and mail icons on a card to contact the person. The filters and search narrow the list, and admins can export it as a CSV.',
       'Enquiries hold phone numbers and emails, so by default only admins and instructors can see them, and they are the people who get the notification and email when one arrives. A super admin can change this per role in Company Settings → module access (\"Enquiries\").',
       'Delete spam or test entries from the enquiry itself. Deleting is permanent.',
+    ],
+  },
+  {
+    id: 'voice-agent',
+    icon: Bot,
+    title: 'Voice Agent',
+    summary: 'Every conversation held by Priya, the AI voice assistant: visitors who pressed "Talk to us" on the website, and outbound marketing calls.',
+    points: [
+      'Each conversation arrives when it ends, with the language, what the person wanted, the agent\'s summary and the full transcript.',
+      'Hot and warm leads, demo bookings and WhatsApp enrolments notify admins straight away.',
+      '"Sent to WhatsApp" means the visitor was shown a Continue on WhatsApp button with their details typed in, so expect their message on the business WhatsApp.',
+      'Work each lead like an enquiry: set the status, assign it and keep notes. Use the phone or WhatsApp icon when a number was given.',
+      'The agent answers only from its knowledge file (knowledge/egire_knowledge.md in the voice agent project). Update offers and batch dates there.',
+      'Conversations hold phone numbers, so by default only admins see them. A super admin can change this per role in Company Settings → module access ("Voice Agent").',
     ],
   },
   {
